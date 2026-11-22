@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   deriveConnectionStatus,
   isAgendaDegraded,
+  isAgendaIncomplete,
   type QueryHealth,
 } from "./connectionStatus";
+import { queryKeys } from "./queryKeys";
 import { agendaFixture } from "./testing.test-utils";
 
 const ok: QueryHealth = { hasData: true, isError: false, dataStale: false };
@@ -126,5 +128,43 @@ describe("isAgendaDegraded", () => {
   it("is false for non-agenda data", () => {
     expect(isAgendaDegraded(undefined)).toBe(false);
     expect(isAgendaDegraded({ refreshMinutes: 60 })).toBe(false);
+  });
+});
+
+describe("isAgendaIncomplete", () => {
+  const key = queryKeys.agenda({ from: "2026-11-23", days: 8 });
+  const covering = (to: string): ReturnType<typeof agendaFixture> =>
+    agendaFixture({ range: { from: "2026-11-23", to } });
+  const FETCHED = Date.parse("2026-11-23T06:00:00Z");
+
+  it("is false for a real response covering all requested days", () => {
+    expect(isAgendaIncomplete(key, covering("2026-12-01"), FETCHED)).toBe(
+      false,
+    );
+  });
+
+  it("is true when the data ends before from + days", () => {
+    expect(isAgendaIncomplete(key, covering("2026-11-30"), FETCHED)).toBe(true);
+  });
+
+  it("is true for a midnight seed (dataUpdatedAt 0), even when it covers all days", () => {
+    expect(isAgendaIncomplete(key, covering("2026-12-01"), 0)).toBe(true);
+  });
+
+  it("is false without data or for keys and data of another shape", () => {
+    expect(isAgendaIncomplete(key, undefined, 0)).toBe(false);
+    expect(isAgendaIncomplete(key, { refreshMinutes: 60 }, FETCHED)).toBe(
+      false,
+    );
+    expect(
+      isAgendaIncomplete(queryKeys.config(), covering("2026-11-24"), FETCHED),
+    ).toBe(false);
+    expect(
+      isAgendaIncomplete(
+        ["kidboard", "agenda", "2026-02-30", 8],
+        covering("2026-11-24"),
+        FETCHED,
+      ),
+    ).toBe(false);
   });
 });
