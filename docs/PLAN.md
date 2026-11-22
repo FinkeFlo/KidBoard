@@ -68,7 +68,7 @@ operation, works offline with the last known state.
 - [x] **T-03 Test setup** (risk: low, deps: T-01)
   Acceptance:
   1. Vitest projects for `shared` (node), `web` (jsdom + Testing Library + jest-dom
-     matchers), `worker` (`@cloudflare/vitest-pool-workers`). `pnpm test` runs all.
+     matchers), `worker` (`@cloudflare/vitest-plugin`). `pnpm test` runs all.
   2. One real test per package (not just `expect(true)`).
   3. Playwright config (Chromium; projects `tablet-1280x800`, `tablet-2000x1200`) starting
      the built app via `vite preview` with API mocked by route interception; one smoke
@@ -154,7 +154,7 @@ operation, works offline with the last known state.
      rules (test with an unbounded `FREQ=MINUTELY`… capped, no hang);
   7. empty VCALENDAR → `[]`; malformed/non-ICS input → typed `FeedParseError`, no throw
      leaks raw content;
-  8. works inside the Workers runtime (test runs in `vitest-pool-workers`).
+  8. works inside the Workers runtime (test runs in `@cloudflare/vitest-plugin`).
 
 - [ ] **T-09 Normalization** (risk: medium, deps: T-07, T-08)
   Acceptance:
@@ -184,7 +184,7 @@ operation, works offline with the last known state.
   6. CORS only for origins in `KIDBOARD_ALLOWED_ORIGINS` (default none; same-origin works
      without CORS). Security headers on API responses (`X-Content-Type-Options`,
      `Cache-Control` appropriate, `Content-Type: application/json`).
-  7. Integration tests in `vitest-pool-workers` with mocked upstream `fetch` serving
+  7. Integration tests in `@cloudflare/vitest-plugin` with mocked upstream `fetch` serving
      fixtures: happy path, upstream 500 with/without last-good, timeout, invalid config.
 
 **M1 exit:** milestone review (`reviewer-opus`), CI green.
@@ -362,3 +362,4 @@ operation, works offline with the last known state.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | Worker test tooling renamed to `@cloudflare/vitest-plugin` (T-03, T-08, T-10) | `@cloudflare/vitest-pool-workers` is deprecated on npm and supports only Vitest 4 |
