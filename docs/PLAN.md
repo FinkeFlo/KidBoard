@@ -367,7 +367,7 @@ operation, works offline with the last known state.
 
 ## M5b – Design hand-off
 
-Adopts the final design from `docs/design/` (Claude Design, 2026-11-22). Runs before T-26/T-27
+Adopts the final design from `docs/design/` (Claude Design, 2026-11-22). Runs before T-27
 so v1.0.0 ships with the final look (T-25 was already built before M5b landed).
 
 **Merge rules (design × built app, three-perspective review 2026-11-22: child UX, tech, a11y/kiosk).**
@@ -451,11 +451,9 @@ not address. These rules apply to every M5b task:
   `/?key=` URL; document it. (M5 follow-up) If security headers or a CSP are added, allow the hash of the
   inline theme boot script in `apps/web/index.html`.
 
-- [ ] **T-26 Vercel alternative** (risk: medium, deps: T-25)
-  Acceptance: `apps/worker/src/vercel.ts` adapter reusing the Hono app (Cache API absent →
-  in-memory/`Cache-Control` fallback, documented); `vercel.json`; Deploy button + guide.
+- ~~**T-26 Vercel alternative**~~ – moved out of v1.0.0 to issue #3 (Vercel as a second hosting provider).
 
-- [ ] **T-27 Documentation** (risk: low, deps: T-25, T-26)
+- [ ] **T-27 Documentation** (risk: low, deps: T-25)
   Acceptance: README EN + DE complete: features, screenshots, Google Calendar setup (where
   to find the secret iCal address, creating separate calendars, sharing caveats), title
   conventions with examples, configuration reference, deploy (Cloudflare + Vercel), kiosk
@@ -495,6 +493,7 @@ not address. These rules apply to every M5b task:
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | T-26 (Vercel) removed from v1.0.0, tracked as issue #3; T-27 no longer depends on it | Maintainer decision: Cloudflare is the only deploy target for v1.0.0 |
 | 2026-11-22 | New T-27a: mandatory UI/UX dummy test loop with three agents (Haiku, Sonnet, Opus) before the release, fix + Sonnet re-check until clean | Maintainer request before v1.0.0 |
 | 2026-11-22 | M5b refined after a design × built-app comparison (child UX, tech, a11y/kiosk): merge rules 1–6, new T-29a (stable test hooks), T-30 split into T-30a (model/layout) and T-30b (UI + rail), acceptance criteria extended; T-25 kept as done (built before the hand-off landed) | Keep what the built app already solved (one symbol per meaning, no silent hiding, AA for past events, kiosk/boundary behaviour) while adopting the new look |
 | 2026-11-22 | New milestone M5b (T-29–T-32): adopt the design hand-off in `docs/design/`; M6 continues after M5b (T-25 was already built before) | Final design from Claude Design replaces the placeholder theme and the band layout before v1.0.0 |
