@@ -38,7 +38,7 @@ operation, works offline with the last known state.
   ADRs 0001–0009, `docs/PROGRESS.md`, `CLAUDE.md`, `.claude/agents/*`, `.claude/settings.json`.
   *Done by orchestrator (Opus) in Phase 0.*
 
-- [ ] **T-01 Workspace scaffold** (risk: medium, deps: T-00)
+- [x] **T-01 Workspace scaffold** (risk: medium, deps: T-00)
   Goal: pnpm monorepo with `apps/web`, `apps/worker`, `packages/shared` that builds.
   Acceptance:
   1. Root `package.json` with `packageManager: pnpm@10.x`, `engines.node`, scripts
