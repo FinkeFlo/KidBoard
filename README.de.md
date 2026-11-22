@@ -59,11 +59,37 @@ Alle Regeln (englisch): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#title-conven
 
 Alle Optionen stehen in [docs/CONFIG.md](docs/CONFIG.md) (mit deutscher Kurzfassung),
 Vorlagen: [config.example.json](config.example.json) und
-[apps/worker/.dev.vars.example](apps/worker/.dev.vars.example).
+[.dev.vars.example](.dev.vars.example).
 
 ## Deployment
 
-_Folgt._ Anleitungen für Cloudflare Workers (T-25) und Vercel (T-26).
+### Cloudflare Workers (empfohlen, der Gratis-Tarif reicht)
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/FinkeFlo/kidboard)
+
+Der Button kopiert dieses Repository in dein GitHub-/GitLab-Konto, baut es mit Workers Builds
+(`pnpm`, Web-App vor dem Worker) und deployt einen Worker, der Board und API ausliefert. Er
+fragt die Kalender-Secrets und Einstellungen ab (`CAL_<ID>_URL`, `KIDBOARD_ACCESS_TOKEN`,
+`KIDBOARD_CONFIG`) und legt den KV-Cache selbst an. Ersetze jedes `REPLACE_ME`.
+
+Alternativ aus einem lokalen Klon:
+
+```sh
+pnpm install
+pnpm exec wrangler login
+pnpm exec wrangler secret put CAL_KINDER_URL   # eins pro Kalender: CAL_<ID>_URL
+pnpm exec wrangler secret put KIDBOARD_ACCESS_TOKEN
+pnpm exec wrangler secret put KIDBOARD_CONFIG
+pnpm deploy:cloudflare                          # baut Web-App + deployt den Worker
+```
+
+Danach auf dem Tablet einmal `https://<dein-worker>.workers.dev/?key=<token>` öffnen. Schritt
+für Schritt, alle Variablen, eigene Domain, Logs und Fehlersuche:
+[docs/DEPLOY.de.md](docs/DEPLOY.de.md).
+
+### Vercel
+
+_Folgt_ (T-26).
 
 ## Kiosk-Tipps
 

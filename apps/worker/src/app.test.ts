@@ -902,6 +902,47 @@ describe("access token", () => {
     expect(seenResponses.join("\n")).not.toContain(TOKEN);
   });
 
+  it.each([
+    ["the template value", "REPLACE_ME"],
+    ["a value still containing the marker", "my-replace_me-token"],
+  ])(
+    "fails closed with 500 for %s, even when the client sends it",
+    async (_, placeholder) => {
+      const h = harness();
+      for (const path of ["/api/agenda", "/api/config"]) {
+        for (const init of [
+          undefined,
+          { headers: { Authorization: `Bearer ${placeholder}` } },
+        ]) {
+          const response = await h.call(
+            path,
+            init,
+            baseEnv({ KIDBOARD_ACCESS_TOKEN: placeholder }),
+          );
+          expect(response.status).toBe(500);
+          expect(response.headers.get("Cache-Control")).toBe("no-store");
+          expect(await response.json()).toEqual({
+            error: "server_misconfigured",
+            message: "Server configuration is invalid",
+          });
+        }
+      }
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(consoleOutput.join("\n")).toContain(
+        "KIDBOARD_ACCESS_TOKEN is still the template placeholder",
+      );
+      // The placeholder value itself is not logged.
+      expect(consoleOutput.join("\n")).not.toContain(placeholder);
+      // /api/health stays public and reports ok.
+      const health = await h.call(
+        "/api/health",
+        undefined,
+        baseEnv({ KIDBOARD_ACCESS_TOKEN: placeholder }),
+      );
+      expect(health.status).toBe(200);
+    },
+  );
+
   it("is disabled when the variable is empty", async () => {
     const response = await harness().call(
       "/api/config",

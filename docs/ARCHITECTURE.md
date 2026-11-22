@@ -47,7 +47,8 @@ flowchart LR
   `config.example.json`). The worker validates it and exposes the public part at
   `/api/config`.
 * One deployable unit: a single Worker serves the SPA as static assets and handles
-  `/api/*` first (`run_worker_first`). See [ADR-0002](adr/0002-hosting.md).
+  `/api/*` first (`run_worker_first`). See [ADR-0002](adr/0002-hosting.md) and
+  [Deploy & static headers](#deploy--static-headers-t-25).
 
 ## Repository layout
 
@@ -59,6 +60,8 @@ packages/
   shared/     Pure TypeScript: data model, config schema, title parser,
               date helpers. No DOM, no Worker globals. Used by both apps.
 docs/         Plan, ADRs, architecture, progress, design hand-off
+wrangler.jsonc       The only Wrangler config (root: Deploy button + Workers Builds)
+.dev.vars.example    Worker secrets template (local `.dev.vars` lives next to it)
 ```
 
 ## Data model (TypeScript)
@@ -218,8 +221,9 @@ the last theme the board applied (`localStorage` `kidboard.theme`, written by
 `rememberTheme` whenever the clock's theme is applied), so a cold start at night (config
 not yet known, or failing from the start) shows the skeleton or error screen in night
 tokens instead of a bright screen. Missing or blocked storage falls back to light tokens.
-The script needs no network and works with the current headers (no CSP); a future
-Content-Security-Policy must allow it by hash. While the theme changes the hook sets
+The script needs no network. The production CSP allows exactly this script by its
+SHA-256 hash, computed from the built `index.html` when `dist/_headers` is generated
+(see [Deploy & static headers](#deploy--static-headers-t-25)). While the theme changes the hook sets
 `data-theme-switching` on `<html>` for 0.8 s, during which `global.css` fades the colours
 over `--duration-slow` (variables do not animate on their own); under
 `prefers-reduced-motion` the durations are 0 and the switch is instant. `?night=1|0`
@@ -469,10 +473,40 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
   and expansion warning codes only. Response `200` if any source is `ok`/`stale`, `502`
   otherwise; `generatedAt` = oldest `fetchedAt` served.
 - **Security:** optional `KIDBOARD_ACCESS_TOKEN` (Bearer or `?key=`, SHA-256 +
-  `crypto.subtle.timingSafeEqual`); `/api/health` is public and returns only
+  `crypto.subtle.timingSafeEqual`); a token still containing the template marker
+  `REPLACE_ME` fails closed (`500 server_misconfigured`, T-25); `/api/health` is public and returns only
   `{ ok: true }`. CORS only for `KIDBOARD_ALLOWED_ORIGINS` (preflights are answered before
   the token check). Hono `secureHeaders()` (nosniff, `Referrer-Policy: no-referrer`, …) and
   `Cache-Control: no-store` on every API response (the client owns caching, ADR-0006).
 - **Config:** `KIDBOARD_CONFIG` is parsed once per isolate (memoized by raw string);
   invalid → `500 { error: "server_misconfigured" }` and a log line with the validation
   errors.
+
+### Deploy & static headers (T-25)
+
+- **Config:** one `wrangler.jsonc` at the repository root (Deploy to Cloudflare and
+  Workers Builds read it from the root; `wrangler` in `apps/worker` finds it by searching
+  up). `main` = `apps/worker/src/index.ts`, assets = `apps/web/dist`, id-less KV binding,
+  `keep_vars: true` (dashboard variables survive deploys), `observability.enabled` with
+  `redact_query_string: true` (the API also accepts `?key=`). `pnpm deploy:cloudflare`
+  builds the web app and runs `wrangler deploy`; CI runs `wrangler deploy --dry-run`.
+  Guide: [docs/DEPLOY.md](DEPLOY.md).
+- **Static headers:** Workers Static Assets applies `apps/web/dist/_headers` to asset
+  responses (also the SPA fallback), never to Worker responses. The file is generated
+  after `vite build` by `apps/web/headers/staticHeaders.ts` from the final
+  `dist/index.html`: a CSP (`default-src 'self'`, `script-src 'self'` + the SHA-256 of
+  every inline script, i.e. the theme boot script; no `unsafe-inline`/`unsafe-eval`,
+  `object-src`/`base-uri`/`form-action 'none'`), `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: no-referrer` and a `Permissions-Policy` without camera, microphone,
+  geolocation, payment, usb (wake lock and fullscreen stay allowed). Framing is not
+  restricted (wall dashboards may embed the board). Cache-Control is not overridden:
+  the platform default `public, max-age=0, must-revalidate` + `ETag` is right for
+  `sw.js`, `index.html` and the manifest.
+- **CSP compatibility:** zod runs `jitless` (`apps/web/src/zodConfig.ts`, first import of
+  `main.tsx`); otherwise its `new Function` probe is reported as a CSP violation.
+  `vite preview` sends the same headers, so the whole E2E suite runs under the CSP;
+  `e2e/csp.spec.ts` checks the header, the boot script and zero violations (also with
+  the service worker).
+- **Logs:** a `/?key=` navigation is answered by static asset serving and never invokes
+  the Worker, so Workers Logs / Logpush (`workers_trace_events`) do not record it. API
+  requests are logged without query string. Details: [docs/DEPLOY.md](DEPLOY.md#logs-and-the-key-link).

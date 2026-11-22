@@ -15,6 +15,7 @@ export default defineProject({
       "src/**/*.test.{ts,tsx}",
       "pwa/**/*.test.ts",
       "demo/**/*.test.ts",
+      "headers/**/*.test.ts",
     ],
     setupFiles: ["./vitest.setup.ts"],
   },

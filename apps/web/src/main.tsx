@@ -1,3 +1,5 @@
+// First: configures zod before any schema is constructed (see zodConfig.ts).
+import "./zodConfig";
 import "@fontsource-variable/nunito";
 import "./styles/global.css";
 

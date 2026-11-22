@@ -1,0 +1,33 @@
+# KidBoard worker - secrets template (dotenv format). NEVER commit real values.
+#
+# Local development: copy to `.dev.vars` in the repository root (next to wrangler.jsonc,
+# git-ignored); `wrangler dev` reads it from there.
+# Production: `pnpm exec wrangler secret put <NAME>` or the Cloudflare dashboard
+# (Worker > Settings > Variables and Secrets). "Deploy to Cloudflare" asks for every
+# uncommented entry below as a secret. Details: docs/DEPLOY.md, docs/CONFIG.md.
+
+# Secret iCal addresses, one per calendar in KIDBOARD_CONFIG: CAL_<ID>_URL, where <ID> is
+# the calendar id in upper case ("kinder" -> CAL_KINDER_URL).
+# Google Calendar: Settings > your calendar > "Secret address in iCal format".
+CAL_KINDER_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPLACE_ME/basic.ics"
+CAL_ESSEN_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPLACE_ME/basic.ics"
+# Optional per-child calendars (id "mia" -> CAL_MIA_URL):
+# CAL_MIA_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPLACE_ME/basic.ics"
+
+# Access token for the API (strongly recommended for a public deployment): a long random
+# string, e.g. the output of `openssl rand -hex 32`. Empty = no check. A value that still
+# contains REPLACE_ME is rejected (the API answers 500), so the template cannot go live.
+KIDBOARD_ACCESS_TOKEN="REPLACE_ME"
+
+# Required: non-secret settings as one JSON document on a single line (shape:
+# config.example.json, options: docs/CONFIG.md). Its calendars match CAL_KINDER_URL and
+# CAL_ESSEN_URL above.
+KIDBOARD_CONFIG='{"locale":"de","timeZone":"Europe/Berlin","children":[{"id":"mia","name":"Mia","color":"#E4572E","avatar":"🦊"}],"calendars":[{"id":"kinder","kind":"events","label":"Kinder"},{"id":"essen","kind":"meals","label":"Essen"}]}'
+
+# Optional: comma-separated list of allowed CORS origins (default: same origin only; the
+# Vite dev server proxies /api, so local development needs none).
+# KIDBOARD_ALLOWED_ORIGINS="http://localhost:5173"
+
+# Optional: how long fetched feeds count as fresh, in seconds (default 3600, 60-86400;
+# with the KV cache at least calendars x 86400 / 500).
+# KIDBOARD_CACHE_TTL=3600

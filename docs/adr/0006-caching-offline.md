@@ -116,10 +116,13 @@ fails, and say so discreetly.
     workers (`page.route` cannot see SW-handled requests); `e2e/pwa.spec.ts` allows
     them and mocks on the context.
   * HTTP caching on Workers Static Assets: the defaults (`Cache-Control: public,
-    max-age=0, must-revalidate` + `ETag`) are right for `sw.js`, `manifest.webmanifest`
-    and `index.html`, so no `_headers` file is needed. Browsers also bypass the HTTP cache
-    for the SW script itself (`updateViaCache: 'imports'`). `_headers` would not apply to
-    `/api/*` anyway (`run_worker_first`, the worker sets its own headers).
+    max-age=0, must-revalidate` + `ETag`, re-checked against the Cloudflare docs and
+    `wrangler dev` in T-25) are right for `sw.js`, `manifest.webmanifest` and
+    `index.html`, so Cache-Control is not overridden. The generated `dist/_headers` (T-25)
+    only adds security headers (CSP etc., ARCHITECTURE.md "Deploy & static headers").
+    Browsers also bypass the HTTP cache for the SW script itself (`updateViaCache:
+    'imports'`). `_headers` does not apply to `/api/*` (`run_worker_first`, the worker
+    sets its own headers).
 * **Manifest and icons:** `theme_color` = `--color-accent`, `background_color` =
   `--color-surface`, parsed from the light `@theme static` block of `tokens.css` at
   build time (single source; unit-tested). Icons are generated during `vite build` by

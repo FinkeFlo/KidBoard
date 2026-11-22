@@ -15,6 +15,7 @@
     "pwa-assets.config.ts",
     "pwa",
     "demo",
+    "headers",
     "screenshots",
     "e2e"
   ]

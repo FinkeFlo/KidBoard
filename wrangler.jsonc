@@ -1,0 +1,28 @@
+{
+  // Single Wrangler config of the monorepo (docs/DEPLOY.md). It lives at the repository
+  // root because "Deploy to Cloudflare" and Workers Builds read it from there; `wrangler`
+  // run in apps/worker finds it by searching up. Paths are relative to this file, and
+  // `.dev.vars` (local secrets) belongs next to it.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kidboard",
+  "main": "apps/worker/src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    // Built by `pnpm --filter @kidboard/web build`; it must exist before deploy/dev.
+    "directory": "apps/web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  // Source cache (ADR-0006). No id on purpose: Wrangler provisions the namespace on the
+  // first deploy (also for dashboard/Git deploys); `wrangler dev` uses a local one.
+  "kv_namespaces": [{ "binding": "KIDBOARD_CACHE" }],
+  // No `vars` here: settings are secrets/variables set per deployment (docs/CONFIG.md).
+  // Keep variables set in the dashboard instead of deleting them on every deploy.
+  "keep_vars": true,
+  "observability": {
+    // Workers Logs (default for new Workers). The API also accepts `?key=<token>`, so
+    // query strings are dropped from logged request URLs.
+    "enabled": true,
+    "redact_query_string": true
+  }
+}
