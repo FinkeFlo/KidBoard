@@ -123,7 +123,7 @@ operation, works offline with the last known state.
      valid/invalid examples; `config.example.json` validates in a test.
   4. Public config DTO excludes nothing secret (URLs are not part of the config at all).
 
-- [ ] **T-07 Title parser** (risk: medium, deps: T-06)
+- [x] **T-07 Title parser** (risk: medium, deps: T-06)
   Acceptance: pure `parseTitle(raw, { kind, children, countdownEmojis, description })`
   implementing ARCHITECTURE.md rules 1–6, with table-driven tests for at least:
   1. simple leading emoji (`⚽ Fußball`), emoji without space (`⚽Fußball`);

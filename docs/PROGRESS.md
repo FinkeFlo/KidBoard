@@ -11,6 +11,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-05 Community & config files | Sonnet 5.5 | Sonnet 5.5 | 2 | Round 1: autoReturnSeconds default inconsistent with T-18. Built in parallel with T-04. |
 | 2026-11-22 | T-04 CI, release, dependency updates | Opus 5.5 (builder-opus) | Opus 5.5 (reviewer-opus) | 1 | High risk (CI/release) → Opus. gitleaks CLI instead of action (license). Release PRs need repo setting 'Allow GitHub Actions to create PRs'. |
 | 2026-11-22 | T-06 Shared data model & config schema | Sonnet 5.5 | Sonnet 5.5 | 1 | zod 4 strictObject for config; DTOs strip unknown keys. |
+| 2026-11-22 | T-07 Title parser | Sonnet 5.5 | Sonnet 5.5 | 1 | emoji-regex v11 used without `u` flag; text symbols like © filtered. Built in parallel with T-08. |
 
 ## Escalations
 
