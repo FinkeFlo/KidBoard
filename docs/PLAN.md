@@ -403,7 +403,7 @@ not address. These rules apply to every M5b task:
   `day-column`, `event-tile`) and all e2e specs/`layout.ts` moved to them while the bands still
   exist; one green commit; no behaviour change.
 
-- [ ] **T-30a Overview model and layout logic** (risk: medium, deps: T-29a)
+- [x] **T-30a Overview model and layout logic** (risk: medium, deps: T-29a)
   Acceptance: `buildDayModel` kept and extended with `timeOfDay` per event; `buildOverviewModel`
   (today + 3 days); pure `columnLayout` (vorbei strip, compact from 6 events, "+N", past first,
   space-based capacity); `resolveChildTint` (token → `--color-child-N-tint`, other CSS colours →

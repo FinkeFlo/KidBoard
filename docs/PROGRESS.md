@@ -33,6 +33,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-25 Cloudflare deploy | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; wrangler config moved to repo root (deploy button needs it); CSP via generated _headers with boot-script hash; REPLACE_ME token fails closed; Cache-Control + ?key= logging verified; reviewer Context7 unreachable (Cloudflare docs repo + installed sources) |
 | 2026-11-22 | T-29 Final design tokens | Sonnet (builder) | Sonnet (reviewer) | 2 | PASS round 2; night nav-active flipped to light fill (>=3:1, synced into docs/design); opacity-past marked not-for-text; week header uses text-tile (no mid-word wrap) |
 | 2026-11-22 | T-29a Stable test hooks | Sonnet (builder) | Sonnet (reviewer) | 2 | PASS round 2; band clipping checks kept alongside day-column until T-30b |
+| 2026-11-22 | T-30a Overview model and layout logic | Sonnet (builder) | Sonnet (reviewer) | 2 | PASS round 2; all folded past events kept for the strip label, strict CSS colour validation, MIN_SLOTS=3, current never hidden |
 
 ## Escalations
 

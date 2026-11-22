@@ -25,6 +25,12 @@ export interface DayEvent {
    * the tile shows a "continues" hint instead of the (misleading) original start time.
    */
   continues: boolean;
+  /**
+   * Time of day for the tile's icon: the band the event is placed in (`night` counts as
+   * morning, events carried over from an earlier day as morning). `null` for all-day
+   * events, which get their own treatment.
+   */
+  timeOfDay: DayBand | null;
 }
 
 export type BandStatus = "past" | "current" | "upcoming";
@@ -134,7 +140,12 @@ export function buildDayModel(
   for (const event of agenda.events) {
     if (event.allDay) {
       if (coversAllDay(event, date)) {
-        allDay.push({ event, status: "upcoming", continues: false });
+        allDay.push({
+          event,
+          status: "upcoming",
+          continues: false,
+          timeOfDay: null,
+        });
       }
       continue;
     }
@@ -150,6 +161,7 @@ export function buildDayModel(
           ? timedStatus(days.startMs, days.endMs, now)
           : "upcoming",
         continues: days.first < date,
+        timeOfDay: band,
       },
     });
   }

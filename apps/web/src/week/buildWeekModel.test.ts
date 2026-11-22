@@ -25,6 +25,7 @@ const dayEvent = (
   event: eventFixture(overrides),
   status,
   continues,
+  timeOfDay: overrides?.allDay === true ? null : "midday",
 });
 
 describe("isWeekendDate", () => {
