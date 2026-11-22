@@ -464,7 +464,16 @@ not address. These rules apply to every M5b task:
   bottom-right fullscreen control (press and hold), wake-lock behaviour and its limits (battery
   saver), Fully Kiosk "keep screen on" as backup; `?night=` / `?burnin=` in a short developer note.
 
-- [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27)
+- [ ] **T-27a UI/UX dummy test loop** (risk: medium, deps: T-27; mandatory before T-28)
+  Acceptance: the demo build (`pnpm dev:demo` / preview with demo data) is clicked through by
+  three independent agents on different models (Haiku, Sonnet, Opus) at 1280×800 and 2000×1200,
+  light and night, incl. offline/error states; each rates UI/UX (glanceability for children
+  3–8, parent use, a11y, kiosk behaviour) with screenshots and a findings list; findings are
+  merged, triaged and fixed via the builder/reviewer loop; a Sonnet agent then re-checks the
+  result; repeat the loop until the re-check reports no blocking findings. Findings, decisions
+  and rounds are logged in `docs/PROGRESS.md`.
+
+- [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27a)
   Acceptance: full review by `reviewer-opus`; gitleaks over full history clean;
   `pnpm audit --prod` without high/critical; release-please release `v1.0.0` published;
   branch-protection settings documented/applied; `CLAUDE.md` switched to PR workflow;
@@ -486,6 +495,7 @@ not address. These rules apply to every M5b task:
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | New T-27a: mandatory UI/UX dummy test loop with three agents (Haiku, Sonnet, Opus) before the release, fix + Sonnet re-check until clean | Maintainer request before v1.0.0 |
 | 2026-11-22 | M5b refined after a design × built-app comparison (child UX, tech, a11y/kiosk): merge rules 1–6, new T-29a (stable test hooks), T-30 split into T-30a (model/layout) and T-30b (UI + rail), acceptance criteria extended; T-25 kept as done (built before the hand-off landed) | Keep what the built app already solved (one symbol per meaning, no silent hiding, AA for past events, kiosk/boundary behaviour) while adopting the new look |
 | 2026-11-22 | New milestone M5b (T-29–T-32): adopt the design hand-off in `docs/design/`; M6 continues after M5b (T-25 was already built before) | Final design from Claude Design replaces the placeholder theme and the band layout before v1.0.0 |
 | 2026-11-22 | M4 review follow-ups: burn-in inner wrapper + fixed toggle place (T-22), glanceability pass (T-24), boundary reset test (T-20), night contrast for new surfaces (T-21), single fixture date constant (T-23) | M4 milestone review by reviewer-opus |
