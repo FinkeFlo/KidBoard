@@ -2,8 +2,8 @@
 
 KidBoard is an open-source, icon-first family calendar and meal plan for a wall-mounted
 tablet in kiosk mode (children ~3–8, many cannot read). Parents edit Google Calendar;
-KidBoard reads secret iCal feeds server-side and shows day/week views. Inspired by the
-idea behind third-party products – **never copy anything** from it.
+KidBoard reads secret iCal feeds server-side and shows day/week views. Everything is
+original work – **never copy texts, graphics, names or layouts from third-party products**.
 
 * Plan (binding): [`docs/PLAN.md`](docs/PLAN.md) · Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 * Decisions: [`docs/adr/`](docs/adr/) · Progress: [`docs/PROGRESS.md`](docs/PROGRESS.md)
@@ -99,3 +99,5 @@ See `docs/PLAN.md` → "Definition of Done".
 * Node 22 LTS, pnpm 10 (via `packageManager`/corepack).
 * Playwright: if a pre-installed Chromium is present (e.g. `/opt/pw-browsers/chromium`),
   set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use it instead of downloading browsers.
+* `scripts/check-forbidden-terms.mjs` blocks terms that must never appear in files or commit
+  messages (pre-commit, commit-msg and CI). Never add the decoded terms anywhere.

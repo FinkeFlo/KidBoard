@@ -43,6 +43,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Forbidden terms
+        run: node scripts/check-forbidden-terms.mjs
+
       - name: Lint
         run: pnpm lint
 
@@ -151,6 +154,9 @@ jobs:
           echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum --check --strict
           tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" gitleaks
           "${RUNNER_TEMP}/gitleaks" version
+
+      - name: Forbidden terms in commit messages
+        run: git log --all --format=%B | node scripts/check-forbidden-terms.mjs --msg /dev/stdin
 
       # `gitleaks git` scans every commit (`git log -p --all --full-history`).
       - name: Scan full git history
