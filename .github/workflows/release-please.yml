@@ -1,8 +1,9 @@
 name: release-please
 
+# Manual until the maintainer cuts the first release (T-28); switch back to
+# `push: branches: [main]` afterwards so release PRs are kept up to date.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 # Default for all jobs: no token permissions; the job below opts in.
 permissions: {}
