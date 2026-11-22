@@ -6,5 +6,30 @@
     "title": "Hoppla, da ist etwas schiefgelaufen",
     "hint": "Nichts ist verloren. Bitte versuche es noch einmal.",
     "retry": "Nochmal versuchen"
+  },
+  "event": {
+    "allDay": "Ganztägig",
+    "status": {
+      "past": "Schon vorbei",
+      "current": "Gerade jetzt"
+    },
+    "forEveryone": "Für alle"
+  },
+  "meal": {
+    "slot": {
+      "breakfast": "Frühstück",
+      "lunch": "Mittagessen",
+      "dinner": "Abendessen",
+      "unspecified": "Essen"
+    }
+  },
+  "legend": {
+    "label": "Wer ist wer"
+  },
+  "status": {
+    "offline": "Kein Internet. Es wird der zuletzt bekannte Plan gezeigt.",
+    "stale": "Der Plan ist vielleicht nicht aktuell.",
+    "error": "Der Plan konnte nicht geladen werden.",
+    "unauthorized": "Der Zugangslink ist abgelaufen. Bitte den neuen Link mit ?key=… auf diesem Tablet öffnen."
   }
 }

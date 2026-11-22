@@ -6,5 +6,30 @@
     "title": "Oops, something went wrong",
     "hint": "Nothing is lost. Please try again.",
     "retry": "Try again"
+  },
+  "event": {
+    "allDay": "All day",
+    "status": {
+      "past": "Already over",
+      "current": "Happening now"
+    },
+    "forEveryone": "For everyone"
+  },
+  "meal": {
+    "slot": {
+      "breakfast": "Breakfast",
+      "lunch": "Lunch",
+      "dinner": "Dinner",
+      "unspecified": "Meal"
+    }
+  },
+  "legend": {
+    "label": "Who is who"
+  },
+  "status": {
+    "offline": "No internet. Showing the last known plan.",
+    "stale": "The plan may be out of date.",
+    "error": "The plan could not be loaded.",
+    "unauthorized": "The access link has expired. Please open the new link with ?key=… on this tablet."
   }
 }
