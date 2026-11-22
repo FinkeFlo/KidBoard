@@ -20,4 +20,5 @@ export {
   useTodayAgenda,
 } from "./queries";
 export { createQueryClient, seedOnlineState } from "./queryClient";
+export { retryNow, useRetryNow } from "./retryNow";
 export { getLocalStorage } from "./storage";

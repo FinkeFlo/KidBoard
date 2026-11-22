@@ -52,17 +52,39 @@ describe("AppErrorBoundary", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("shows a friendly fallback with the error as plain text", () => {
+  it("shows the friendly error card: 🧸, title, parent line, retry and a short code", () => {
     render(
       <AppErrorBoundary>
         <Bomb />
       </AppErrorBoundary>,
     );
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+    const card = screen.getByRole("alert");
+    expect(card).toHaveAttribute("data-variant", "error");
+    expect(card).toHaveTextContent("🧸");
     expect(
       screen.getByRole("heading", { name: en.error.title }),
     ).toBeInTheDocument();
-    expect(screen.getByText("boom <b>not html</b>")).toBeInTheDocument();
+    expect(card).toHaveTextContent(en.error.hint);
+    expect(screen.getByTestId("error-code")).toHaveTextContent(
+      "Error code for parents: KB-UI",
+    );
+    // A child-sized target (>= 64px via the touch token).
+    expect(screen.getByRole("button", { name: en.error.retry })).toHaveClass(
+      "min-h-touch",
+      "min-w-touch",
+    );
+  });
+
+  it("never shows the raw error message, and no fixed retry seconds", () => {
+    render(
+      <AppErrorBoundary>
+        <Bomb />
+      </AppErrorBoundary>,
+    );
+    const card = screen.getByRole("alert");
+    expect(card).not.toHaveTextContent("boom");
+    expect(card).not.toHaveTextContent("not html");
+    expect(card.textContent).not.toMatch(/\d+\s*(s|sec|seconds|Sekunden)\b/u);
   });
 
   it("retries rendering when the button is pressed", async () => {

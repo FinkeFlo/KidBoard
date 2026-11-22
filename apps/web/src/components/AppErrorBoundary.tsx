@@ -5,12 +5,11 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ErrorBoundary,
-  type FallbackProps,
-  getErrorMessage,
-} from "react-error-boundary";
+import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { useTranslation } from "react-i18next";
+
+import { ErrorCard } from "./ErrorCard";
+import { errorCode } from "./errorCode";
 
 /** First automatic retry after this long; doubles with every failed retry. */
 export const AUTO_RESET_BASE_MS = 5_000;
@@ -32,6 +31,9 @@ interface BackoffState {
   lastResetAt: number;
 }
 
+/** Test hook of the fallback card (a component prop, so not exempt like DOM `data-*`). */
+const FALLBACK_TEST_ID = "error-fallback";
+
 type ErrorFallbackProps = FallbackProps & {
   /** Delay until the next automatic reset (computed when the fallback appears). */
   nextDelay: () => number;
@@ -42,7 +44,6 @@ type ErrorFallbackProps = FallbackProps & {
 };
 
 function ErrorFallback({
-  error,
   resetErrorBoundary,
   nextDelay,
   onAutoReset,
@@ -69,27 +70,18 @@ function ErrorFallback({
     };
   }, [nextDelay, onAutoReset]);
 
+  // The friendly card (rule 5: behaviour stays, visuals change). The thrown value is only
+  // logged (`onError`), never shown: it may be a raw technical message.
   return (
-    <main
+    <ErrorCard
+      variant="error"
       role={announce ? "alert" : undefined}
-      data-testid="error-fallback"
-      className="bg-surface text-text gap-gutter p-page flex h-full flex-col items-center justify-center text-center"
-    >
-      <span aria-hidden="true" className="text-display">
-        🌙
-      </span>
-      <h1 className="text-heading font-bold">{t("error.title")}</h1>
-      <p className="text-title text-text-muted">{t("error.hint")}</p>
-      <button
-        type="button"
-        onClick={resetErrorBoundary}
-        className="bg-accent text-on-accent text-title rounded-pill min-h-touch min-w-touch px-page font-bold"
-      >
-        {t("error.retry")}
-      </button>
-      {/* Technical detail for the parent; plain text only. */}
-      <p className="text-caption text-text-muted">{getErrorMessage(error)}</p>
-    </main>
+      data-testid={FALLBACK_TEST_ID}
+      title={t("error.title")}
+      parentLine={t("error.hint")}
+      code={errorCode("render")}
+      onRetry={resetErrorBoundary}
+    />
   );
 }
 
@@ -98,7 +90,8 @@ function logError(error: unknown): void {
 }
 
 /**
- * Last line of defence. Shows a friendly fallback and resets itself after a delay with
+ * Last line of defence. Shows the friendly {@link ErrorCard} (🧸, one parent line, a
+ * "reload now" button and the short code `KB-UI`, never the raw error) and resets itself after a delay with
  * exponential backoff (base, x2, ... capped at the maximum). The backoff starts over once
  * the children have run for the stable period without failing again. The retry button
  * resets at once and does not count as an automatic attempt. The fallback is a live

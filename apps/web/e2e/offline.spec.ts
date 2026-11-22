@@ -72,9 +72,8 @@ test.describe("with the service worker", () => {
       page.getByRole("img", { name: "Dinner: Vegetable soup" }),
     ).toBeVisible();
     await expect(banner(page)).toHaveAttribute("data-status", "offline");
-    await expect(banner(page)).toHaveText(
-      "No internet. Showing the last known plan.",
-    );
+    // The pill says how old the shown plan is (fetched at the fixed 12:00 clock).
+    await expect(banner(page)).toHaveText(/^Offline · as of 12:\d{2}\sPM$/u);
     await expect(page.locator("[data-error]")).toHaveCount(0);
     // Nothing reached the (mocked) network while offline.
     expect(api.requests.slice(requestsBefore)).toEqual([]);
@@ -143,7 +142,9 @@ test("API reports stale: true: stale hint only after the 5 s delay", async ({
   await expect(banner(page)).toHaveAttribute("data-status", "stale", {
     timeout: 10_000,
   });
-  await expect(banner(page)).toHaveText("The plan may be out of date.");
+  await expect(banner(page)).toHaveText(
+    /^Maybe not current · as of \d{1,2}:\d{2}\s(AM|PM)$/u,
+  );
   const marks = await page.evaluate(
     () => (window as unknown as { __marks: Record<string, number> }).__marks,
   );
@@ -196,7 +197,10 @@ test("API 502 without any data: the calm error state", async ({ page }) => {
   await expect(alert).toHaveAttribute("data-error", "failed", {
     timeout: 15_000,
   });
-  await expect(alert).toContainText("The plan could not be loaded.");
+  await expect(alert).toContainText("The calendar can't be reached right now");
+  await expect(page.getByTestId("error-code")).toHaveText(
+    "Error code for parents: KB-502",
+  );
   await expect(page.getByTestId("event-tile")).toHaveCount(0);
   await expect(banner(page)).toHaveCount(0);
 });

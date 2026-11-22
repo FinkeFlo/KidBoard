@@ -51,6 +51,8 @@ const SIZES: Record<
     stacked: false,
   },
   dense: {
+    // 4rem leaves exactly the 3.5rem emoji line box (leading-none) inside the 4px edge;
+    // the glyph's slightly taller ink stays below the edge overlay (see `statusClasses`).
     tile: "h-16 gap-3 ps-3 pe-4",
     emoji: "text-[3.5rem]",
     title: "text-tile-compact",
@@ -92,6 +94,10 @@ const SIZES: Record<
   },
 };
 
+/** Overlay that carries the tile edge on top of the tile's content. */
+const EDGE_OVERLAY =
+  "after:pointer-events-none after:absolute after:inset-0 after:rounded-tile";
+
 /**
  * Status look. Past events recede through surface/text tokens, never opacity (merge
  * rule 4); the current event keeps its accent ring and the next upcoming one gets a ring
@@ -103,12 +109,14 @@ function statusClasses(
   tint: TileTint,
 ): string {
   if (status === "past") return "bg-surface-sunken text-text-muted";
+  // The edge is drawn by an overlay above the content (`after:`), so a large emoji glyph
+  // can never paint over the child's edge.
   const edge =
     tint.edge !== null
-      ? "inset-ring-4 inset-ring-(color:--child-color)"
+      ? `${EDGE_OVERLAY} after:inset-ring-4 after:inset-ring-(color:--child-color)`
       : tint.kind === "split"
         ? ""
-        : "inset-ring-2 inset-ring-border";
+        : `${EDGE_OVERLAY} after:inset-ring-2 after:inset-ring-border`;
   const emphasis =
     status === "current"
       ? "ring-accent shadow-raised ring-4"
@@ -202,7 +210,7 @@ export function EventTile({
         data-size={size}
         data-tint={past ? "past" : tint.kind}
         style={past ? undefined : tileTintStyle(tint)}
-        className={`${statusClasses(status, next, tint)} ${sizes.tile} rounded-tile flex items-center`}
+        className={`${statusClasses(status, next, tint)} ${sizes.tile} rounded-tile relative flex items-center`}
       >
         <Emoji
           emoji={event.icon}
@@ -211,7 +219,12 @@ export function EventTile({
         <div className={sizes.stacked ? "min-w-0" : "min-w-0 flex-1"}>
           {/* Week tiles are picture-first: the title is in the accessible name only. */}
           {!sizes.stacked && (
-            <p className={`${sizes.title} truncate pe-5`}>{event.title}</p>
+            // Room for the corner badges only when there are any.
+            <p
+              className={`${sizes.title} truncate ${tint.badges.length > 0 ? "pe-5" : ""}`}
+            >
+              {event.title}
+            </p>
           )}
           <p
             className={`text-meta text-text-muted flex min-w-0 items-center gap-1.5 ${sizes.stacked ? "justify-center" : ""}`}

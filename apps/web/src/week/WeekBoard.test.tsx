@@ -302,6 +302,19 @@ describe("WeekBoard", () => {
     expect(columns[3]?.className).toContain("bg-surface-sunken");
   });
 
+  it("survives a countdown without events: the day stays untinted, the moons stay", () => {
+    const columns = renderWeek([], [], { date: "2026-11-26", events: [] });
+    const target = columns[4] as HTMLElement;
+    expect(target).toHaveAttribute("data-countdown-day", "true");
+    expect(target.style.getPropertyValue("--child-color")).toBe("");
+    expect(target.className).not.toContain("inset-ring");
+    expect(
+      columns
+        .slice(0, 4)
+        .map((c) => within(c).queryAllByTestId("column-moon").length),
+    ).toEqual([1, 1, 1, 1]);
+  });
+
   it("keeps the plain surface on a countdown day without a child", () => {
     const columns = renderWeek([], [], {
       date: "2026-11-26",

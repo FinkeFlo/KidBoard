@@ -1,8 +1,9 @@
 {
   "error": {
-    "title": "Oops, something went wrong",
-    "hint": "Nothing is lost. Please try again.",
-    "retry": "Try again"
+    "title": "Back in a moment",
+    "hint": "Parents: Something went wrong. KidBoard restarts on its own shortly.",
+    "retry": "Reload now",
+    "code": "Error code for parents: {{code}}"
   },
   "event": {
     "allDay": "All day",
@@ -29,22 +30,27 @@
     "label": "Who is who"
   },
   "status": {
-    "offline": "No internet. Showing the last known plan.",
-    "stale": "The plan may be out of date.",
+    "offline": "Offline · as of {{time}}",
+    "offlineNoTime": "Offline",
+    "stale": "Maybe not current · as of {{time}}",
+    "staleNoTime": "Maybe not current",
     "error": "The plan could not be loaded.",
-    "unauthorized": "The access link has expired. Please open the new link with ?key=… on this tablet."
+    "unauthorized": "Open the link again: please open the tablet link with ?key=… on this tablet once more."
   },
   "day": {
     "meals": "Meals",
-    "loading": "Loading the plan",
+    "loading": "Getting the day …",
     "empty": {
       "title": "Nothing planned today",
-      "hint": "A free day. Have fun!"
+      "hint": "Time to play"
     },
     "error": {
-      "title": "The plan isn't here right now",
-      "hint": "KidBoard keeps trying on its own. A grown-up can check the details below.",
-      "offline": "No internet and no saved plan yet."
+      "failed": "Parents: The calendar can't be reached right now. KidBoard keeps trying on its own.",
+      "offline": "Parents: No internet and no saved plan yet. KidBoard loads as soon as the network is back.",
+      "unauthorized": {
+        "title": "A grown-up can fix this",
+        "hint": "Parents: open the link again. The access link has expired; please open the new link with ?key=… on this tablet."
+      }
     },
     "hidden": {
       "badge": "+{{count}}",
@@ -57,7 +63,7 @@
     "now": "now",
     "nowLabel": "now, {{time}}",
     "past": {
-      "label": "over",
+      "label": "done",
       "list": "Already over: {{titles, list}}"
     }
   },
@@ -69,7 +75,8 @@
     "viewGroup": "View",
     "day": "Today",
     "week": "Week",
-    "updated": "Updated {{time}}"
+    "updated": "Updated {{time}}",
+    "navLabel": "Navigation"
   },
   "week": {
     "label": "Next seven days",

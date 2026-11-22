@@ -430,7 +430,7 @@ not address. These rules apply to every M5b task:
   target day; up to 14 moons shown individually (no "+N" for counting); meals as a three-row
   list; existing week, countdown and burn-in e2e adjusted.
 
-- [ ] **T-32 States and night mode per hand-off** (risk: medium, deps: T-30b)
+- [x] **T-32 States and night mode per hand-off** (risk: medium, deps: T-30b)
   Acceptance: loading skeleton (4 columns, no spinner), offline/stale pill merged into
   `StatusBanner`, friendly error card (🧸, parent line, retry ≥ 64 px, short error code, no
   fixed seconds) on top of the existing boundary logic (rule 5), calm 401 variant ("open the

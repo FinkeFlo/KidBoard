@@ -140,6 +140,10 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ["--color-today-ring", "--color-surface", UI_AA] as const,
   ["--color-on-nav-active", "--color-nav-active", TEXT_AA] as const,
   ["--color-text", "--color-soft-error", TEXT_AA] as const,
+  // Error card (T-32): parent line and error code in muted text, the "reload now" button
+  // (nav-active fill) against the card and the code below the card on the page.
+  ["--color-text-muted", "--color-soft-error", TEXT_AA] as const,
+  ["--color-nav-active", "--color-soft-error", UI_AA] as const,
   // The active view button must stand out from the inactive one and from the page.
   ["--color-nav-active", "--color-surface-raised", UI_AA] as const,
   ["--color-nav-active", "--color-surface-sunken", UI_AA] as const,

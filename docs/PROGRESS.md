@@ -36,6 +36,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-30a Overview model and layout logic | Sonnet (builder) | Sonnet (reviewer) | 2 | PASS round 2; all folded past events kept for the strip label, strict CSS colour validation, MIN_SLOTS=3, current never hidden |
 | 2026-11-22 | T-30b Four-day overview as main screen | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; today 2fr, 🌆 evening, now line + next ring, vorbei strip named, bands removed; nits (first-frame flash, badge padding, dense emoji overflow, screenshot determinism) folded into T-32 |
 | 2026-11-22 | T-31 Week view in the new tile language | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; space-based +N with titles, countdown column tint, header moons, meal rows; deterministic screenshot raster flags; nits (countdown events[0] guard) folded into T-32 |
+| 2026-11-22 | T-32 States and night mode per hand-off | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; error card on unchanged boundary logic, calm 401, no-flash measurement, review follow-ups a-g; dense emoji tuck under edge (open for M5b review / T-27a) |
 
 ## Escalations
 

@@ -31,6 +31,9 @@ import de from "../i18n/locales/de.json";
 import en from "../i18n/locales/en.json";
 import { Board } from "./Board";
 
+/** The stale pill for data fetched at 12:00 (the faked clock). */
+const STALE_TEXT = en.status.stale.replace("{{time}}", "12:00 PM");
+
 let fake: FakeFetch;
 let clients: QueryClient[] = [];
 
@@ -75,6 +78,10 @@ describe("Board", () => {
     renderDay();
     expect(screen.getByRole("status")).toHaveTextContent(en.day.loading);
     expect(screen.getByRole("main")).toHaveAttribute("aria-busy", "true");
+    // A calm skeleton of the overview: four columns (today first) next to the rail,
+    // nothing spinning or pulsing.
+    expect(screen.getAllByTestId("skeleton-column")).toHaveLength(4);
+    expect(screen.getByRole("main").innerHTML).not.toMatch(/animate-|spin/u);
     // No agenda request with a guessed zone while the config is missing.
     expect(fake.count("/api/agenda")).toBe(0);
   });
@@ -238,6 +245,9 @@ describe("Board", () => {
     expect(updated).toHaveTextContent("Updated 12:00 PM");
     expect(updated.closest("[aria-live], [role=status]")).toBeNull();
     expect(screen.getByTestId("nav-rail")).toContainElement(updated);
+    expect(screen.getByRole("navigation", { name: en.board.navLabel })).toBe(
+      screen.getByTestId("nav-rail"),
+    );
   });
 
   it("follows the config locale and zone", async () => {
@@ -265,8 +275,13 @@ describe("Board", () => {
     renderDay();
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveAttribute("data-error", "unauthorized");
-    expect(alert).toHaveTextContent(en.day.error.title);
-    expect(alert).toHaveTextContent(en.status.unauthorized);
+    expect(alert).toHaveAttribute("data-variant", "unauthorized");
+    expect(alert).toHaveTextContent(en.day.error.unauthorized.title);
+    expect(alert).toHaveTextContent(en.day.error.unauthorized.hint);
+    expect(alert).toHaveTextContent("?key=");
+    expect(screen.getByTestId("error-code")).toHaveTextContent("KB-401");
+    // Nothing to retry: only a parent opening the link again helps.
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("explains offline without any saved plan (no 'last known plan' claim)", async () => {
@@ -276,9 +291,11 @@ describe("Board", () => {
       "[data-error]",
     );
     expect(status).toHaveAttribute("data-error", "offline");
-    expect(status).toHaveTextContent(en.day.error.title);
+    expect(status).toHaveAttribute("role", "status");
+    expect(status).toHaveTextContent(en.error.title);
     expect(status).toHaveTextContent(en.day.error.offline);
-    expect(status).not.toHaveTextContent(en.status.offline);
+    expect(status).not.toHaveTextContent("as of");
+    expect(screen.getByTestId("error-code")).toHaveTextContent("KB-OFF");
     expect(screen.queryByTestId("day-column")).not.toBeInTheDocument();
   });
 
@@ -290,8 +307,31 @@ describe("Board", () => {
     renderDay();
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveAttribute("data-error", "failed");
-    expect(alert).toHaveTextContent(en.status.error);
+    expect(alert).toHaveAttribute("data-variant", "error");
+    expect(alert).toHaveTextContent(en.error.title);
+    expect(alert).toHaveTextContent(en.day.error.failed);
+    expect(screen.getByTestId("error-code")).toHaveTextContent(
+      "Error code for parents: KB-502",
+    );
+    // Never the raw technical message ("/api/agenda: upstream (HTTP 502)").
+    expect(alert).not.toHaveTextContent("/api/agenda");
+    expect(alert).not.toHaveTextContent("HTTP");
     expect(screen.queryByTestId("day-column")).not.toBeInTheDocument();
+  });
+
+  it("refetches at once when 'reload now' is pressed on the error card", async () => {
+    fake.setReplies("/api/agenda", {
+      status: 502,
+      body: { error: "upstream" },
+    });
+    renderDay();
+    await screen.findByRole("alert");
+    const before = fake.count("/api/agenda");
+    fake.setReplies("/api/agenda", { status: 200, body: agendaFixture() });
+    fireEvent.click(screen.getByRole("button", { name: en.error.retry }));
+    expect(await screen.findAllByTestId("day-column")).toHaveLength(4);
+    expect(fake.count("/api/agenda")).toBe(before + 1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("keeps showing the board for worker-stale data", async () => {
@@ -320,11 +360,11 @@ describe("Board", () => {
     await vi.waitFor(() => {
       expect(screen.getAllByTestId("day-column")).toHaveLength(4);
     });
-    expect(screen.queryByText(en.status.stale)).not.toBeInTheDocument();
+    expect(screen.queryByText(STALE_TEXT)).not.toBeInTheDocument();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(STALE_BANNER_DELAY_MS);
     });
-    expect(screen.getByRole("status")).toHaveTextContent(en.status.stale);
+    expect(screen.getByRole("status")).toHaveTextContent(STALE_TEXT);
   });
 
   describe("burn-in shift and banner slot (T-22)", () => {
@@ -363,7 +403,7 @@ describe("Board", () => {
         await vi.advanceTimersByTimeAsync(STALE_BANNER_DELAY_MS);
       });
       const banner = screen.getByRole("status");
-      expect(banner).toHaveTextContent(en.status.stale);
+      expect(banner).toHaveTextContent(STALE_TEXT);
       expect(screen.getByRole("banner")).not.toContainElement(banner);
       expect(screen.getByTestId("nav-rail")).not.toContainElement(banner);
       expect(screen.getByTestId("burn-in-shift")).not.toContainElement(banner);

@@ -191,7 +191,7 @@ export function DayColumn({
         className="-mx-1.5 flex min-h-0 flex-1 basis-0 flex-col gap-2 overflow-hidden px-1.5 pt-2 pb-1.5"
       >
         {day.isToday && empty ? (
-          <DayEmpty />
+          <DayEmpty childList={childList} />
         ) : (
           <>
             {layout.pastStrip.length > 0 && (

@@ -9,12 +9,19 @@ import { useSettled } from "./useSettled";
  */
 export const STALE_BANNER_DELAY_MS = 5000;
 
-/** {@link ConnectedStatusBanner} with the transient `stale` state debounced. */
-export function DiscreetStatusBanner(): React.JSX.Element | null {
+/**
+ * {@link ConnectedStatusBanner} with the transient `stale` state debounced. `time` is when
+ * the shown data was fetched, formatted ("14:02"), for "Offline · Stand von 14:02".
+ */
+export function DiscreetStatusBanner({
+  time,
+}: {
+  time?: string | undefined;
+} = {}): React.JSX.Element | null {
   const status = useConnectionStatus();
   const errorKind = useApiErrorKind();
   const staleOnly = status === "stale" && errorKind !== "unauthorized";
   const settled = useSettled(staleOnly, STALE_BANNER_DELAY_MS);
   if (staleOnly && !settled) return null;
-  return <ConnectedStatusBanner />;
+  return <ConnectedStatusBanner time={time} />;
 }

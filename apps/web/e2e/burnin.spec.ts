@@ -108,7 +108,7 @@ test.describe("burn-in shift", () => {
       );
       expect(await moons(page)).toBe(14);
       await context.setOffline(true);
-      await expect(page.getByRole("status")).toContainText("No internet");
+      await expect(page.getByRole("status")).toContainText("Offline");
 
       for (const view of ["Today", "Week"]) {
         await page.getByRole("button", { name: view }).click();
@@ -231,7 +231,7 @@ test.describe("the rail's view toggle keeps its place when the banner appears", 
     }
 
     await context.setOffline(true);
-    await expect(page.getByRole("status")).toContainText("No internet");
+    await expect(page.getByRole("status")).toContainText("Offline");
     for (const view of ["Today", "Week"]) {
       await page.getByRole("button", { name: view }).click();
       positions[`offline ${view}`] = (await metrics(page)).toggle;

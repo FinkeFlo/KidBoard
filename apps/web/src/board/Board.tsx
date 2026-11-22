@@ -77,7 +77,11 @@ export function Board(): React.JSX.Element {
 
   if (config === undefined || today === undefined || models === undefined) {
     const kind = errorKindOf(status, apiError);
-    return kind === undefined ? <DayLoading /> : <DayError kind={kind} />;
+    return kind === undefined ? (
+      <DayLoading />
+    ) : (
+      <DayError kind={kind} apiError={apiError} />
+    );
   }
   return (
     <BoardFrame

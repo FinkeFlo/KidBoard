@@ -77,7 +77,7 @@ test.describe("countdown", () => {
     }
 
     await context.setOffline(true);
-    await expect(page.getByRole("status")).toContainText("No internet");
+    await expect(page.getByRole("status")).toContainText("Offline");
     await expectNoOverflow(page);
     await page.getByRole("button", { name: "Today" }).click();
     await expect(countdown).toHaveAttribute("data-variant", "compact");

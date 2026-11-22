@@ -44,7 +44,7 @@ describe("DiscreetStatusBanner", () => {
     act(() => {
       vi.advanceTimersByTime(STALE_BANNER_DELAY_MS);
     });
-    expect(screen.getByRole("status")).toHaveTextContent(en.status.stale);
+    expect(screen.getByRole("status")).toHaveTextContent(en.status.staleNoTime);
     hooks.status.mockReturnValue("ready");
     view.rerender(<DiscreetStatusBanner />);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
@@ -66,10 +66,20 @@ describe("DiscreetStatusBanner", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
+  it("shows the time of the shown data in the pill", () => {
+    hooks.status.mockReturnValue("offline");
+    render(<DiscreetStatusBanner time="2:02 PM" />);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Offline · as of 2:02 PM",
+    );
+  });
+
   it("shows offline, error and unauthorized immediately", () => {
     hooks.status.mockReturnValue("offline");
     const view = render(<DiscreetStatusBanner />);
-    expect(screen.getByRole("status")).toHaveTextContent(en.status.offline);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      en.status.offlineNoTime,
+    );
     hooks.status.mockReturnValue("error");
     view.rerender(<DiscreetStatusBanner />);
     expect(screen.getByRole("alert")).toHaveTextContent(en.status.error);

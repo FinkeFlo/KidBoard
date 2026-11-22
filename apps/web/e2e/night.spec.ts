@@ -305,7 +305,7 @@ test.describe("theme before the config is known", () => {
           { timeout: 15_000 },
         );
       } else {
-        await expect(page.getByRole("status")).toHaveText("Loading the plan");
+        await expect(page.getByRole("status")).toContainText("Getting the day");
       }
       expect(await firstPaintTheme(page)).toBe("night");
       expect(await theme(page)).toBe("night");
@@ -328,7 +328,7 @@ test.describe("theme before the config is known", () => {
     await coldStart(page);
     await page.route("**/api/config", () => new Promise(() => undefined));
     await page.goto("/");
-    await expect(page.getByRole("status")).toHaveText("Loading the plan");
+    await expect(page.getByRole("status")).toContainText("Getting the day");
     expect(await firstPaintTheme(page)).toBe("light");
     expect(await bodyBackground(page)).toBe(LIGHT_BG);
   });

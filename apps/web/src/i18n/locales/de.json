@@ -1,8 +1,9 @@
 {
   "error": {
-    "title": "Hoppla, da ist etwas schiefgelaufen",
-    "hint": "Nichts ist verloren. Bitte versuche es noch einmal.",
-    "retry": "Nochmal versuchen"
+    "title": "Gleich geht's weiter",
+    "hint": "Eltern: Etwas ist schiefgelaufen. KidBoard startet gleich von selbst neu.",
+    "retry": "Jetzt neu laden",
+    "code": "Fehlercode für Eltern: {{code}}"
   },
   "event": {
     "allDay": "Ganztägig",
@@ -29,22 +30,27 @@
     "label": "Wer ist wer"
   },
   "status": {
-    "offline": "Kein Internet. Es wird der zuletzt bekannte Plan gezeigt.",
-    "stale": "Der Plan ist vielleicht nicht aktuell.",
+    "offline": "Offline · Stand von {{time}}",
+    "offlineNoTime": "Offline",
+    "stale": "Vielleicht nicht aktuell · Stand von {{time}}",
+    "staleNoTime": "Vielleicht nicht aktuell",
     "error": "Der Plan konnte nicht geladen werden.",
-    "unauthorized": "Der Zugangslink ist abgelaufen. Bitte den neuen Link mit ?key=… auf diesem Tablet öffnen."
+    "unauthorized": "Link neu öffnen: Bitte den Tablet-Link mit ?key=… auf diesem Tablet noch einmal öffnen."
   },
   "day": {
     "meals": "Essen",
-    "loading": "Der Plan wird geladen",
+    "loading": "Der Tag wird geholt …",
     "empty": {
       "title": "Heute ist nichts geplant",
-      "hint": "Ein freier Tag. Viel Spaß!"
+      "hint": "Zeit zum Spielen"
     },
     "error": {
-      "title": "Der Plan ist gerade nicht da",
-      "hint": "KidBoard versucht es von selbst weiter. Ein Erwachsener kann unten die Einzelheiten lesen.",
-      "offline": "Kein Internet und noch kein gespeicherter Plan."
+      "failed": "Eltern: Der Kalender ist gerade nicht erreichbar. KidBoard versucht es von selbst wieder.",
+      "offline": "Eltern: Kein Internet und noch kein gespeicherter Plan. KidBoard lädt, sobald das Netz zurück ist.",
+      "unauthorized": {
+        "title": "Ein Erwachsener hilft kurz",
+        "hint": "Eltern: Link neu öffnen. Der Zugangslink ist abgelaufen; bitte den neuen Link mit ?key=… auf diesem Tablet öffnen."
+      }
     },
     "hidden": {
       "badge": "+{{count}}",
@@ -69,7 +75,8 @@
     "viewGroup": "Ansicht",
     "day": "Heute",
     "week": "Woche",
-    "updated": "Stand {{time}}"
+    "updated": "Stand {{time}}",
+    "navLabel": "Navigation"
   },
   "week": {
     "label": "Die nächsten sieben Tage",

@@ -19,4 +19,17 @@ describe("Emoji", () => {
       expect(screen.getByText("🏊")).toHaveAttribute("aria-hidden", "true");
     },
   );
+
+  it("dims itself at night, in the component and not in the callers", () => {
+    render(<Emoji emoji="🏊" className="text-title grayscale" />);
+    const emoji = screen.getByText("🏊");
+    // `night:` = under <html data-theme="night">; filter utilities compose, so the
+    // caller's grayscale (past events) still applies.
+    expect(emoji).toHaveClass(
+      "night:brightness-75",
+      "night:saturate-80",
+      "grayscale",
+      "leading-none",
+    );
+  });
 });

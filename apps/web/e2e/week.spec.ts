@@ -238,7 +238,10 @@ test.describe("week view", () => {
     await expect(badges).toContainText("🐻");
     // The single child's edge is drawn in the child's colour (Ben is child-2, #0072b2).
     expect(
-      await football.evaluate((el) => getComputedStyle(el).boxShadow),
+      await football.evaluate(
+        // The edge is an overlay above the content (`::after`).
+        (el) => getComputedStyle(el, "::after").boxShadow,
+      ),
     ).toContain("rgb(0, 114, 178)");
     // Time-of-day symbols on the tiles; the evening is a dusk skyline, never a moon.
     await expect(football).toContainText("🌞");

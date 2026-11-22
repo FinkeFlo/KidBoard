@@ -106,9 +106,37 @@ describe("EventTile", () => {
     expect(tile().style.getPropertyValue("--child-color")).toBe(
       "var(--color-child-1)",
     );
-    expect(tile()).toHaveClass("inset-ring-4");
+    // The edge is an overlay above the content, so the emoji never paints over it.
+    expect(tile()).toHaveClass(
+      "relative",
+      "after:absolute",
+      "after:inset-0",
+      "after:inset-ring-4",
+    );
     expect(within(badges()).getByText("🦊")).toBeInTheDocument();
     expect(badges()).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("reserves room for the corner badges only when there are badges", () => {
+    const title = (): HTMLElement => screen.getByText("Swimming");
+    const { unmount } = render(
+      <EventTile
+        event={eventFixture({ title: "Swimming", childIds: ["mia"] })}
+        childList={[MIA, BEN]}
+        format={format}
+      />,
+    );
+    expect(title()).toHaveClass("truncate", "pe-5");
+    unmount();
+    render(
+      <EventTile
+        event={eventFixture({ title: "Swimming", childIds: [] })}
+        childList={[MIA, BEN]}
+        format={format}
+      />,
+    );
+    expect(title()).toHaveClass("truncate");
+    expect(title()).not.toHaveClass("pe-5");
   });
 
   it("two children: split tint, no edge, two overlapping badges", () => {
@@ -121,7 +149,7 @@ describe("EventTile", () => {
     );
     expect(tile()).toHaveAttribute("data-tint", "split");
     expect(tile().style.background).toContain("linear-gradient");
-    expect(tile()).not.toHaveClass("inset-ring-4");
+    expect(tile().className).not.toMatch(/inset-ring/u);
     const shown = [...badges().children];
     expect(shown.map((badge) => badge.textContent)).toEqual(["🦊", "🐻"]);
     expect(shown[1]).toHaveClass("-ms-3");
@@ -223,9 +251,10 @@ describe("EventTile", () => {
       );
     expect(TILE_HEIGHT_REM.large).toBe(token("--spacing-tile"));
     expect(TILE_HEIGHT_REM.compact).toBe(token("--spacing-tile-compact"));
-    // Dense sizes are shorter, but still >= the 3.5rem emoji (today) they carry.
+    // Dense sizes are shorter, but still hold the 3.5rem emoji line box (today) inside
+    // the 4px edge on both sides (0.25rem each at the 16px baseline).
     expect(TILE_HEIGHT_REM.dense).toBeLessThan(TILE_HEIGHT_REM.large);
-    expect(TILE_HEIGHT_REM.dense).toBeGreaterThanOrEqual(3.5);
+    expect(TILE_HEIGHT_REM.dense).toBeGreaterThanOrEqual(3.5 + 2 * 0.25);
     expect(TILE_HEIGHT_REM["compact-dense"]).toBeLessThan(
       TILE_HEIGHT_REM.compact,
     );

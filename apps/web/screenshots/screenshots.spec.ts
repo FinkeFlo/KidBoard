@@ -76,3 +76,64 @@ test("countdown reaching today, light", async ({ page }, testInfo) => {
   await expect(page.getByTestId("countdown-today")).toContainText("🎉");
   await shoot(page, "day-countdown-today", size);
 });
+
+/*
+ * States (T-32): loading skeleton, offline pill over the board, the friendly error card
+ * and the empty day. Light theme, same pinned clock and burn-in offset; each on a fresh
+ * page, so no cached state leaks from one into the next.
+ */
+test("state: loading", async ({ page }, testInfo) => {
+  const size = testInfo.project.name.replace("tablet-", "");
+  await mockBoard(page, {
+    config: demoConfig(),
+    agenda: demoAgenda(dateOf(0), NOW),
+  });
+  // Registered after the mock, so it wins: the config never answers.
+  await page.route("**/api/config", () => new Promise(() => undefined));
+  await page.goto("/?burnin=0&night=0");
+  await expect(page.getByTestId("board-loading")).toBeVisible();
+  await shoot(page, "state-loading", size);
+});
+
+test("state: offline", async ({ page, context }, testInfo) => {
+  const size = testInfo.project.name.replace("tablet-", "");
+  await openBoard(page, "light");
+  await context.setOffline(true);
+  await expect(page.locator("p[data-status=offline]")).toBeVisible();
+  await shoot(page, "state-offline", size);
+});
+
+test("state: error", async ({ page }, testInfo) => {
+  const size = testInfo.project.name.replace("tablet-", "");
+  await mockBoard(page, {
+    config: demoConfig(),
+    agendaStatus: 502,
+    agenda: { error: "upstream_failed" },
+  });
+  await page.goto("/?burnin=0&night=0");
+  // After the two automatic retries of a 5xx.
+  await expect(page.getByRole("alert")).toHaveAttribute(
+    "data-error",
+    "failed",
+    {
+      timeout: 15_000,
+    },
+  );
+  await shoot(page, "state-error", size);
+});
+
+test("empty day, light", async ({ page }, testInfo) => {
+  const size = testInfo.project.name.replace("tablet-", "");
+  const full = demoAgenda(dateOf(0), NOW);
+  await mockBoard(page, {
+    config: demoConfig(),
+    // Nothing timed or all-day today; the other days and every meal stay.
+    agenda: {
+      ...full,
+      events: full.events.filter((event) => !event.start.startsWith(dateOf(0))),
+    },
+  });
+  await page.goto("/?burnin=0&night=0");
+  await expect(page.getByTestId("day-empty")).toBeVisible();
+  await shoot(page, "day-empty", size);
+});

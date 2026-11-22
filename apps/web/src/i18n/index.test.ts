@@ -10,7 +10,7 @@ afterEach(() => {
 describe("initI18n / applyLocale", () => {
   it("translates with the resolved language and updates <html lang>", () => {
     expect(initI18n({ configLocale: "de" })).toBe("de");
-    expect(i18n.t("error.retry")).toBe("Nochmal versuchen");
+    expect(i18n.t("error.retry")).toBe("Jetzt neu laden");
     expect(document.documentElement.lang).toBe("de");
   });
 
@@ -28,7 +28,7 @@ describe("initI18n / applyLocale", () => {
     vi.spyOn(navigator, "languages", "get").mockReturnValue(["de-DE"]);
     initI18n();
     expect(applyLocale("en")).toBe("en");
-    expect(i18n.t("error.retry")).toBe("Try again");
+    expect(i18n.t("error.retry")).toBe("Reload now");
     expect(document.documentElement.lang).toBe("en");
   });
 });

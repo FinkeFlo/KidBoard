@@ -2,6 +2,7 @@ import type { CalendarEvent, Meal } from "@kidboard/shared";
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { TILE_HEIGHT_REM } from "../components/EventTile";
 import {
   BEN,
   eventFixture,
@@ -57,6 +58,9 @@ function day(
 }
 
 /** Makes the list report `heightRem` (at a 16px root) through a stubbed observer. */
+/** Height of a dense tile in today's column (rem). */
+const DENSE = TILE_HEIGHT_REM.dense;
+
 function stubListHeight(heightRem: number): void {
   vi.stubGlobal(
     "ResizeObserver",
@@ -174,7 +178,7 @@ describe("DayColumn", () => {
     // 12 events from 6:00 every 50 min: 7 over, 1 current (11:50), 4 upcoming at 12:00.
     const events = hourly(12, 6);
     // Room for the strip, the now line and three dense tiles plus "+N".
-    stubListHeight(2.25 + 1.5 + 3 * 4 + 2.25 + 5 * 0.5);
+    stubListHeight(2.25 + 1.5 + 3 * DENSE + 2.25 + 5 * 0.5);
     const column = renderColumn(day(events));
     const strip = within(column).getByRole("group", { name: /Already over/ });
     const folded = Number(strip.dataset["count"]);
@@ -207,7 +211,7 @@ describe("DayColumn", () => {
   it("counts strip icons beyond the drawn ones as +N with an sr-only label", () => {
     // 11 past events, 1 upcoming, little room: all past fold, only 8 get an icon.
     const events = hourly(12, 3);
-    stubListHeight(2.25 + 1.5 + 4 + 2 * 0.5);
+    stubListHeight(2.25 + 1.5 + DENSE + 2 * 0.5);
     const column = renderColumn(day(events));
     const strip = within(column).getByTestId("past-strip");
     expect(strip.querySelectorAll(".font-emoji")).toHaveLength(8);
@@ -273,6 +277,27 @@ describe("DayColumn", () => {
       within(column).getByRole("img", { name: "Lunch: Pasta" }),
     ).toBeInTheDocument();
     expect(within(column).queryByRole("separator")).toBeNull();
+  });
+
+  it("the empty-day illustration uses the children's tints, 🧸 and 🪁, decorative only", () => {
+    const column = renderColumn(day([], [mealFixture()]));
+    const empty = within(column).getByTestId("day-empty");
+    expect(empty).toHaveTextContent(en.day.empty.hint);
+    const art = within(empty).getByTestId("day-empty-art");
+    expect(art).toHaveAttribute("aria-hidden", "true");
+    expect(art).toHaveTextContent("🧸");
+    expect(art).toHaveTextContent("🪁");
+    const fills = [...art.querySelectorAll<HTMLElement>("span")].map(
+      (span) => span.style.backgroundColor,
+    );
+    // Mia's token tint; Ben's custom colour is mixed into the surface (childTint).
+    expect(fills[0]).toBe("var(--color-child-1-tint)");
+    expect(fills[1]).toContain("color-mix");
+  });
+
+  it("other days without events show no empty illustration", () => {
+    const column = renderColumn(day([], [], 1));
+    expect(within(column).queryByTestId("day-empty")).toBeNull();
   });
 
   it("renders titles as text, never as markup", () => {

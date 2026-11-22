@@ -186,7 +186,7 @@ test("loads the app shell offline after the first visit and never caches API or 
   await page.reload();
   // The cached shell renders the persisted day with the discreet offline hint.
   await expect(page.getByRole("article", { name: "Swimming" })).toBeVisible();
-  await expect(page.getByRole("status")).toContainText("No internet");
+  await expect(page.getByRole("status")).toContainText("Offline");
   const offlineStyle = await page.evaluate(async () => {
     await document.fonts.ready;
     return {

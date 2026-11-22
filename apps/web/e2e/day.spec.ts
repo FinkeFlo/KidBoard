@@ -194,7 +194,7 @@ test.describe("overview (main screen)", () => {
       "true",
     );
     const updated = rail.getByTestId("updated-at");
-    await expect(updated).toHaveText(/^Updated \d{1,2}:\d{2} (AM|PM)$/);
+    await expect(updated).toHaveText(/^Updated \d{1,2}:\d{2}\s(AM|PM)$/u);
     expect(
       await updated.evaluate(
         (el) => el.closest("[aria-live], [role=status], [role=alert]") === null,
@@ -212,7 +212,7 @@ test.describe("overview (main screen)", () => {
       page.getByRole("article", { name: /^Football/ }),
     ).toBeVisible();
     await context.setOffline(true);
-    await expect(page.getByRole("status")).toContainText("No internet");
+    await expect(page.getByRole("status")).toContainText("Offline · as of");
     await expect(
       page.getByRole("article", { name: /^Football/ }),
     ).toBeVisible();
@@ -228,7 +228,7 @@ test.describe("overview (main screen)", () => {
     );
     await page.goto("/");
     const alert = page.getByRole("alert");
-    await expect(alert).toContainText("The plan isn't here right now");
+    await expect(alert).toContainText("A grown-up can fix this");
     await expect(alert).toContainText("?key=");
     await expectNoOverflow(page);
   });
@@ -238,7 +238,7 @@ test.describe("overview (main screen)", () => {
   }) => {
     await page.route("**/api/**", () => new Promise(() => undefined));
     await page.goto("/");
-    await expect(page.getByRole("status")).toHaveText("Loading the plan");
+    await expect(page.getByRole("status")).toContainText("Getting the day");
     await expectNoOverflow(page);
   });
 

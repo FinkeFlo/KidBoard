@@ -9,6 +9,7 @@ import {
   formatWeekday,
 } from "../i18n/format";
 import { NavRail } from "./NavRail";
+import { formatUpdatedTime } from "./updatedTime";
 import type { BoardView } from "./ViewToggle";
 
 export interface BoardFrameProps {
@@ -88,7 +89,7 @@ export function BoardFrame({
           rail's bottom slot (fullscreen control): it appears and disappears without moving
           anything, and it is not shifted (it is transient). */}
       <div className="h-touch left-touch pointer-events-none fixed right-[calc(var(--spacing-nav)+var(--spacing-gutter))] bottom-0 flex items-center justify-center">
-        <DiscreetStatusBanner />
+        <DiscreetStatusBanner time={formatUpdatedTime(updatedAt, format)} />
       </div>
     </main>
   );

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
-import { type FormatContext, formatTime } from "../i18n/format";
+import type { FormatContext } from "../i18n/format";
+import { formatUpdatedTime } from "./updatedTime";
 import { type BoardView, ViewToggle } from "./ViewToggle";
 
 export interface NavRailProps {
@@ -25,18 +26,22 @@ export function NavRail({
   format,
 }: NavRailProps): React.JSX.Element {
   const { t } = useTranslation();
+  const time = formatUpdatedTime(updatedAt, format);
   return (
     <nav
+      aria-label={t("board.navLabel")}
       data-testid="nav-rail"
       className="w-nav flex shrink-0 flex-col items-center"
     >
       <ViewToggle view={view} onChange={onViewChange} />
-      {updatedAt > 0 && (
+      {time !== undefined && (
+        // The time never breaks inside ("12:00 PM"); a long label wraps before it, as a
+        // balanced second line, instead of leaving "PM" alone.
         <p
           data-testid="updated-at"
-          className="text-caption text-text-muted mt-auto text-center"
+          className="text-caption text-text-muted mt-auto text-center text-balance"
         >
-          {t("board.updated", { time: formatTime(updatedAt, format) })}
+          {t("board.updated", { time })}
         </p>
       )}
     </nav>

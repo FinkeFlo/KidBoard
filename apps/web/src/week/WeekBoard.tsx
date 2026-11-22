@@ -75,11 +75,13 @@ function WeekColumn({
   // The countdown day wears the awaited event's child tint and edge; every day before it
   // shows one moon in its header (the night after it is still to sleep).
   const target = countdown !== undefined && countdown.date === day.date;
-  const tint = target
-    ? resolveTileTint(
-        childrenOf(countdown.events[0] as CalendarEvent, childList),
-      )
-    : undefined;
+  // Guarded: an empty `events` list (never built today, but the type allows it) leaves
+  // the day untinted instead of crashing the board.
+  const awaited = target ? countdown.events[0] : undefined;
+  const tint =
+    awaited === undefined
+      ? undefined
+      : resolveTileTint(childrenOf(awaited, childList));
   const tinted = tint !== undefined && tint.kind !== "none";
   const moon = countdown !== undefined && day.date < countdown.date;
 
