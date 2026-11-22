@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 
 import { App } from "./App";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import {
   consumeAccessToken,
   createApiClient,
@@ -38,13 +39,15 @@ if (!container) {
 
 createRoot(container).render(
   <StrictMode>
-    <DataProvider
-      apiClient={apiClient}
-      queryClient={queryClient}
-      storage={storage}
-    >
-      <App />
-    </DataProvider>
+    <AppErrorBoundary>
+      <DataProvider
+        apiClient={apiClient}
+        queryClient={queryClient}
+        storage={storage}
+      >
+        <App />
+      </DataProvider>
+    </AppErrorBoundary>
   </StrictMode>,
 );
 

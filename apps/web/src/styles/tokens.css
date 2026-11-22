@@ -21,6 +21,9 @@
 
   /* Typography (rem: scales with the fluid root font size from global.css). */
   --font-sans: "Nunito Variable", ui-rounded, system-ui, sans-serif;
+  /* Native emoji fonts (ADR-0009); only used by the <Emoji> component. */
+  --font-emoji:
+    "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
   --text-caption: 0.875rem;
   --text-caption--line-height: 1.25rem;
   --text-body: 1.125rem;

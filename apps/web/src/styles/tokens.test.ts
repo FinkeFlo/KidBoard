@@ -92,6 +92,7 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
     [`--color-text-muted`, `--color-band-${band}`, TEXT_AA] as const,
     [`--color-band-${band}-accent`, `--color-band-${band}`, TEXT_AA] as const,
   ]),
+  ["--color-text-muted", "--color-surface-sunken", TEXT_AA] as const,
   ...CHILD_TOKENS.flatMap((child) => [
     ["--color-on-child", child, TEXT_AA] as const,
     [child, "--color-surface", UI_AA] as const,

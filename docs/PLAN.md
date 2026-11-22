@@ -247,7 +247,7 @@ operation, works offline with the last known state.
 
 ## M3 – Day view
 
-- [ ] **T-15 Core components** (risk: medium, deps: M2)
+- [x] **T-15 Core components** (risk: medium, deps: M2)
   Acceptance: `Emoji` (ADR-0009, `role="img"`, `aria-label` from title), `EventTile`
   (icon large, title small, time small, child color edge + avatar dots, past/current/all-day
   variants, long titles clamp to 2 lines), `MealCard`, `ChildLegend`, `StatusBanner`
