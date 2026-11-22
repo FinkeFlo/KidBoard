@@ -233,7 +233,7 @@ operation, works offline with the last known state.
   4. Tests with MSW or fetch mocks: first load, refetch, offline with persisted data,
      schema-invalid response treated as error without wiping persisted data.
 
-- [ ] **T-14 PWA** (risk: **high** → Opus, deps: T-11)
+- [x] **T-14 PWA** (risk: **high** → Opus, deps: T-11)
   Acceptance:
   1. vite-plugin-pwa (`generateSW`, `registerType: 'autoUpdate'`), manifest (name, short
      name, `display: fullscreen`, `orientation: landscape`, theme/background colors from

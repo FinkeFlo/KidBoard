@@ -1,11 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-test("renders the placeholder page", async ({ page }) => {
-  // The API is never contacted for real in E2E: intercept every call.
+// The API is never contacted for real in E2E: intercept every call (also avoids the
+// preview proxy's ECONNREFUSED noise).
+test.beforeEach(async ({ page }) => {
   await page.route("**/api/**", (route) =>
     route.fulfill({ json: { ok: true } }),
   );
+});
 
+test("renders the placeholder page", async ({ page }) => {
   await page.goto("/");
 
   await expect(
@@ -15,10 +18,6 @@ test("renders the placeholder page", async ({ page }) => {
 });
 
 test("fits the viewport without scrolling", async ({ page }) => {
-  await page.route("**/api/**", (route) =>
-    route.fulfill({ json: { ok: true } }),
-  );
-
   await page.goto("/");
   await expect(
     page.getByRole("heading", { level: 1, name: "KidBoard" }),

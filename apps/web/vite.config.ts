@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { VitePWA } from "vite-plugin-pwa";
+
+import { createPwaOptions } from "./pwa/options.ts";
+import { readPwaColors } from "./pwa/tokenColors.ts";
 
 const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
@@ -14,7 +18,7 @@ export const appDefine: Record<string, string> = {
 };
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), VitePWA(createPwaOptions(readPwaColors()))],
   define: appDefine,
   server: { proxy: { "/api": "http://localhost:8787" } },
 });

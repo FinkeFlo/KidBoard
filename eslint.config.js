@@ -81,6 +81,8 @@ export default defineConfig(
       "apps/web/vite.config.ts",
       "apps/web/vitest.config.ts",
       "apps/web/playwright.config.ts",
+      "apps/web/pwa-assets.config.ts",
+      "apps/web/pwa/**/*.ts",
       "apps/web/e2e/**/*.ts",
       "apps/worker/**/*.ts",
     ],
