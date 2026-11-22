@@ -1,3 +1,4 @@
+import emojiRegex from "emoji-regex";
 import { z } from "zod";
 
 /** Calendar date `YYYY-MM-DD`. */
@@ -39,16 +40,34 @@ export const TimeZoneSchema = z.string().refine(isValidTimeZone, {
   message: "Expected a valid IANA time zone, e.g. Europe/Berlin",
 });
 
-const EMOJI_PART = /\p{Extended_Pictographic}|\p{Regional_Indicator}|⃣/u;
+// emoji-regex v11 emits a non-`u` pattern (surrogate pairs); keep flags empty.
+const EMOJI_EXACT = new RegExp(`^(?:${emojiRegex().source})$`);
+const EMOJI_PRESENTATION = /\p{Emoji_Presentation}/u;
 
-/** True if `value` is exactly one grapheme cluster that looks like an emoji. */
+/**
+ * True if `grapheme` (one grapheme cluster) is an emoji that should be rendered as a picture.
+ * `emoji-regex` also matches text-style symbols such as `©`, `™` or a bare `☀`; those are
+ * rejected here unless they are a multi-code-point sequence (VS16 `☀️`, keycap `1️⃣`, flag,
+ * ZWJ, skin tone) or have emoji presentation by default (`⚽`).
+ */
+export function isEmojiGrapheme(grapheme: string): boolean {
+  if (!EMOJI_EXACT.test(grapheme)) {
+    return false;
+  }
+  const firstCodePoint = grapheme.codePointAt(0) ?? 0;
+  const isSingleCodePoint =
+    grapheme.length === (firstCodePoint > 0xffff ? 2 : 1);
+  return !isSingleCodePoint || EMOJI_PRESENTATION.test(grapheme);
+}
+
+/** True if `value` is exactly one grapheme cluster that is an emoji (see {@link isEmojiGrapheme}). */
 export function isSingleEmoji(value: string): boolean {
   const graphemes = [
     ...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(
       value,
     ),
   ];
-  return graphemes.length === 1 && EMOJI_PART.test(value);
+  return graphemes.length === 1 && isEmojiGrapheme(value);
 }
 
 /** A single emoji (one grapheme cluster, ZWJ sequences and flags allowed). */
