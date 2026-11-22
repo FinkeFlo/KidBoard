@@ -52,6 +52,13 @@ The root `.env.example` only lists tooling variables (e.g. `PLAYWRIGHT_CHROMIUM_
 | `refreshMinutes`        | integer                       | `60`                             | `30`                            | How often the client refetches data.                                                                 |
 | `autoReturnSeconds`     | integer                       | `120`                             | `180`                           | Seconds of inactivity before the UI returns to the day view.                                         |
 
+Validation details (schema in `packages/shared`): unknown keys are rejected (typos are
+reported, not ignored); ids (children and calendars) match `[a-z0-9][a-z0-9_-]*` (max 32
+chars); the secret name is the upper-cased id with `-` replaced by `_` (`school-a` ->
+`CAL_SCHOOL_A_URL`), so ids that map to the same name (`a-b` and `a_b`) are rejected; child
+names must be unique (case-insensitive); `refreshMinutes` is 1-1440; `autoReturnSeconds` is
+10-3600; bands must be strictly ascending; `nightMode.start` and `end` must differ.
+
 Notes: calendar `mia` and child `mia` are separate namespaces, so the same slug may be used
 for both. The final schema is defined in T-06 (`packages/shared`); if this document and the
 schema ever disagree, the schema wins and this page must be fixed.
