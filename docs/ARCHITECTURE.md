@@ -182,7 +182,21 @@ Order of operations on the raw `SUMMARY`:
 | Service worker (Workbox precache) | app shell, fonts, icons | until next deploy |
 | TanStack Query persisted cache | last `/api/agenda` + `/api/config` | 7 days |
 
-The client refetches hourly, on `visibilitychange`/`online`, and after midnight.
+The client refetches every `refreshMinutes` (default hourly), on `visibilitychange`/`online`,
+and after midnight (new day = new agenda query key, T-16).
+
+### Client data layer (T-13)
+
+`apps/web/src/data/`: typed API client (zod-validated, 15 s timeout > worker's ~11 s
+upstream budget, Bearer token from a one-time `?key=`), TanStack Query with the
+localStorage persister, `useConfig()`, `useAgenda({ from, days })` and
+`useConnectionStatus()` → `loading | ready | offline | stale | error`. A 502 or an
+invalid response never replaces shown or persisted data; with data it shows as `stale`,
+without data as `error`. A 200 agenda that is worker-stale or has a failed source is
+`stale` too. A 401 wipes all calendar data (memory and storage) and the stored token:
+status `error`, `useApiErrorKind()` = `unauthorized`. Persisted queries older than 7 days
+are dropped. The config `locale` is applied to i18n as soon as the config is
+known (fetched or restored). Rules in detail: [ADR-0006](adr/0006-caching-offline.md).
 
 ### Worker API details (T-10)
 
