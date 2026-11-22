@@ -324,18 +324,22 @@ operation, works offline with the last known state.
   Acceptance: Screen Wake Lock requested when visible and re-acquired on
   `visibilitychange`; graceful no-op where unsupported; small, unobtrusive parent control
   for fullscreen (Fullscreen API); unit tests with mocked APIs. (M3 follow-up) `AppErrorBoundary` auto-resets after a delay with backoff so an unattended
-  kiosk recovers without a tap.
+  kiosk recovers without a tap (test that the reset lands in the day view).
 
 - [ ] **T-21 Night mode** (risk: medium, deps: T-11, T-16)
   Acceptance: automatic switch by `config.nightMode` times (spanning midnight works),
   dimmed warm token set, smooth transition (none under reduced motion), optional manual
-  toggle via URL param `?night=1|0` for testing; contrast of night tokens meets AA. (M3 follow-up) Use `useCurrentBand` or remove it and fix its ARCHITECTURE mention. (M2 follow-up) `<meta name="theme-color">` follows night mode, or the reason it doesn't is
+  toggle via URL param `?night=1|0` for testing; contrast of night tokens meets AA. (M3 follow-up) Use `useCurrentBand` or remove it and fix its ARCHITECTURE mention. (M4 follow-up) Night-token contrast for weekend columns, countdown surface, band accents and
+  `ring-accent`. (M2 follow-up) `<meta name="theme-color">` follows night mode, or the reason it doesn't is
   documented.
 
 - [ ] **T-22 Burn-in protection** (risk: low, deps: T-11)
   Acceptance: whole layout shifts by a few px on a slow orbit every few minutes, never
   causes overflow/scrolling; under reduced motion shifts happen without animation; tests
   with fake timers.
+  (M4 follow-ups) Shift moves an inner wrapper within the gutter (not `<main>`), e2e re-run with
+  max shift + banner + 14 moons; the view toggle keeps a fixed place when a banner appears
+  (reserve a banner slot or keep the toggle on header row 1).
 
 - [ ] **T-23 Offline & stale UX end-to-end** (risk: **high** → Opus, deps: T-13, T-14, T-17)
   Acceptance: Playwright: load online → go offline → reload → last state + discreet
@@ -344,7 +348,7 @@ operation, works offline with the last known state.
   refetch. (M2 follow-ups) offline across midnight keeps showing data; 401 with persisted
   data wipes storage and `kidboard.accessToken`. (M3 follow-ups) the e2e clock Proxy gets a test-only offset setter (offline across midnight)
   and an `apply` trap; Playwright projects set `timezoneId` (e.g. America/Los_Angeles) so the
-  config zone is proven against a non-UTC device zone; `pwa.spec.ts` offline test asserts day
+  config zone is proven against a non-UTC device zone; `mockApi.ts` derives fixture dates (`dateOf`) and the clock from one constant; `pwa.spec.ts` offline test asserts day
   content or the offline banner again; ARCHITECTURE gets a day-view section (placement rules,
   5 s stale-banner delay) and ADR-0006/ADR-0009 mention the delay and the decorative emoji mode.
 
@@ -354,6 +358,10 @@ operation, works offline with the last known state.
   2000×1200 in light and night mode with fixture data (Mia 🦊 / Ben 🐻 example) into
   `docs/screenshots/`; a CI job runs them (artifact upload), committed copies are used in
   the README.
+  (M4 follow-ups) Glanceability pass on the screenshots: larger compact countdown moons on the
+  day view, a pictorial "today!" cue (e.g. 🎉), check 🌙/☀️ double meanings (band vs. sleep
+  unit vs. toggle), child colour cue on week icons, past events in today's week column ranked
+  last or dimmed.
 
 **M5 exit:** milestone review, CI green.
 
@@ -400,6 +408,7 @@ operation, works offline with the last known state.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | M4 review follow-ups: burn-in inner wrapper + fixed toggle place (T-22), glanceability pass (T-24), boundary reset test (T-20), night contrast for new surfaces (T-21), single fixture date constant (T-23) | M4 milestone review by reviewer-opus |
 | 2026-11-22 | T-18: the meal plan is shown inside the week columns instead of a separate meal screen | No extra screen, one glance: children and parents see events and meals of the whole week at once |
 | 2026-11-22 | M3 review: agenda `days` limit 14 → 31 and client range 8 → 31 (T-19, shared query for day/week/countdown); follow-ups to T-18 (shared frame, continuing events), T-20 (boundary auto-reset), T-21 (`useCurrentBand`), T-23 (e2e clock, `timezoneId`, docs), T-28 (release-please initial version) | M3 milestone review by reviewer-opus; countdown needs 30 days but `/api/agenda` capped at 14 |
 | 2026-11-22 | M2 review follow-ups: unauthorized state + boundary placement (T-15), shared today helper, offline midnight placeholder, pre-config behaviour (T-16), `formatTime` for timed events only (T-17), theme-color in night mode (T-21), offline-midnight + 401 e2e (T-23), static-asset Cache-Control + `?key=` logging check (T-25), token flow docs (T-27) | M2 milestone review by reviewer-opus |
