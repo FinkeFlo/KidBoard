@@ -90,7 +90,7 @@ operation, works offline with the last known state.
   5. `.github/dependabot.yml`: npm + github-actions, weekly, grouped.
   6. CI run on GitHub for the pushed commit is green.
 
-- [ ] **T-05 Community & config files** (risk: low, deps: T-01)
+- [x] **T-05 Community & config files** (risk: low, deps: T-01)
   Acceptance:
   1. `LICENSE` (MIT, © 2026 FinkeFlo), `README.md` (EN) + `README.de.md` (DE) skeleton with
      language switch links, feature list, screenshot placeholders, sections stubbed for
