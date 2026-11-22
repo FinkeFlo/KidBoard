@@ -135,7 +135,7 @@ describe("AppErrorBoundary auto reset", () => {
     expect(screen.getByRole("alert")).toBeInTheDocument();
     shouldThrow = false;
     advance(AUTO_RESET_BASE_MS);
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("error-fallback")).not.toBeInTheDocument();
     vi.useRealTimers();
     expect(
       await screen.findByRole("heading", { level: 1, name: "Sunday" }),
@@ -154,7 +154,7 @@ describe("AppErrorBoundary auto reset", () => {
     const seen: number[] = [];
     for (let i = 0; i < 9; i += 1) {
       advance(delay - 1);
-      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.getByTestId("error-fallback")).toBeInTheDocument();
       const before = vi.getTimerCount();
       advance(1); // reset fires, Bomb throws again, new fallback + timer
       expect(before).toBe(1);
@@ -166,7 +166,7 @@ describe("AppErrorBoundary auto reset", () => {
     expect(Math.max(...seen)).toBe(AUTO_RESET_MAX_MS);
     // At the cap the delay stays at the cap.
     advance(AUTO_RESET_MAX_MS - 1);
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByTestId("error-fallback")).toBeInTheDocument();
     shouldThrow = false;
     advance(1);
     expect(screen.getByText("recovered")).toBeInTheDocument();
@@ -204,6 +204,40 @@ describe("AppErrorBoundary auto reset", () => {
     expect(screen.getByRole("alert")).toBeInTheDocument();
     advance(1); // base delay, not 4x
     expect(screen.getByText("recovered")).toBeInTheDocument();
+  });
+
+  it("announces an incident once, not on every failed automatic retry", () => {
+    render(
+      <AppErrorBoundary>
+        <Bomb />
+      </AppErrorBoundary>,
+    );
+    expect(screen.getByRole("alert")).toBe(
+      screen.getByTestId("error-fallback"),
+    );
+    advance(AUTO_RESET_BASE_MS); // retry fails: a fresh fallback, but silent
+    expect(screen.getByTestId("error-fallback")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // Still the main landmark with the friendly text for anyone who looks.
+    expect(screen.getByRole("main")).toHaveTextContent(en.error.title);
+    advance(AUTO_RESET_BASE_MS * 2); // and stays silent on the next one
+    expect(screen.getByTestId("error-fallback")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps announcing the fallback while it stays up (re-renders do not silence it)", () => {
+    const { rerender } = render(
+      <AppErrorBoundary>
+        <Bomb />
+      </AppErrorBoundary>,
+    );
+    rerender(
+      <AppErrorBoundary>
+        <Bomb />
+      </AppErrorBoundary>,
+    );
+    advance(AUTO_RESET_BASE_MS - 1);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
   });
 
   it("clears the timer on unmount", () => {

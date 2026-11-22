@@ -1,4 +1,10 @@
-import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ErrorBoundary,
   type FallbackProps,
@@ -31,6 +37,8 @@ type ErrorFallbackProps = FallbackProps & {
   nextDelay: () => number;
   /** Counts the automatic attempt; called right before the reset. */
   onAutoReset: () => void;
+  /** True when this failure starts a new incident (not a failed automatic retry). */
+  isNewIncident: () => boolean;
 };
 
 function ErrorFallback({
@@ -38,8 +46,12 @@ function ErrorFallback({
   resetErrorBoundary,
   nextDelay,
   onAutoReset,
+  isNewIncident,
 }: ErrorFallbackProps): React.JSX.Element {
   const { t } = useTranslation();
+  // Announced once per incident: a failed automatic retry mounts a new fallback, which
+  // must not interrupt assistive tech again every few minutes. Decided once per mount.
+  const [announce] = useState(isNewIncident);
   // An unattended kiosk recovers without a tap; the timer dies with the fallback
   // (manual retry, unmount of the boundary).
   // Latest reset function without restarting the timer when its identity changes.
@@ -59,7 +71,8 @@ function ErrorFallback({
 
   return (
     <main
-      role="alert"
+      role={announce ? "alert" : undefined}
+      data-testid="error-fallback"
       className="bg-surface text-text gap-gutter p-page flex h-full flex-col items-center justify-center text-center"
     >
       <span aria-hidden="true" className="text-display">
@@ -88,7 +101,8 @@ function logError(error: unknown): void {
  * Last line of defence. Shows a friendly fallback and resets itself after a delay with
  * exponential backoff (base, x2, ... capped at the maximum). The backoff starts over once
  * the children have run for the stable period without failing again. The retry button
- * resets at once and does not count as an automatic attempt.
+ * resets at once and does not count as an automatic attempt. The fallback is a live
+ * `alert` only for the first failure of an incident, not for each failed automatic retry.
  */
 export function AppErrorBoundary({
   children,
@@ -109,6 +123,10 @@ export function AppErrorBoundary({
   const onAutoReset = useCallback((): void => {
     backoff.current.attempts += 1;
   }, []);
+  const isNewIncident = useCallback((): boolean => {
+    const state = backoff.current;
+    return state.attempts === 0 || Date.now() - state.lastResetAt >= stableMs;
+  }, [stableMs]);
 
   return (
     <ErrorBoundary
@@ -117,6 +135,7 @@ export function AppErrorBoundary({
           {...props}
           nextDelay={nextDelay}
           onAutoReset={onAutoReset}
+          isNewIncident={isNewIncident}
         />
       )}
       onError={logError}

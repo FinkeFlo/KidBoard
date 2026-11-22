@@ -36,15 +36,15 @@ describe("demo data", () => {
     );
   });
 
-  it("moves with today: the same pattern starts on any given day", () => {
+  it("moves with today: the same pattern starts on any given day (same weekday kind)", () => {
     const first = demoAgenda("2026-11-22", NOW);
-    const later = demoAgenda("2027-03-01", "2027-03-01T12:00:00+01:00");
+    const later = demoAgenda("2027-02-28", "2027-02-28T12:00:00+01:00");
     const titles = (a: typeof first, date: string): string[] =>
       a.events
         .filter((e) => (e.allDay ? e.start : e.start.slice(0, 10)) === date)
         .map((e) => e.title);
-    expect(titles(first, "2026-11-22")).toEqual(titles(later, "2027-03-01"));
-    expect(later.range.from).toBe("2027-03-01");
+    expect(titles(first, "2026-11-22")).toEqual(titles(later, "2027-02-28"));
+    expect(later.range.from).toBe("2027-02-28");
   });
 
   it("has exactly one countdown event, `countdownDays` nights ahead", () => {
@@ -71,6 +71,33 @@ describe("demo data", () => {
     expect(hours.some((hour) => hour >= 11 && hour < 17)).toBe(true);
     expect(hours.some((hour) => hour >= 17)).toBe(true);
     expect(todays.some((event) => event.allDay)).toBe(true);
+  });
+
+  it("has no kindergarten on weekends, but on weekdays", () => {
+    // The busy template (today) on a Sunday and on a Saturday, then on a Monday.
+    for (const today of ["2026-11-22", "2026-11-21"]) {
+      const titles = demoAgenda(today, NOW)
+        .events.filter((event) => event.start.startsWith(today))
+        .map((event) => event.title);
+      expect(titles).not.toContain("Kindergarten");
+      expect(titles).toContain("Pancake breakfast");
+    }
+    const monday = demoAgenda("2026-11-23", NOW)
+      .events.filter((event) => event.start.startsWith("2026-11-23"))
+      .map((event) => event.title);
+    expect(monday).toContain("Kindergarten");
+    // Across the whole month: never on a Saturday or Sunday.
+    for (const event of demoAgenda(TODAY, NOW).events) {
+      if (event.title !== "Kindergarten") continue;
+      const day = new Date(`${event.start.slice(0, 10)}T12:00:00Z`).getUTCDay();
+      expect([1, 2, 3, 4, 5]).toContain(day);
+    }
+  });
+
+  it("gives every meal a slot", () => {
+    for (const meal of demoAgenda(TODAY, NOW).meals) {
+      expect(meal.slot).not.toBe("unspecified");
+    }
   });
 });
 

@@ -49,6 +49,13 @@ describe("FullscreenControl", () => {
     ).toBeInTheDocument();
   });
 
+  it("draws the glyph in the quiet token colour without opacity (WCAG 1.4.11)", () => {
+    render(<FullscreenControl />);
+    const button = screen.getByTestId("fullscreen-control");
+    expect(button).toHaveClass("text-control-quiet");
+    expect(button.className).not.toMatch(/opacity-/);
+  });
+
   it("ignores a short tap (children)", () => {
     render(<FullscreenControl />);
     const button = screen.getByTestId("fullscreen-control");

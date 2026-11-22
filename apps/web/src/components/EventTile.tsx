@@ -18,6 +18,12 @@ export interface EventTileProps {
   status?: EventStatus;
   /** Timed event that began on an earlier day: shows "continues" instead of the start. */
   continues?: boolean;
+  /**
+   * Fill the parent, which must be a size container (`@container-size`) with a definite
+   * height: icon, padding and avatars scale with its height (`cqh`), the title drops to
+   * one line and the time hides on short tiles, so the tile shrinks instead of clipping.
+   */
+  fit?: boolean;
 }
 
 const STATUS_CLASSES: Record<EventStatus, string> = {
@@ -27,14 +33,42 @@ const STATUS_CLASSES: Record<EventStatus, string> = {
   past: "bg-surface-sunken text-text-muted",
 };
 
+/** Natural tile vs. a tile that scales with its size-container parent (`fit`). */
+const LAYOUT = {
+  natural: {
+    tile: "min-h-touch gap-3 p-3",
+    icon: "text-display",
+    title: "line-clamp-2",
+    time: "",
+    kids: "flex flex-col gap-1",
+    avatar: "size-8 text-body",
+  },
+  fit: {
+    tile: "h-full gap-[clamp(--spacing(1),5cqh,--spacing(3))] p-[clamp(--spacing(1),8cqh,--spacing(3))]",
+    // Bounded by height and width, so a narrow two-column cell keeps room for the title.
+    icon: "text-[length:clamp(1.25rem,min(50cqh,20cqw),var(--text-display))]",
+    // Two lines need about 5.5rem of tile height; narrow cells use the smaller type.
+    title:
+      "line-clamp-2 hyphens-auto [@container(max-height:5.5rem)]:line-clamp-1 [@container(max-width:14rem)]:text-caption",
+    // The time line needs about 3.5rem of tile height.
+    time: "[@container(max-height:3.5rem)]:hidden",
+    // Two rows at most (more children add columns), sized by the tile.
+    kids: "grid grid-flow-col grid-rows-2 gap-[2cqh]",
+    avatar:
+      "size-[clamp(1rem,min(40cqh,13cqw),--spacing(8))] text-[length:clamp(0.625rem,min(22cqh,7cqw),var(--text-body))]",
+  },
+} as const;
+
 export function EventTile({
   event,
   childList,
   format,
   status = "upcoming",
   continues = false,
+  fit = false,
 }: EventTileProps): React.JSX.Element {
   const { t } = useTranslation();
+  const layout = LAYOUT[fit ? "fit" : "natural"];
   const titleId = useId();
   const kids = event.childIds.flatMap((id) => {
     const child = childList.find((c) => c.id === id);
@@ -46,17 +80,18 @@ export function EventTile({
       data-status={status}
       data-all-day={event.allDay}
       style={childColorStyle(kids[0]?.color)}
-      className={`${STATUS_CLASSES[status]} min-h-touch rounded-tile flex items-center gap-3 border-s-8 border-(color:--child-color) p-3`}
+      data-fit={fit}
+      className={`${STATUS_CLASSES[status]} ${layout.tile} rounded-tile flex items-center border-s-8 border-(color:--child-color)`}
     >
-      <Emoji emoji={event.icon} className="text-display" />
+      <Emoji emoji={event.icon} className={layout.icon} />
       <div className="min-w-0 flex-1">
         <p
           id={titleId}
-          className="text-body line-clamp-2 font-bold break-words"
+          className={`text-body font-bold break-words ${layout.title}`}
         >
           {event.title}
         </p>
-        <p className="text-caption text-text-muted">
+        <p className={`text-caption text-text-muted ${layout.time}`}>
           {event.allDay
             ? t("event.allDay")
             : continues
@@ -72,10 +107,10 @@ export function EventTile({
         )}
       </div>
       {kids.length > 0 && (
-        <ul className="flex shrink-0 flex-col gap-1">
+        <ul className={`${layout.kids} shrink-0`}>
           {kids.map((child) => (
             <li key={child.id}>
-              <ChildAvatar child={child} />
+              <ChildAvatar child={child} className={layout.avatar} />
             </li>
           ))}
         </ul>
