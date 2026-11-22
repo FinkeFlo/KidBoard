@@ -64,6 +64,11 @@ test.describe("countdown", () => {
     await page.getByRole("button", { name: "Week" }).click();
     await expect(countdown).toHaveAttribute("data-variant", "full");
     expect(await moons(page)).toBe(14);
+    // The target is beyond the week: each of the seven headers shows its night's moon,
+    // and the pill's moons are the only ones counted in it.
+    await expect(
+      page.getByTestId("day-column").getByTestId("column-moon"),
+    ).toHaveCount(7);
     await expectNoOverflow(page);
     if (SHOT_DIR !== undefined) {
       await page.screenshot({

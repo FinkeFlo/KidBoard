@@ -73,11 +73,9 @@
   },
   "week": {
     "label": "Die nächsten sieben Tage",
-    "more": "{{count}} weitere",
+    "more": "{{count}} weitere: {{titles, list}}",
     "meals": "Essen",
-    "forChildren": "Für {{names, list}}",
-    "moreBadge": "+{{count}}",
-    "mealEntry": "{{slot}}: {{title}}"
+    "moreBadge": "+{{count}}"
   },
   "countdown": {
     "label": "Wie oft noch schlafen?",

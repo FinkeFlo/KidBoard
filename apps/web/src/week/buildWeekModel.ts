@@ -1,7 +1,6 @@
 import {
   addCalendarDays,
   type AgendaResponse,
-  type CalendarEvent,
   type Meal,
 } from "@kidboard/shared";
 
@@ -18,8 +17,6 @@ import {
  */
 
 export const WEEK_DAYS = 7;
-/** Icons shown per column; the rest is summarised as "+N". */
-export const MAX_ICONS_PER_DAY = 3;
 
 export interface WeekDay {
   /** `YYYY-MM-DD` in the config zone. */
@@ -27,10 +24,11 @@ export interface WeekDay {
   isToday: boolean;
   /** Saturday or Sunday. */
   isWeekend: boolean;
-  /** The most important events of the day (at most {@link MAX_ICONS_PER_DAY}). */
-  icons: CalendarEvent[];
-  /** Events of the day that did not make it into `icons` (the "+N"). */
-  more: number;
+  /**
+   * All events of the day, most important first ({@link rankByImportance}). How many get
+   * a tile is decided by the available space, not here (`fitWeekColumn`).
+   */
+  events: DayEvent[];
   /** Meals ordered breakfast, lunch, dinner, unspecified. */
   meals: Meal[];
 }
@@ -43,7 +41,8 @@ export function isWeekendDate(date: string): boolean {
 }
 
 /**
- * Ranks a day's events by importance for the icon budget of a week column:
+ * Ranks a day's events by importance for the tile budget of a week column (what is
+ * dropped first when space is short):
  * 0. events that are already over (only today has them) go last: the column answers
  *    "what is still to come?", and a past event may only fill a slot nothing else wants,
  * 1. countdown events (the child is waiting for them),
@@ -69,6 +68,22 @@ export function rankByImportance(events: readonly DayEvent[]): DayEvent[] {
   );
 }
 
+/**
+ * Display order of the tiles in a column: all-day events first, then timed ones by start
+ * (an event continuing from an earlier day counts as starting at the beginning of the
+ * day), ties by title. Unlike the ranking this ignores countdown and "over".
+ */
+export function chronological(events: readonly DayEvent[]): DayEvent[] {
+  const startMs = ({ event, continues }: DayEvent): number =>
+    event.allDay || continues ? 0 : Date.parse(event.start);
+  return [...events].sort(
+    (a, b) =>
+      Number(b.event.allDay) - Number(a.event.allDay) ||
+      startMs(a) - startMs(b) ||
+      a.event.title.localeCompare(b.event.title),
+  );
+}
+
 export function buildWeekModel(
   agenda: Pick<AgendaResponse, "events" | "meals">,
   config: DayModelConfig,
@@ -78,16 +93,14 @@ export function buildWeekModel(
   return Array.from({ length: WEEK_DAYS }, (_, offset): WeekDay => {
     const date = addCalendarDays(from, offset);
     const day = buildDayModel(agenda, config, date, now);
-    const ranked = rankByImportance([
-      ...day.allDay,
-      ...day.bands.flatMap((band) => band.events),
-    ]);
     return {
       date,
       isToday: offset === 0,
       isWeekend: isWeekendDate(date),
-      icons: ranked.slice(0, MAX_ICONS_PER_DAY).map(({ event }) => event),
-      more: Math.max(0, ranked.length - MAX_ICONS_PER_DAY),
+      events: rankByImportance([
+        ...day.allDay,
+        ...day.bands.flatMap((band) => band.events),
+      ]),
       meals: day.meals,
     };
   });

@@ -414,8 +414,12 @@ describe("Board", () => {
       expect(
         screen.getByRole("button", { name: en.board.week }),
       ).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByRole("img", { name: "Dentist" })).toBeInTheDocument();
-      expect(screen.getByText("Lunch: Soup")).toBeInTheDocument();
+      expect(
+        screen.getByRole("article", { name: /^Dentist, 9:00 AM/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("img", { name: "Lunch: Soup" }),
+      ).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: en.board.day }));
       expect(screen.getAllByTestId("day-column")).toHaveLength(4);

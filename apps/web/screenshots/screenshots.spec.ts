@@ -34,6 +34,12 @@ async function openBoard(
 async function shoot(page: Page, name: string, size: string): Promise<void> {
   // Webfont and emoji glyphs must be in before the picture is taken.
   await page.evaluate(() => document.fonts.ready);
+  // A button that was just pressed may still be finishing its press transition.
+  await page.evaluate(() =>
+    Promise.all(
+      document.getAnimations().map((animation) => animation.finished),
+    ),
+  );
   await page.screenshot({
     path: `${SCREENSHOT_DIR}/${name}-${size}.png`,
     animations: "disabled",
@@ -53,6 +59,13 @@ for (const theme of ["light", "night"] as const) {
 
     await page.getByRole("button", { name: "Week" }).click();
     await expect(page.getByTestId("day-column")).toHaveCount(7);
+    // The click leaves the pointer on the button (hover/press look): move it away so the
+    // picture does not depend on the button's transition.
+    await page.mouse.move(0, 0);
+    await expect(page.getByRole("button", { name: "Week" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await shoot(page, `week-${theme}`, size);
   });
 }

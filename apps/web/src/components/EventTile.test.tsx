@@ -231,6 +231,26 @@ describe("EventTile", () => {
     );
   });
 
+  it("week sizes stack emoji over time, hide the visible title and keep the name", () => {
+    render(
+      <EventTile
+        event={eventFixture({ childIds: ["mia"] })}
+        childList={[MIA]}
+        format={format}
+        timeOfDay="midday"
+        size="week"
+      />,
+    );
+    expect(tile()).toHaveAttribute("data-size", "week");
+    expect(tile().className).toContain("flex-col");
+    expect(screen.queryByText("Swimming")).toBeNull();
+    expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For Mia");
+    expect(within(tile()).getByText("🌞")).toBeInTheDocument();
+    expect(TILE_HEIGHT_REM["week-dense"]).toBeLessThan(TILE_HEIGHT_REM.week);
+    // The stacked emoji and time row fit the dense height (emoji 2.25rem + meta 1rem).
+    expect(TILE_HEIGHT_REM["week-dense"]).toBeGreaterThanOrEqual(2.25 + 1.3);
+  });
+
   it("renders an HTML-looking title as text, never as markup", () => {
     const evil = '<img src=x onerror="alert(1)"><b>hi</b>';
     const { container } = render(

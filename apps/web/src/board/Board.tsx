@@ -109,6 +109,7 @@ export function Board(): React.JSX.Element {
           days={models.week}
           childList={config.children}
           format={format}
+          countdown={models.countdown}
         />
       )}
     </BoardFrame>

@@ -1,5 +1,6 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
+import { columnAccount, expectNoOverflow } from "./layout";
 import { agenda, config, mockBoard, type MockEvent } from "./mockApi";
 
 const SHOT_DIR = process.env["E2E_SCREENSHOT_DIR"];
@@ -18,6 +19,7 @@ EVENTS.push({
   icon: "🎂",
   time: "16:00",
   day: 3,
+  childIds: ["mia"],
   countdown: true,
 });
 const MEALS = Array.from({ length: 7 }, (_, day) => [
@@ -26,63 +28,6 @@ const MEALS = Array.from({ length: 7 }, (_, day) => [
   { slot: "dinner", title: "Vegetable soup and bread", icon: "🍲", day },
   { slot: "unspecified", title: "Apple slices", icon: "🍎", day },
 ]).flat();
-
-async function expectNoOverflow(page: Page): Promise<void> {
-  const report = await page.evaluate(() => {
-    const viewport = { width: window.innerWidth, height: window.innerHeight };
-    const root = document.documentElement;
-    const clipped: string[] = [];
-    const outside: string[] = [];
-    for (const el of document.querySelectorAll<HTMLElement>(
-      "main, [data-testid=week-board], [data-testid=day-column], header",
-    )) {
-      if (el.scrollHeight > el.clientHeight + 1) {
-        clipped.push(`${el.tagName} ${el.textContent.slice(0, 30)} h`);
-      }
-      if (el.scrollWidth > el.clientWidth + 1) {
-        clipped.push(`${el.tagName} ${el.textContent.slice(0, 30)} w`);
-      }
-      const rect = el.getBoundingClientRect();
-      if (
-        rect.left < -0.5 ||
-        rect.top < -0.5 ||
-        rect.right > viewport.width + 0.5 ||
-        rect.bottom > viewport.height + 0.5
-      ) {
-        outside.push(el.textContent.slice(0, 30));
-      }
-    }
-    // Everything inside a column lies inside that column.
-    const escaping: string[] = [];
-    for (const column of document.querySelectorAll(
-      "[data-testid=day-column]",
-    )) {
-      const box = column.getBoundingClientRect();
-      for (const child of column.querySelectorAll("li")) {
-        const rect = child.getBoundingClientRect();
-        if (
-          rect.bottom > box.bottom + 0.5 ||
-          rect.right > box.right + 0.5 ||
-          rect.left < box.left - 0.5
-        ) {
-          escaping.push(child.textContent.slice(0, 30));
-        }
-      }
-    }
-    return {
-      docScroll: [root.scrollWidth, root.scrollHeight],
-      viewport: [viewport.width, viewport.height],
-      clipped,
-      outside,
-      escaping,
-    };
-  });
-  expect(report.docScroll[0]).toBeLessThanOrEqual(report.viewport[0] ?? 0);
-  expect(report.docScroll[1]).toBeLessThanOrEqual(report.viewport[1] ?? 0);
-  expect(report.clipped).toEqual([]);
-  expect(report.outside).toEqual([]);
-  expect(report.escaping).toEqual([]);
-}
 
 test.describe("week view", () => {
   test("toggles to a seven-day week without scrolling or overflow and back", async ({
@@ -130,21 +75,44 @@ test.describe("week view", () => {
     );
     expect(surfaces[0]).toBe(surfaces[6]);
     expect(surfaces[1]).not.toBe(surfaces[0]);
-    expect(new Set(surfaces.slice(1, 6)).size).toBe(1);
+    // Weekdays share one surface, except the countdown day (Wednesday), which wears the
+    // child's tint.
+    expect(
+      new Set([...surfaces.slice(1, 3), ...surfaces.slice(4, 6)]).size,
+    ).toBe(1);
+    expect(surfaces[3]).not.toBe(surfaces[1]);
 
-    // Three icons plus "+N" (6 events, +1 for the day with the countdown), meals compact.
+    // Tiles in the overview's language; "+N" only for what does not fit (space, not a
+    // fixed count), and nothing is lost: shown + summed up === events of the day.
     const wednesday = columns.nth(3);
-    await expect(wednesday.getByRole("img")).toHaveCount(3);
-    // The countdown event wins a slot despite being late in the day.
+    const account = await columnAccount(wednesday);
+    expect(account.shown.length).toBeGreaterThanOrEqual(3);
+    expect(account.shown.length + account.hidden).toBe(7);
+    expect(account.hidden).toBeGreaterThan(0);
+    expect(account.hiddenText).toContain(`${String(account.hidden)} more`);
+    // The countdown event wins a slot despite being late in the day (T-24 ranking).
+    expect(
+      account.shown.some((name) => name.startsWith("Birthday party")),
+    ).toBe(true);
+    // The countdown day is shown in the child's tint and edge (Mia is child-1, #c2410c).
+    await expect(wednesday).toHaveAttribute("data-countdown-day", "true");
+    expect(
+      await wednesday.evaluate((el) => getComputedStyle(el).boxShadow),
+    ).toContain("rgb(194, 65, 12)");
+    // One moon per night still to sleep: in each header before the target day.
     await expect(
-      wednesday.getByRole("img", { name: "Birthday party" }),
-    ).toBeVisible();
-    await expect(wednesday.getByText("+4", { exact: true })).toBeVisible();
+      columns.evaluateAll((all) =>
+        all.map(
+          (column) =>
+            column.querySelectorAll("[data-testid=column-moon]").length,
+        ),
+      ),
+    ).resolves.toEqual([1, 1, 1, 0, 0, 0, 0]);
+    // Meals: breakfast, lunch, dinner rows plus the unspecified one.
+    const meals = wednesday.getByTestId("meal-rows");
+    await expect(meals.getByRole("img")).toHaveCount(4);
     await expect(
-      columns.first().getByText("+3", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      wednesday.getByRole("listitem").filter({ hasText: "Apple" }),
+      meals.getByRole("img", { name: "Lunch: Spaghetti with tomato sauce" }),
     ).toBeVisible();
     await expectNoOverflow(page);
 
@@ -206,12 +174,12 @@ test.describe("week view", () => {
       page
         .getByTestId("day-column")
         .first()
-        .getByRole("img", { name: "Swimming" }),
+        .getByRole("article", { name: /^Swimming, 10:00 AM/ }),
     ).toBeVisible();
     await expectNoOverflow(page);
   });
 
-  test("child colour ring and avatar on icons, finished events of today rank last", async ({
+  test("tinted tiles with child badges; finished events of today give way first", async ({
     page,
   }) => {
     await mockBoard(page, {
@@ -229,6 +197,9 @@ test.describe("week view", () => {
             time: "16:00",
             childIds: ["mia", "ben"],
           },
+          { title: "Bath", icon: "🛁", time: "18:00" },
+          { title: "Story", icon: "📖", time: "19:00" },
+          { title: "Sleep song", icon: "🎶", time: "19:30" },
           // Tomorrow the same early events are not over.
           { title: "Swimming", icon: "🏊", time: "07:30", day: 1 },
         ],
@@ -239,37 +210,43 @@ test.describe("week view", () => {
     await page.getByRole("button", { name: "Week" }).click();
     const columns = page.getByTestId("day-column");
     const today = columns.first();
-    await expect(
-      today
-        .getByRole("img")
-        .evaluateAll((all) => all.map((img) => img.getAttribute("aria-label"))),
-    ).resolves.toEqual(["Lunch", "Football", "Music"]);
-    await expect(today.getByText("+2", { exact: true })).toBeVisible();
+    const account = await columnAccount(today);
+    // 8 events in a column that cannot show them all: shown + summed up === 8.
+    expect(account.hidden).toBeGreaterThan(0);
+    expect(account.shown.length + account.hidden).toBe(8);
+    // The finished events are summed up before any upcoming one.
+    const statuses = await today
+      .getByTestId("event-tile")
+      .evaluateAll((all) =>
+        all.map((tile) => tile.getAttribute("data-status")),
+      );
+    expect(statuses).not.toContain("past");
+    expect(account.hiddenText).toContain("Swimming");
+    expect(account.hiddenText).toContain("Dentist");
 
-    // Child cue: ring colour from the first child, avatars for all, name for assistive tech.
-    const icons = today.getByTestId("week-icon");
-    await expect(icons.nth(0)).toHaveAttribute("data-child-ids", "");
-    await expect(icons.nth(1)).toHaveAttribute("data-child-ids", "ben");
-    await expect(icons.nth(2)).toHaveAttribute("data-child-ids", "mia ben");
-    await expect(icons.nth(1)).toContainText("🐻");
-    await expect(icons.nth(2)).toContainText("🦊");
-    await expect(icons.nth(2)).toContainText("🐻");
-    await expect(icons.nth(2).getByText("For Mia and Ben")).toBeAttached();
-    const rings = await icons.evaluateAll((all) =>
-      all.map((li) => {
-        const style = getComputedStyle(li);
-        return { shadow: style.boxShadow };
-      }),
-    );
-    expect(rings[0]?.shadow).toBe("none");
-    // The ring (box-shadow) is drawn in the child's colour: Ben is child-2 (#0072b2).
-    expect(rings[1]?.shadow).toContain("rgb(0, 114, 178)");
-    // Mia (child-1, #c2410c) for the shared event: the first child wins.
-    expect(rings[2]?.shadow).toContain("rgb(194, 65, 12)");
+    // Child cue: tint kind, badges (avatar emoji) and the name for assistive tech.
+    const tiles = today.getByTestId("event-tile");
+    const lunch = tiles.filter({ hasText: "12:30" });
+    await expect(lunch).toHaveAttribute("data-tint", "none");
+    const football = today.getByRole("article", { name: /^Football/ });
+    await expect(football).toHaveAttribute("data-tint", "single");
+    await expect(football).toHaveAccessibleName("Football, 3:00 PM, For Ben");
+    const music = today.getByRole("article", { name: /^Music/ });
+    await expect(music).toHaveAttribute("data-tint", "split");
+    const badges = music.locator("xpath=..").getByTestId("child-badges");
+    await expect(badges).toContainText("🦊");
+    await expect(badges).toContainText("🐻");
+    // The single child's edge is drawn in the child's colour (Ben is child-2, #0072b2).
+    expect(
+      await football.evaluate((el) => getComputedStyle(el).boxShadow),
+    ).toContain("rgb(0, 114, 178)");
+    // Time-of-day symbols on the tiles; the evening is a dusk skyline, never a moon.
+    await expect(football).toContainText("🌞");
+    expect(await today.getByText("🌙").count()).toBe(0);
 
     // Tomorrow nothing is over: the early event keeps its place.
     await expect(
-      columns.nth(1).getByRole("img", { name: "Swimming" }),
+      columns.nth(1).getByRole("article", { name: /^Swimming, 7:30 AM/ }),
     ).toBeVisible();
     await expectNoOverflow(page);
   });

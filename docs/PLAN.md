@@ -423,7 +423,7 @@ not address. These rules apply to every M5b task:
   title, 📅 fallback) fits 1280×800 and 2000×1200 without scrolling, incl. burn-in corners;
   i18n DE + EN; `docs/screenshots` regenerated.
 
-- [ ] **T-31 Week view in the new tile language** (risk: low, deps: T-30b)
+- [x] **T-31 Week view in the new tile language** (risk: low, deps: T-30b)
   Acceptance: week tiles tinted with child badge and time-of-day icon; weekend columns stay
   visually distinct (T-18); past events of today ranked last (T-24); "+N" only when there is
   no room; countdown day in the child's tint and edge, moons in the column headers up to the

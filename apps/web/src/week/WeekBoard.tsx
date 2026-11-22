@@ -1,72 +1,53 @@
 import type { CalendarEvent, Child } from "@kidboard/shared";
-import { useId } from "react";
+import { useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ChildAvatar } from "../components/ChildAvatar";
-import { childColorStyle } from "../components/childColor";
+import { resolveTileTint, tileTintStyle } from "../components/childTint";
 import { Emoji } from "../components/Emoji";
+import { childrenOf, EventTile } from "../components/EventTile";
+import { useContentHeight } from "../day/useContentHeight";
 import {
   type FormatContext,
-  formatDayMonth,
+  formatDayMonthShort,
   formatWeekday,
 } from "../i18n/format";
-import type { WeekDay } from "./buildWeekModel";
+import { chronological, type WeekDay } from "./buildWeekModel";
+import { MealRows } from "./MealRows";
+import { fitWeekColumn } from "./weekCapacity";
 
-/** Children an event is for (unknown ids skipped), in the event's order. */
-function kidsOf(event: CalendarEvent, childList: readonly Child[]): Child[] {
-  return event.childIds.flatMap((id) => {
-    const child = childList.find((c) => c.id === id);
-    return child === undefined ? [] : [child];
-  });
+/** 🌙 counts sleeps and nothing else (merge rule 1); one per night still to sleep. */
+const MOON = "🌙";
+
+/** The day the countdown waits for, as far as the week columns need it. */
+export interface WeekCountdown {
+  /** Start date (`YYYY-MM-DD`, config zone) of the awaited events. */
+  date: string;
+  /** The awaited events; the first one's children tint the target day. */
+  events: readonly CalendarEvent[];
 }
 
-/**
- * One event icon of a week column. For a child's event the icon sits in a ring in that
- * child's colour (the first child, like the day view's tile edge) with a small avatar per
- * child in the corner, so "whose is this?" reads at a glance without words; the colour is
- * never the only cue (the avatar emoji and a screen reader text say who).
- */
-function WeekIcon({
-  event,
-  childList,
+/** "+N" row for the events without a tile; names them for assistive tech. */
+function MoreRow({
+  items,
 }: {
-  event: CalendarEvent;
-  childList: readonly Child[];
+  items: readonly CalendarEvent[];
 }): React.JSX.Element {
   const { t } = useTranslation();
-  const kids = kidsOf(event, childList);
-  const first = kids[0];
   return (
     <li
-      data-testid="week-icon"
-      data-child-ids={kids.map((child) => child.id).join(" ")}
-      style={childColorStyle(first?.color)}
-      className={`rounded-tile relative p-1 ${
-        first === undefined
-          ? ""
-          : "bg-surface-raised ring-4 ring-(--child-color)"
-      }`}
+      data-testid="column-more"
+      data-count={items.length}
+      className="bg-surface-raised text-text-muted inset-ring-border rounded-tile text-title flex h-9 items-center justify-center font-black inset-ring-2"
     >
-      <Emoji emoji={event.icon} label={event.title} className="text-icon" />
-      {kids.length > 0 && (
-        <>
-          <span className="absolute -end-2 -bottom-2 flex">
-            {kids.map((child) => (
-              <ChildAvatar
-                key={child.id}
-                decorative
-                child={child}
-                className="border-surface-raised text-body -ms-2 size-8 border-2 first:ms-0"
-              />
-            ))}
-          </span>
-          <span className="sr-only">
-            {t("week.forChildren", {
-              names: kids.map((child) => child.name),
-            })}
-          </span>
-        </>
-      )}
+      <span aria-hidden="true">
+        {t("week.moreBadge", { count: items.length })}
+      </span>
+      <span className="sr-only">
+        {t("week.more", {
+          count: items.length,
+          titles: items.map((event) => event.title),
+        })}
+      </span>
     </li>
   );
 }
@@ -75,17 +56,47 @@ function WeekColumn({
   day,
   childList,
   format,
+  countdown,
 }: {
   day: WeekDay;
   childList: readonly Child[];
   format: FormatContext;
+  countdown: WeekCountdown | undefined;
 }): React.JSX.Element {
-  const { t } = useTranslation();
   const headingId = useId();
-  const surface = day.isWeekend
-    ? "bg-surface-weekend text-text"
-    : "bg-surface-raised text-text";
-  const ring = day.isToday ? "ring-accent shadow-raised ring-4" : "shadow-card";
+  const listRef = useRef<HTMLUListElement>(null);
+  const measured = useContentHeight(listRef);
+  const fit = fitWeekColumn(
+    day.events,
+    measured === null ? null : measured.height / measured.rem,
+  );
+  const shown = chronological(fit.visible);
+
+  // The countdown day wears the awaited event's child tint and edge; every day before it
+  // shows one moon in its header (the night after it is still to sleep).
+  const target = countdown !== undefined && countdown.date === day.date;
+  const tint = target
+    ? resolveTileTint(
+        childrenOf(countdown.events[0] as CalendarEvent, childList),
+      )
+    : undefined;
+  const tinted = tint !== undefined && tint.kind !== "none";
+  const moon = countdown !== undefined && day.date < countdown.date;
+
+  // Weekend columns keep their own surface (T-18); today is raised like in the overview;
+  // the countdown day's inline tint wins over all of them.
+  const surface = tinted
+    ? "text-text"
+    : day.isWeekend
+      ? "bg-surface-weekend text-text"
+      : day.isToday
+        ? "bg-surface-raised text-text"
+        : "bg-surface-sunken text-text";
+  const edge =
+    tint !== undefined && tint.edge !== null
+      ? "inset-ring-4 inset-ring-(color:--child-color)"
+      : "";
+  const ring = day.isToday ? "ring-today-ring shadow-raised ring-[5px]" : "";
   const label = day.isWeekend ? "text-band-morning-accent" : "text-text";
   return (
     <section
@@ -95,7 +106,10 @@ function WeekColumn({
       data-date={day.date}
       data-weekend={day.isWeekend}
       data-today={day.isToday}
-      className={`${surface} ${ring} rounded-tile flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden p-3`}
+      data-countdown-day={target}
+      data-size={fit.size}
+      style={tinted ? tileTintStyle(tint) : undefined}
+      className={`${surface} ${edge} ${ring} rounded-column flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden p-3`}
     >
       <div className="shrink-0">
         <h2
@@ -104,55 +118,40 @@ function WeekColumn({
         >
           {formatWeekday(day.date, format)}
         </h2>
-        <p className="text-caption text-text-muted font-bold">
-          {formatDayMonth(day.date, format)}
-        </p>
-      </div>
-      {(day.icons.length > 0 || day.more > 0) && (
-        <ul className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
-          {day.icons.map((event) => (
-            <WeekIcon key={event.id} event={event} childList={childList} />
-          ))}
-          {day.more > 0 && (
-            <li className="text-title text-text-muted font-extrabold">
-              <span aria-hidden="true">
-                {t("week.moreBadge", { count: day.more })}
-              </span>
-              <span className="sr-only">
-                {t("week.more", { count: day.more })}
-              </span>
-            </li>
+        <div className="flex items-center justify-between gap-1">
+          <p className="text-caption text-text-muted min-w-0 truncate font-bold">
+            {formatDayMonthShort(day.date, format)}
+          </p>
+          {moon && (
+            <span data-testid="column-moon" className="shrink-0">
+              <Emoji emoji={MOON} className="text-title" />
+            </span>
           )}
-        </ul>
-      )}
-      {day.meals.length > 0 && (
-        <ul
-          aria-label={t("week.meals")}
-          className="border-border mt-auto flex shrink-0 flex-col gap-1 border-t-2 pt-2"
-        >
-          {day.meals.map((meal) => (
-            <li
-              key={meal.id}
-              data-slot={meal.slot}
-              className="flex min-w-0 items-center gap-2"
-            >
-              <Emoji emoji={meal.icon} className="text-title" />
-              <span
-                aria-hidden="true"
-                className="text-caption min-w-0 flex-1 truncate font-bold"
-              >
-                {meal.title}
-              </span>
-              <span className="sr-only">
-                {t("week.mealEntry", {
-                  slot: t(`meal.slot.${meal.slot}`),
-                  title: meal.title,
-                })}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+        </div>
+      </div>
+      <ul
+        ref={listRef}
+        data-testid="column-events"
+        className="-mx-1.5 flex min-h-0 flex-1 basis-0 flex-col gap-2 overflow-hidden px-1.5 pt-2 pb-1.5"
+      >
+        {shown.map((item) => (
+          <li key={item.event.id} className="min-w-0">
+            <EventTile
+              event={item.event}
+              childList={childList}
+              format={format}
+              status={item.status}
+              continues={item.continues}
+              timeOfDay={item.timeOfDay}
+              size={fit.size}
+            />
+          </li>
+        ))}
+        {fit.hidden.length > 0 && (
+          <MoreRow items={fit.hidden.map((item) => item.event)} />
+        )}
+      </ul>
+      <MealRows meals={day.meals} />
     </section>
   );
 }
@@ -162,13 +161,20 @@ export interface WeekBoardProps {
   /** Configured children; `event.childIds` are looked up here (unknown ids skipped). */
   childList: readonly Child[];
   format: FormatContext;
+  /** The awaited countdown: tints its day and puts a moon in the earlier headers. */
+  countdown?: WeekCountdown | undefined;
 }
 
-/** Seven day columns side by side (today first) with icons and meals. Presentational. */
+/**
+ * Seven day columns side by side (today first) in the overview's tile language: tinted
+ * tiles with child badges and a time-of-day symbol, meals as a three-row list. How many
+ * tiles fit is measured per column; the rest becomes "+N". Presentational.
+ */
 export function WeekBoard({
   days,
   childList,
   format,
+  countdown,
 }: WeekBoardProps): React.JSX.Element {
   const { t } = useTranslation();
   return (
@@ -176,7 +182,7 @@ export function WeekBoard({
       role="group"
       aria-label={t("week.label")}
       data-testid="week-board"
-      className="grid min-h-0 flex-1 grid-cols-7 gap-3"
+      className="gap-gutter grid min-h-0 flex-1 grid-cols-7 grid-rows-[minmax(0,1fr)]"
     >
       {days.map((day) => (
         <WeekColumn
@@ -184,6 +190,7 @@ export function WeekBoard({
           day={day}
           childList={childList}
           format={format}
+          countdown={countdown}
         />
       ))}
     </div>

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   type FormatContext,
   formatDayMonth,
+  formatDayMonthShort,
   formatLongDate,
   formatTime,
   formatWeekday,
@@ -18,6 +19,9 @@ describe("date/time formatting", () => {
     expect(formatWeekday(instant, berlinEn)).toBe("Sunday");
     expect(formatDayMonth(instant, berlinDe)).toBe("2. März");
     expect(formatDayMonth(instant, berlinEn)).toBe("March 2");
+    expect(formatDayMonthShort(instant, berlinEn)).toBe("Mar 2");
+    expect(formatDayMonthShort("2025-11-26", berlinEn)).toBe("Nov 26");
+    expect(formatDayMonthShort("2025-11-26", berlinDe)).toMatch(/^26\. Nov/);
     expect(formatLongDate(instant, berlinEn)).toBe("March 2, 2025");
     expect(formatLongDate(instant, berlinDe)).toBe("2. März 2025");
   });

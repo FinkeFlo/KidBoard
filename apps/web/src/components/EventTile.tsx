@@ -12,10 +12,12 @@ export type EventStatus = "upcoming" | "current" | "past";
 
 /**
  * Tile sizes: `large` / `dense` in today's column (dense from 6 events or when space is
- * short), `compact` / `compact-dense` on the other days. Heights are fixed, so a column
+ * short), `compact` / `compact-dense` on the other days, `week` / `week-dense` for the
+ * seven narrow week columns (stacked: emoji above time, no visible title). Heights are fixed, so a column
  * can derive how many tiles fit from its height ({@link TILE_HEIGHT_REM}).
  */
-export type TileSize = "large" | "dense" | "compact" | "compact-dense";
+export type TileSize =
+  "large" | "dense" | "compact" | "compact-dense" | "week" | "week-dense";
 
 /** Tile heights in rem; `large` and `compact` are `--spacing-tile(-compact)`. */
 export const TILE_HEIGHT_REM: Record<TileSize, number> = {
@@ -23,6 +25,8 @@ export const TILE_HEIGHT_REM: Record<TileSize, number> = {
   dense: 4,
   compact: 4.75,
   "compact-dense": 3.75,
+  week: 5.75,
+  "week-dense": 4.5,
 };
 
 // Full class names so Tailwind can see them. Today's emoji stay >= 3.5rem in both sizes.
@@ -34,6 +38,8 @@ const SIZES: Record<
     title: string;
     badge: string;
     badgeText: string;
+    /** Emoji above the time (week columns) instead of beside the title. */
+    stacked: boolean;
   }
 > = {
   large: {
@@ -42,6 +48,7 @@ const SIZES: Record<
     title: "text-tile",
     badge: "size-badge",
     badgeText: "text-title",
+    stacked: false,
   },
   dense: {
     tile: "h-16 gap-3 ps-3 pe-4",
@@ -49,6 +56,7 @@ const SIZES: Record<
     title: "text-tile-compact",
     badge: "size-8",
     badgeText: "text-body",
+    stacked: false,
   },
   compact: {
     tile: "h-tile-compact gap-2 ps-2.5 pe-3",
@@ -56,6 +64,7 @@ const SIZES: Record<
     title: "text-tile-compact",
     badge: "size-9",
     badgeText: "text-body",
+    stacked: false,
   },
   "compact-dense": {
     tile: "h-15 gap-2 ps-2.5 pe-3",
@@ -63,6 +72,23 @@ const SIZES: Record<
     title: "text-tile-compact",
     badge: "size-8",
     badgeText: "text-body",
+    stacked: false,
+  },
+  week: {
+    tile: "h-23 flex-col justify-center gap-1 px-1.5",
+    emoji: "text-[2.75rem]",
+    title: "text-tile-compact",
+    badge: "size-7",
+    badgeText: "text-caption",
+    stacked: true,
+  },
+  "week-dense": {
+    tile: "h-18 flex-col justify-center gap-0.5 px-1.5",
+    emoji: "text-[2.25rem]",
+    title: "text-tile-compact",
+    badge: "size-7",
+    badgeText: "text-caption",
+    stacked: true,
   },
 };
 
@@ -182,9 +208,14 @@ export function EventTile({
           emoji={event.icon}
           className={`${sizes.emoji} ${past ? "grayscale" : ""}`}
         />
-        <div className="min-w-0 flex-1">
-          <p className={`${sizes.title} truncate pe-5`}>{event.title}</p>
-          <p className="text-meta text-text-muted flex min-w-0 items-center gap-1.5">
+        <div className={sizes.stacked ? "min-w-0" : "min-w-0 flex-1"}>
+          {/* Week tiles are picture-first: the title is in the accessible name only. */}
+          {!sizes.stacked && (
+            <p className={`${sizes.title} truncate pe-5`}>{event.title}</p>
+          )}
+          <p
+            className={`text-meta text-text-muted flex min-w-0 items-center gap-1.5 ${sizes.stacked ? "justify-center" : ""}`}
+          >
             {event.allDay ? (
               <AllDayIcon />
             ) : timeOfDay !== null ? (

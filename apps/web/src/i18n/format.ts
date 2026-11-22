@@ -76,6 +76,14 @@ export function formatDayMonth(value: DateInput, ctx: FormatContext): string {
   return fmt(value, ctx.locale === "de" ? "d. MMMM" : "MMMM d", ctx);
 }
 
+/** Day and abbreviated month for narrow columns, e.g. "26. Nov" / "Nov 26". */
+export function formatDayMonthShort(
+  value: DateInput,
+  ctx: FormatContext,
+): string {
+  return fmt(value, ctx.locale === "de" ? "d. MMM" : "MMM d", ctx);
+}
+
 /**
  * Wall-clock time, 24 h for `de` ("14:30"), 12 h for `en` ("2:30 PM").
  * A `YYYY-MM-DD` date key has no time of day, so it throws a `RangeError`

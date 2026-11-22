@@ -4,6 +4,7 @@ import { eventFixture, mealFixture } from "../components/fixtures.test-utils";
 import type { DayEvent } from "../day/buildDayModel";
 import {
   buildWeekModel,
+  chronological,
   isWeekendDate,
   rankByImportance,
   WEEK_DAYS,
@@ -121,6 +122,39 @@ describe("rankByImportance", () => {
   });
 });
 
+describe("chronological", () => {
+  it("puts all-day first, then continuing, then by start; keeps past ones in time order", () => {
+    const input = [
+      dayEvent({ id: "late", start: "2026-11-22T18:00:00+01:00" }),
+      dayEvent(
+        { id: "over", start: "2026-11-22T08:00:00+01:00" },
+        false,
+        "past",
+      ),
+      dayEvent({
+        id: "cd",
+        countdown: true,
+        start: "2026-11-22T20:00:00+01:00",
+      }),
+      dayEvent({ id: "carry", start: "2026-11-21T22:00:00+01:00" }, true),
+      dayEvent({
+        id: "allday",
+        allDay: true,
+        start: "2026-11-22",
+        end: "2026-11-23",
+      }),
+    ];
+    expect(chronological(input).map((entry) => entry.event.id)).toEqual([
+      "allday",
+      "carry",
+      "over",
+      "late",
+      "cd",
+    ]);
+    expect(input.map((entry) => entry.event.id)[0]).toBe("late");
+  });
+});
+
 describe("buildWeekModel", () => {
   it("returns seven consecutive days from today with weekend flags", () => {
     const week = buildWeekModel({ events: [], meals: [] }, CONFIG, FROM, NOW);
@@ -154,7 +188,7 @@ describe("buildWeekModel", () => {
     ]);
   });
 
-  it("limits icons to three, counts the rest and keeps the most important", () => {
+  it("ranks all events of a day, most important first, without a fixed cut-off", () => {
     const events = [
       eventFixture({
         id: "e1",
@@ -184,11 +218,16 @@ describe("buildWeekModel", () => {
       }),
     ];
     const monday = buildWeekModel({ events, meals: [] }, CONFIG, FROM, NOW)[1];
-    expect(monday?.icons.map((e) => e.id)).toEqual(["cd", "e1", "e2"]);
-    expect(monday?.more).toBe(2);
+    expect(monday?.events.map((e) => e.event.id)).toEqual([
+      "cd",
+      "e1",
+      "e2",
+      "e3",
+      "e4",
+    ]);
   });
 
-  it("fills today's icons with what is still to come; finished events only after that", () => {
+  it("ranks what is still to come before finished events today", () => {
     const at = (id: string, hour: number): ReturnType<typeof eventFixture> =>
       eventFixture({
         id,
@@ -203,8 +242,12 @@ describe("buildWeekModel", () => {
       FROM,
       NOW,
     );
-    expect(today?.icons.map((e) => e.id)).toEqual(["a", "b", "early"]);
-    expect(today?.more).toBe(1);
+    expect(today?.events.map((e) => e.event.id)).toEqual([
+      "a",
+      "b",
+      "early",
+      "mid",
+    ]);
     // The same events a day later are not over: plain start-time order.
     const next = buildWeekModel(
       {
@@ -221,11 +264,16 @@ describe("buildWeekModel", () => {
       FROM,
       NOW,
     )[1];
-    expect(next?.icons.map((e) => e.id)).toEqual(["early", "mid", "a"]);
-    expect(tomorrow?.icons).toEqual([]);
+    expect(next?.events.map((e) => e.event.id)).toEqual([
+      "early",
+      "mid",
+      "a",
+      "b",
+    ]);
+    expect(tomorrow?.events).toEqual([]);
   });
 
-  it("shows no +N when exactly three events exist", () => {
+  it("keeps every event of a day in the model (the column decides what fits)", () => {
     const events = ["a", "b", "c"].map((id, i) =>
       eventFixture({
         id,
@@ -234,8 +282,7 @@ describe("buildWeekModel", () => {
       }),
     );
     const tuesday = buildWeekModel({ events, meals: [] }, CONFIG, FROM, NOW)[2];
-    expect(tuesday?.icons).toHaveLength(3);
-    expect(tuesday?.more).toBe(0);
+    expect(tuesday?.events).toHaveLength(3);
   });
 
   it("places multi-day all-day events on each covered day and filters meals per day", () => {
@@ -254,7 +301,7 @@ describe("buildWeekModel", () => {
       mealFixture({ id: "outside", date: "2026-12-30" }),
     ];
     const week = buildWeekModel({ events, meals }, CONFIG, FROM, NOW);
-    expect(week.map((day) => day.icons.length)).toEqual([0, 1, 1, 0, 0, 0, 0]);
+    expect(week.map((day) => day.events.length)).toEqual([0, 1, 1, 0, 0, 0, 0]);
     expect(week[1]?.meals.map((m) => m.id)).toEqual(["b", "d"]);
     expect(week[2]?.meals.map((m) => m.id)).toEqual(["other"]);
   });
@@ -270,8 +317,8 @@ describe("buildWeekModel", () => {
       }),
     ];
     const week = buildWeekModel({ events, meals: [] }, CONFIG, FROM, NOW);
-    expect(week[1]?.icons).toEqual([]);
-    expect(week[2]?.icons.map((e) => e.id)).toEqual(["late"]);
+    expect(week[1]?.events).toEqual([]);
+    expect(week[2]?.events.map((e) => e.event.id)).toEqual(["late"]);
   });
 
   it("builds across a DST change (Berlin 2026-10-25) without skipping or repeating a day", () => {

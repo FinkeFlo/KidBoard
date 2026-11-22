@@ -25,7 +25,13 @@ export default defineConfig({
     colorScheme: "light",
     locale: "en-US",
     deviceScaleFactor: 1,
-    ...(executablePath ? { launchOptions: { executablePath } } : {}),
+    launchOptions: {
+      // One raster thread and no partial raster: with several, the anti-aliased seams of
+      // rounded rectangles differ by a pixel from run to run, so the PNGs would not be
+      // reproducible byte for byte.
+      args: ["--num-raster-threads=1", "--disable-partial-raster"],
+      ...(executablePath ? { executablePath } : {}),
+    },
   },
   projects: [
     {
