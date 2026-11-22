@@ -61,6 +61,7 @@
     "label": "Next seven days",
     "more": "{{count}} more",
     "meals": "Meals",
+    "forChildren": "For {{names, list}}",
     "moreBadge": "+{{count}}",
     "mealEntry": "{{slot}}: {{title}}"
   },

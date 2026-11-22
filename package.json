@@ -15,6 +15,8 @@
     "typecheck": "tsc -p tsconfig.json && pnpm -r --workspace-concurrency=1 typecheck",
     "test": "vitest run",
     "test:e2e": "pnpm --filter @kidboard/web test:e2e",
+    "dev:demo": "pnpm --filter @kidboard/web dev:demo",
+    "screenshots": "pnpm --filter @kidboard/web screenshots",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "node -e \"process.exit(require('fs').existsSync('.git')?0:1)\" && lefthook install || echo \"skipping lefthook install\""

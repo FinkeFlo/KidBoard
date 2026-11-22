@@ -352,7 +352,7 @@ operation, works offline with the last known state.
   content or the offline banner again; ARCHITECTURE gets a day-view section (placement rules,
   5 s stale-banner delay) and ADR-0006/ADR-0009 mention the delay and the decorative emoji mode.
 
-- [ ] **T-24 Visual screenshots** (risk: medium, deps: T-21, T-23)
+- [x] **T-24 Visual screenshots** (risk: medium, deps: T-21, T-23)
   Acceptance: a dev/screenshot fixture with dates relative to "today" (or recurring) exists so manual dev
   and screenshots show realistic data; Playwright generates screenshots of day + week view at 1280×800 and
   2000×1200 in light and night mode with fixture data (Mia 🦊 / Ben 🐻 example) into

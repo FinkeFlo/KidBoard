@@ -23,11 +23,17 @@ iCal-Adressen serverseitig und zeigt eine ruhige Tages- und Wochenansicht.
 
 ## Screenshots
 
-_Folgt._ Platzhalter (Dateien kommen nach `docs/screenshots/`):
+Synthetische Demo-Daten (erzeugt mit `pnpm screenshots`; Versionen in 2000x1200 liegen in
+[`docs/screenshots/`](docs/screenshots/)).
 
-- `docs/screenshots/day-view.png`
-- `docs/screenshots/week-view.png`
-- `docs/screenshots/night-mode.png`
+| Tagesansicht                                                    | Wochenansicht                                                     |
+| --------------------------------------------------------------- | ----------------------------------------------------------------- |
+| ![Tagesansicht](docs/screenshots/day-light-1280x800.png)        | ![Wochenansicht](docs/screenshots/week-light-1280x800.png)        |
+| ![Tagesansicht, Nacht](docs/screenshots/day-night-1280x800.png) | ![Wochenansicht, Nacht](docs/screenshots/week-night-1280x800.png) |
+
+Der Countdown "Wie oft noch schlafen?" wird am großen Tag zum Konfetti-Popper:
+
+![Countdown erreicht heute](docs/screenshots/day-countdown-today-1280x800.png)
 
 ## Google-Kalender einrichten
 

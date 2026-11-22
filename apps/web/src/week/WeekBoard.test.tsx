@@ -1,7 +1,12 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { eventFixture, mealFixture } from "../components/fixtures.test-utils";
+import {
+  BEN,
+  eventFixture,
+  mealFixture,
+  MIA,
+} from "../components/fixtures.test-utils";
 import type { FormatContext } from "../i18n/format";
 import { buildWeekModel } from "./buildWeekModel";
 import { WeekBoard } from "./WeekBoard";
@@ -22,7 +27,7 @@ function renderWeek(
     "2026-11-22",
     Date.parse("2026-11-22T12:00:00+01:00"),
   );
-  render(<WeekBoard days={days} format={format} />);
+  render(<WeekBoard days={days} childList={[MIA, BEN]} format={format} />);
   return screen.getAllByTestId("week-day");
 }
 
@@ -110,5 +115,81 @@ describe("WeekBoard", () => {
     const icon = within(columns[0] as HTMLElement).getByRole("img");
     expect(icon).toHaveAttribute("aria-label", "<img src=x onerror=alert(1)>");
     expect(document.querySelector("img")).toBeNull();
+  });
+
+  it("gives a child's icon a ring in the child's colour and a name for assistive tech", () => {
+    const columns = renderWeek([
+      eventFixture({
+        id: "mia",
+        title: "Swimming",
+        childIds: ["mia"],
+        start: "2026-11-22T14:00:00+01:00",
+        end: "2026-11-22T15:00:00+01:00",
+      }),
+      eventFixture({
+        id: "all",
+        title: "Zoo",
+        icon: "🦁",
+        childIds: [],
+        start: "2026-11-22T15:00:00+01:00",
+        end: "2026-11-22T16:00:00+01:00",
+      }),
+    ]);
+    const [swim, zoo] = within(columns[0] as HTMLElement).getAllByTestId(
+      "week-icon",
+    ) as [HTMLElement, HTMLElement];
+    expect(swim).toHaveAttribute("data-child-ids", "mia");
+    expect(swim.style.getPropertyValue("--child-color")).toBe(
+      "var(--color-child-1)",
+    );
+    expect(swim.className).toContain("ring-(--child-color)");
+    // The avatar emoji is a second cue besides colour; the name is read out.
+    expect(swim).toHaveTextContent("🦊");
+    expect(within(swim).getByText("For Mia")).toHaveClass("sr-only");
+    // No child: no ring, no avatar, nothing to announce.
+    expect(zoo).toHaveAttribute("data-child-ids", "");
+    expect(zoo.className).not.toContain("ring-");
+    expect(zoo).not.toHaveTextContent("🦊");
+    expect(within(zoo).queryByText(/^For /)).toBeNull();
+  });
+
+  it("shows an avatar per child for a shared event and skips unknown ids", () => {
+    const columns = renderWeek([
+      eventFixture({
+        id: "both",
+        title: "Music",
+        childIds: ["ben", "ghost", "mia"],
+        start: "2026-11-22T14:00:00+01:00",
+        end: "2026-11-22T15:00:00+01:00",
+      }),
+    ]);
+    const icon = within(columns[0] as HTMLElement).getByTestId("week-icon");
+    expect(icon).toHaveAttribute("data-child-ids", "ben mia");
+    expect(icon).toHaveTextContent("🐻");
+    expect(icon).toHaveTextContent("🦊");
+    expect(within(icon).getByText("For Ben and Mia")).toBeInTheDocument();
+    // The avatars are decorative: only the event icon is an image for assistive tech.
+    expect(within(icon).getAllByRole("img")).toHaveLength(1);
+  });
+
+  it("lets an already finished event of today yield its icon slot", () => {
+    // Now is 12:00: the 08:00 event is over, so the three later ones take the slots.
+    const at = (hour: number): { start: string; end: string } => ({
+      start: `2026-11-22T${String(hour).padStart(2, "0")}:00:00+01:00`,
+      end: `2026-11-22T${String(hour + 1).padStart(2, "0")}:00:00+01:00`,
+    });
+    const columns = renderWeek([
+      eventFixture({ id: "over", title: "Over", ...at(8) }),
+      eventFixture({ id: "a", title: "A", ...at(13) }),
+      eventFixture({ id: "b", title: "B", ...at(15) }),
+      eventFixture({ id: "c", title: "C", ...at(17) }),
+    ]);
+    const today = columns[0] as HTMLElement;
+    expect(
+      within(today)
+        .getAllByRole("img")
+        .map((img) => img.getAttribute("aria-label")),
+    ).toEqual(["A", "B", "C"]);
+    expect(within(today).getByText("+1")).toBeInTheDocument();
   });
 });

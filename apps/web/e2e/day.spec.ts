@@ -178,4 +178,48 @@ test.describe("day view", () => {
     await expect(page.getByRole("status")).toHaveText("Loading the plan");
     await expectNoOverflow(page);
   });
+
+  test("each symbol has one meaning: no 🌙 or ☀️ in a band heading, 🌙 only counts sleeps", async ({
+    page,
+  }) => {
+    await mockBoard(page, {
+      agenda: agenda(
+        [
+          ...EVENTS,
+          {
+            title: "Party",
+            icon: "🎂",
+            time: "16:00",
+            day: 3,
+            countdown: true,
+          },
+        ],
+        MEALS,
+      ),
+    });
+    await page.goto("/");
+    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    const bandSymbols = await page
+      .getByTestId("day-band")
+      .evaluateAll((bands) =>
+        bands.map(
+          (band) => band.querySelector("h2 .font-emoji")?.textContent ?? "",
+        ),
+      );
+    expect(new Set(bandSymbols).size).toBe(3);
+    expect(bandSymbols).not.toContain("🌙");
+    expect(bandSymbols).not.toContain("☀️");
+    // The only moons on the board are the countdown's three sleeps.
+    const moonsOnBoard = await page.evaluate(
+      () =>
+        [...document.querySelectorAll(".font-emoji")].filter(
+          (el) => el.textContent === "🌙",
+        ).length,
+    );
+    expect(moonsOnBoard).toBe(3);
+    // And the day toggle's ☀️ is not repeated in the bands.
+    await expect(page.getByRole("button", { name: "Day view" })).toHaveText(
+      "☀️",
+    );
+  });
 });

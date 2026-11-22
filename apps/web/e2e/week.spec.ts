@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 
-import { agenda, mockBoard, type MockEvent } from "./mockApi";
+import { agenda, config, mockBoard, type MockEvent } from "./mockApi";
 
 const SHOT_DIR = process.env["E2E_SCREENSHOT_DIR"];
 
@@ -168,6 +168,69 @@ test.describe("week view", () => {
         .getByTestId("week-day")
         .first()
         .getByRole("img", { name: "Swimming" }),
+    ).toBeVisible();
+    await expectNoOverflow(page);
+  });
+
+  test("child colour ring and avatar on icons, finished events of today rank last", async ({
+    page,
+  }) => {
+    await mockBoard(page, {
+      config: config(),
+      agenda: agenda(
+        [
+          // Now is 12:00 Berlin: the first two are over, so they must not take the slots.
+          { title: "Swimming", icon: "🏊", time: "07:30", childIds: ["mia"] },
+          { title: "Dentist", icon: "🦷", time: "08:30", childIds: ["ben"] },
+          { title: "Lunch", icon: "🍝", time: "12:30" },
+          { title: "Football", icon: "⚽", time: "15:00", childIds: ["ben"] },
+          {
+            title: "Music",
+            icon: "🎻",
+            time: "16:00",
+            childIds: ["mia", "ben"],
+          },
+          // Tomorrow the same early events are not over.
+          { title: "Swimming", icon: "🏊", time: "07:30", day: 1 },
+        ],
+        [],
+      ),
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Week view" }).click();
+    const columns = page.getByTestId("week-day");
+    const today = columns.first();
+    await expect(
+      today
+        .getByRole("img")
+        .evaluateAll((all) => all.map((img) => img.getAttribute("aria-label"))),
+    ).resolves.toEqual(["Lunch", "Football", "Music"]);
+    await expect(today.getByText("+2", { exact: true })).toBeVisible();
+
+    // Child cue: ring colour from the first child, avatars for all, name for assistive tech.
+    const icons = today.getByTestId("week-icon");
+    await expect(icons.nth(0)).toHaveAttribute("data-child-ids", "");
+    await expect(icons.nth(1)).toHaveAttribute("data-child-ids", "ben");
+    await expect(icons.nth(2)).toHaveAttribute("data-child-ids", "mia ben");
+    await expect(icons.nth(1)).toContainText("🐻");
+    await expect(icons.nth(2)).toContainText("🦊");
+    await expect(icons.nth(2)).toContainText("🐻");
+    await expect(icons.nth(2).getByText("For Mia and Ben")).toBeAttached();
+    const rings = await icons.evaluateAll((all) =>
+      all.map((li) => {
+        const style = getComputedStyle(li);
+        return { shadow: style.boxShadow };
+      }),
+    );
+    expect(rings[0]?.shadow).toBe("none");
+    // The ring (box-shadow) is drawn in the child's colour: Ben is child-2 (#0072b2).
+    expect(rings[1]?.shadow).toContain("rgb(0, 114, 178)");
+    // Mia (child-1, #c2410c) for the shared event: the first child wins.
+    expect(rings[2]?.shadow).toContain("rgb(194, 65, 12)");
+
+    // Tomorrow nothing is over: the early event keeps its place.
+    await expect(
+      columns.nth(1).getByRole("img", { name: "Swimming" }),
     ).toBeVisible();
     await expectNoOverflow(page);
   });

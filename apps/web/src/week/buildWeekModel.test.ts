@@ -20,9 +20,10 @@ const NOW = Date.parse("2026-11-22T12:00:00+01:00");
 const dayEvent = (
   overrides: Parameters<typeof eventFixture>[0],
   continues = false,
+  status: DayEvent["status"] = "upcoming",
 ): DayEvent => ({
   event: eventFixture(overrides),
-  status: "upcoming",
+  status,
   continues,
 });
 
@@ -74,6 +75,39 @@ describe("rankByImportance", () => {
       ),
     ]).map((entry) => entry.event.id);
     expect(ranked).toEqual(["cont", "a", "b"]);
+  });
+
+  it("ranks events that are already over last, whatever else they are", () => {
+    const ranked = rankByImportance([
+      dayEvent(
+        {
+          id: "past-countdown",
+          countdown: true,
+          start: "2026-11-22T08:00:00+01:00",
+        },
+        false,
+        "past",
+      ),
+      dayEvent(
+        { id: "past", start: "2026-11-22T07:00:00+01:00" },
+        false,
+        "past",
+      ),
+      dayEvent({ id: "late", start: "2026-11-22T18:00:00+01:00" }),
+      dayEvent(
+        { id: "now", start: "2026-11-22T11:00:00+01:00" },
+        false,
+        "current",
+      ),
+      dayEvent({
+        id: "allday",
+        allDay: true,
+        start: "2026-11-22",
+        end: "2026-11-23",
+      }),
+    ]).map((entry) => entry.event.id);
+    // Past ones keep the usual order among themselves (countdown first, then by start).
+    expect(ranked).toEqual(["allday", "now", "late", "past-countdown", "past"]);
   });
 
   it("does not modify its input", () => {
@@ -151,6 +185,43 @@ describe("buildWeekModel", () => {
     const monday = buildWeekModel({ events, meals: [] }, CONFIG, FROM, NOW)[1];
     expect(monday?.icons.map((e) => e.id)).toEqual(["cd", "e1", "e2"]);
     expect(monday?.more).toBe(2);
+  });
+
+  it("fills today's icons with what is still to come; finished events only after that", () => {
+    const at = (id: string, hour: number): ReturnType<typeof eventFixture> =>
+      eventFixture({
+        id,
+        start: `2026-11-22T${String(hour).padStart(2, "0")}:00:00+01:00`,
+        end: `2026-11-22T${String(hour + 1).padStart(2, "0")}:00:00+01:00`,
+      });
+    // NOW is 12:00: "early" and "mid" are over.
+    const events = [at("early", 7), at("mid", 9), at("a", 13), at("b", 16)];
+    const [today, tomorrow] = buildWeekModel(
+      { events, meals: [] },
+      CONFIG,
+      FROM,
+      NOW,
+    );
+    expect(today?.icons.map((e) => e.id)).toEqual(["a", "b", "early"]);
+    expect(today?.more).toBe(1);
+    // The same events a day later are not over: plain start-time order.
+    const next = buildWeekModel(
+      {
+        events: events.map((e) =>
+          eventFixture({
+            ...e,
+            start: e.start.replace("2026-11-22", "2026-11-23"),
+            end: e.end.replace("2026-11-22", "2026-11-23"),
+          }),
+        ),
+        meals: [],
+      },
+      CONFIG,
+      FROM,
+      NOW,
+    )[1];
+    expect(next?.icons.map((e) => e.id)).toEqual(["early", "mid", "a"]);
+    expect(tomorrow?.icons).toEqual([]);
   });
 
   it("shows no +N when exactly three events exist", () => {

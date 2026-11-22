@@ -23,11 +23,17 @@ server side and shows a calm day and week view.
 
 ## Screenshots
 
-_Coming soon._ Placeholders (files go to `docs/screenshots/`):
+Synthetic demo data (generated with `pnpm screenshots`; 2000x1200 versions are in
+[`docs/screenshots/`](docs/screenshots/)).
 
-- `docs/screenshots/day-view.png`
-- `docs/screenshots/week-view.png`
-- `docs/screenshots/night-mode.png`
+| Day view                                                    | Week view                                                     |
+| ----------------------------------------------------------- | ------------------------------------------------------------- |
+| ![Day view](docs/screenshots/day-light-1280x800.png)        | ![Week view](docs/screenshots/week-light-1280x800.png)        |
+| ![Day view, night](docs/screenshots/day-night-1280x800.png) | ![Week view, night](docs/screenshots/week-night-1280x800.png) |
+
+The "How many sleeps?" countdown turns into a party popper on the big day:
+
+![Countdown reaches today](docs/screenshots/day-countdown-today-1280x800.png)
 
 ## Google Calendar setup
 
