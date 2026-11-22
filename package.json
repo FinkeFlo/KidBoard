@@ -2,17 +2,37 @@
   "name": "kidboard",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "Icon-first family calendar and meal plan for a wall-mounted kiosk tablet.",
   "packageManager": "pnpm@10.28.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "pnpm --parallel --filter @kidboard/web --filter @kidboard/worker dev",
     "build": "pnpm --filter @kidboard/web build && pnpm --filter @kidboard/worker build",
-    "lint": "echo \"lint: placeholder until T-02\"",
+    "lint": "eslint --max-warnings=0 .",
     "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
     "test": "echo \"test: placeholder until T-03\"",
     "test:e2e": "echo \"test:e2e: placeholder until T-03\"",
-    "format": "echo \"format: placeholder until T-02\"",
-    "format:check": "echo \"format:check: placeholder until T-02\""
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "node -e \"process.exit(require('fs').existsSync('.git')?0:1)\" && lefthook install || echo \"skipping lefthook install\""
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-simple-import-sort": "^14.0.0",
+    "globals": "^17.14.0",
+    "lefthook": "^2.2.2",
+    "prettier": "^3.10.1",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.73.0"
   }
 }
