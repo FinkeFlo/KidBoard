@@ -16,6 +16,8 @@ export interface EventTileProps {
   format: FormatContext;
   /** Relative to now; computed by the caller (the tile is presentational). */
   status?: EventStatus;
+  /** Timed event that began on an earlier day: shows "continues" instead of the start. */
+  continues?: boolean;
 }
 
 const STATUS_CLASSES: Record<EventStatus, string> = {
@@ -30,6 +32,7 @@ export function EventTile({
   childList,
   format,
   status = "upcoming",
+  continues = false,
 }: EventTileProps): React.JSX.Element {
   const { t } = useTranslation();
   const titleId = useId();
@@ -54,9 +57,14 @@ export function EventTile({
           {event.title}
         </p>
         <p className="text-caption text-text-muted">
-          {event.allDay ? t("event.allDay") : formatTime(event.start, format)}
+          {event.allDay
+            ? t("event.allDay")
+            : continues
+              ? t("event.continues")
+              : formatTime(event.start, format)}
         </p>
-        {event.childIds.length === 0 && (
+        {/* Also when every id is unconfigured: no avatar is shown, so it reads as "everyone". */}
+        {kids.length === 0 && (
           <p className="sr-only">{t("event.forEveryone")}</p>
         )}
         {status !== "upcoming" && (

@@ -394,4 +394,51 @@ describe("buildDayModel", () => {
       ).isEmpty,
     ).toBe(false);
   });
+
+  it("flags timed events that started on an earlier day as continuing", () => {
+    const model = buildDayModel(
+      {
+        events: [
+          timed(
+            "cont",
+            "2026-11-21T20:00:00+01:00",
+            "2026-11-22T09:00:00+01:00",
+          ),
+          timed(
+            "own",
+            "2026-11-22T10:00:00+01:00",
+            "2026-11-22T11:00:00+01:00",
+          ),
+        ],
+        meals: [],
+      },
+      CONFIG,
+      TODAY,
+      at("12:00"),
+    );
+    const flags = model.bands
+      .flatMap((band) => band.events)
+      .map((e) => [e.event.id, e.continues]);
+    expect(flags).toEqual([
+      ["cont", true],
+      ["own", false],
+    ]);
+    // On its first day the same event is not "continuing".
+    const first = buildDayModel(
+      {
+        events: [
+          timed(
+            "cont",
+            "2026-11-21T20:00:00+01:00",
+            "2026-11-22T09:00:00+01:00",
+          ),
+        ],
+        meals: [],
+      },
+      CONFIG,
+      "2026-11-21",
+      at("12:00"),
+    );
+    expect(first.bands[2]?.events[0]?.continues).toBe(false);
+  });
 });

@@ -1,5 +1,12 @@
 import { onlineManager, type QueryClient } from "@tanstack/react-query";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -18,11 +25,11 @@ import {
   type FakeFetch,
   TEST_TOKEN,
 } from "../data/testing.test-utils";
+import { STALE_BANNER_DELAY_MS } from "../day/DiscreetStatusBanner";
 import { applyLocale } from "../i18n";
 import de from "../i18n/locales/de.json";
 import en from "../i18n/locales/en.json";
-import { DayView } from "./DayView";
-import { STALE_BANNER_DELAY_MS } from "./DiscreetStatusBanner";
+import { Board } from "./Board";
 
 let fake: FakeFetch;
 let clients: QueryClient[] = [];
@@ -37,7 +44,7 @@ function renderDay(): void {
   );
   render(
     <Wrapper>
-      <DayView />
+      <Board />
     </Wrapper>,
   );
 }
@@ -62,7 +69,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("DayView", () => {
+describe("Board", () => {
   it("shows the loading skeleton until the config is there", () => {
     fake.setReplies("/api/config", "hang");
     renderDay();
@@ -264,5 +271,85 @@ describe("DayView", () => {
       await vi.advanceTimersByTimeAsync(STALE_BANNER_DELAY_MS);
     });
     expect(screen.getByRole("status")).toHaveTextContent(en.status.stale);
+  });
+
+  describe("day / week toggle", () => {
+    const agenda = (): void => {
+      fake.setReplies("/api/agenda", {
+        status: 200,
+        body: agendaFixture({
+          events: [
+            eventFixture({ id: "today", title: "Swimming" }),
+            eventFixture({
+              id: "tue",
+              title: "Dentist",
+              icon: "🦷",
+              start: "2026-11-24T09:00:00+01:00",
+              end: "2026-11-24T10:00:00+01:00",
+            }),
+          ],
+          meals: [
+            mealFixture({ id: "tue-m", date: "2026-11-24", title: "Soup" }),
+          ],
+        }),
+      });
+    };
+
+    it("starts on the day view and switches to the week with the shared header", async () => {
+      agenda();
+      renderDay();
+      expect(await screen.findAllByTestId("day-band")).toHaveLength(3);
+      expect(screen.queryByTestId("week-board")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: en.board.week }));
+      expect(screen.getByTestId("week-board")).toBeInTheDocument();
+      expect(screen.queryByTestId("day-band")).not.toBeInTheDocument();
+      expect(screen.getAllByTestId("week-day")).toHaveLength(7);
+      // Header (date and legend) and toggle stay.
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Sunday" }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("November 22, 2026")).toBeInTheDocument();
+      expect(screen.getByRole("list", { name: en.legend.label })).toBeVisible();
+      expect(
+        screen.getByRole("button", { name: en.board.week }),
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("img", { name: "Dentist" })).toBeInTheDocument();
+      expect(screen.getByText("Lunch: Soup")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: en.board.day }));
+      expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+    });
+
+    it("returns to the day view after autoReturnSeconds of inactivity, not before", async () => {
+      vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+      vi.setSystemTime(Date.parse("2026-11-22T12:00:00+01:00"));
+      fake.setReplies("/api/config", {
+        status: 200,
+        body: configFixture({ children: [MIA], autoReturnSeconds: 30 }),
+      });
+      agenda();
+      renderDay();
+      await vi.waitFor(() => {
+        expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+      });
+      fireEvent.click(screen.getByRole("button", { name: en.board.week }));
+      expect(screen.getByTestId("week-board")).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(29_000);
+      });
+      // Touch resets the countdown.
+      fireEvent.pointerDown(screen.getByTestId("week-board"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(29_000);
+      });
+      expect(screen.getByTestId("week-board")).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+      expect(screen.queryByTestId("week-board")).not.toBeInTheDocument();
+      expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+    });
   });
 });

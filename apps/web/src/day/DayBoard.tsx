@@ -2,19 +2,13 @@ import type { Child } from "@kidboard/shared";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ChildLegend } from "../components/ChildLegend";
 import { Emoji } from "../components/Emoji";
 import { EventTile } from "../components/EventTile";
 import { MealCard } from "../components/MealCard";
-import {
-  type FormatContext,
-  formatLongDate,
-  formatWeekday,
-} from "../i18n/format";
+import type { FormatContext } from "../i18n/format";
 import type { DayBand } from "../time";
 import type { DayBandModel, DayEvent, DayModel } from "./buildDayModel";
 import { DayEmpty } from "./DayStates";
-import { DiscreetStatusBanner } from "./DiscreetStatusBanner";
 
 const BAND_SYMBOL: Record<DayBand, string> = {
   morning: "🌅",
@@ -50,13 +44,14 @@ function EventList({
 }): React.JSX.Element {
   return (
     <ul className={className}>
-      {items.map(({ event, status }) => (
+      {items.map(({ event, status, continues }) => (
         <li key={event.id} className="min-w-0">
           <EventTile
             event={event}
             childList={childList}
             format={format}
             status={status}
+            continues={continues}
           />
         </li>
       ))}
@@ -113,36 +108,19 @@ function BandColumn({
 
 export interface DayBoardProps {
   model: DayModel;
-  /** Today, `YYYY-MM-DD` in the config zone. */
-  today: string;
   childList: readonly Child[];
   format: FormatContext;
 }
 
-/** The loaded day view: header, all-day row, three bands, meals. Purely presentational. */
+/** The loaded day view (below the shared board frame): all-day row, three bands, meals. Purely presentational. */
 export function DayBoard({
   model,
-  today,
   childList,
   format,
 }: DayBoardProps): React.JSX.Element {
   const { t } = useTranslation();
   return (
-    <main className="bg-surface text-text gap-gutter p-gutter flex h-full flex-col">
-      <header className="gap-gutter flex shrink-0 items-center justify-between">
-        <div className="min-w-0">
-          <h1 className="text-display font-extrabold">
-            {formatWeekday(today, format)}
-          </h1>
-          <p className="text-title text-text-muted font-bold">
-            {formatLongDate(today, format)}
-          </p>
-        </div>
-        <div className="gap-gutter flex min-w-0 flex-wrap items-center justify-end">
-          <DiscreetStatusBanner />
-          <ChildLegend childList={childList} />
-        </div>
-      </header>
+    <div className="gap-gutter flex min-h-0 flex-1 flex-col">
       {model.isEmpty ? (
         <DayEmpty />
       ) : (
@@ -181,6 +159,6 @@ export function DayBoard({
           </ul>
         </section>
       )}
-    </main>
+    </div>
   );
 }

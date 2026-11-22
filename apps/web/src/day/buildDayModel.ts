@@ -11,7 +11,7 @@ import type { EventStatus } from "../components/EventTile";
 import { bandOf, DAY_BANDS, type DayBand } from "../time";
 
 /**
- * Pure model of the day view: which events and meals belong to "today" (a date key in
+ * Pure model of the day view: which events and meals belong to `date` (a date key in
  * the config zone) and where they are placed. No React, no timers; every instant is
  * interpreted in the configured zone, never the device zone.
  */
@@ -20,6 +20,11 @@ export interface DayEvent {
   event: CalendarEvent;
   /** `upcoming` for all-day events (they have no time to recede from). */
   status: EventStatus;
+  /**
+   * A timed event that started on an earlier day and is still under way on this one:
+   * the tile shows a "continues" hint instead of the (misleading) original start time.
+   */
+  continues: boolean;
 }
 
 export type BandStatus = "past" | "current" | "upcoming";
@@ -31,13 +36,13 @@ export interface DayBandModel {
 }
 
 export interface DayModel {
-  /** All-day events (also multi-day ones) covering today, in feed order. */
+  /** All-day events (also multi-day ones) covering the date, in feed order. */
   allDay: DayEvent[];
   /** Always the three bands in order morning, midday, evening. */
   bands: DayBandModel[];
   /** Today's meals ordered breakfast, lunch, dinner, unspecified. */
   meals: Meal[];
-  /** No event and no meal today. */
+  /** No event and no meal on the date. */
   isEmpty: boolean;
 }
 
@@ -51,9 +56,9 @@ const MEAL_ORDER: readonly MealSlot[] = [
 ];
 
 /** Date keys compare correctly as strings (`YYYY-MM-DD`). */
-function coversAllDay(event: CalendarEvent, today: string): boolean {
+function coversAllDay(event: CalendarEvent, date: string): boolean {
   // `end` is exclusive; a zero-length all-day event still counts for its start day.
-  return event.start <= today && (today < event.end || event.start === today);
+  return event.start <= date && (date < event.end || event.start === date);
 }
 
 /** First and last day (zone date keys) a timed event touches. `end` is exclusive. */
@@ -81,7 +86,7 @@ function timedStatus(startMs: number, endMs: number, now: number): EventStatus {
 
 /**
  * Band an event is placed in, by its start time:
- * - starts today: band of the start (`bandOf`, wall clock in the zone);
+ * - starts on the date: band of the start (`bandOf`, wall clock in the zone);
  * - `night` (before `morningStart`) goes to the morning band: the board has no night
  *   band, and an early event is the first thing of the day, not something to hide;
  * - started on an earlier day (multi-day or midnight-crossing): the morning band too,
@@ -90,33 +95,33 @@ function timedStatus(startMs: number, endMs: number, now: number): EventStatus {
 function placementBand(
   startMs: number,
   firstDay: string,
-  today: string,
+  date: string,
   config: DayModelConfig,
 ): DayBand {
-  if (firstDay < today) return "morning";
+  if (firstDay < date) return "morning";
   const band = bandOf(startMs, config.bands, config.timeZone);
   return band === "night" ? "morning" : band;
 }
 
 function currentBandIndex(
-  today: string,
+  date: string,
   config: DayModelConfig,
   now: number,
 ): number {
-  if (dateKeyInZone(now, config.timeZone) !== today) return -1;
+  if (dateKeyInZone(now, config.timeZone) !== date) return -1;
   const band = bandOf(now, config.bands, config.timeZone);
   return band === "night" ? -1 : DAY_BANDS.indexOf(band);
 }
 
 /**
- * Builds the day view model for `today` (`YYYY-MM-DD` in `config.timeZone`) at `now`
- * (epoch ms). Past/current status is only derived when `now` is on `today`; before
+ * Builds the day view model for `date` (`YYYY-MM-DD` in `config.timeZone`) at `now`
+ * (epoch ms). Past/current status is only derived when `now` is on `date`; before
  * `morningStart` no band is current and nothing is past.
  */
 export function buildDayModel(
   agenda: Pick<AgendaResponse, "events" | "meals">,
   config: DayModelConfig,
-  today: string,
+  date: string,
   now: number,
 ): DayModel {
   const allDay: DayEvent[] = [];
@@ -124,18 +129,18 @@ export function buildDayModel(
     DayBand,
     { startMs: number; title: string; item: DayEvent }[]
   >(DAY_BANDS.map((band) => [band, []]));
-  const isToday = dateKeyInZone(now, config.timeZone) === today;
+  const isToday = dateKeyInZone(now, config.timeZone) === date;
 
   for (const event of agenda.events) {
     if (event.allDay) {
-      if (coversAllDay(event, today)) {
-        allDay.push({ event, status: "upcoming" });
+      if (coversAllDay(event, date)) {
+        allDay.push({ event, status: "upcoming", continues: false });
       }
       continue;
     }
     const days = timedDays(event, config.timeZone);
-    if (days.first > today || days.last < today) continue;
-    const band = placementBand(days.startMs, days.first, today, config);
+    if (days.first > date || days.last < date) continue;
+    const band = placementBand(days.startMs, days.first, date, config);
     placed.get(band)?.push({
       startMs: days.startMs,
       title: event.title,
@@ -144,11 +149,12 @@ export function buildDayModel(
         status: isToday
           ? timedStatus(days.startMs, days.endMs, now)
           : "upcoming",
+        continues: days.first < date,
       },
     });
   }
 
-  const current = currentBandIndex(today, config, now);
+  const current = currentBandIndex(date, config, now);
   const bands = DAY_BANDS.map((id, index): DayBandModel => {
     const events = [...(placed.get(id) ?? [])]
       .sort((a, b) => a.startMs - b.startMs || a.title.localeCompare(b.title))
@@ -163,7 +169,7 @@ export function buildDayModel(
   });
 
   const meals = agenda.meals
-    .filter((meal) => meal.date === today)
+    .filter((meal) => meal.date === date)
     .sort((a, b) => MEAL_ORDER.indexOf(a.slot) - MEAL_ORDER.indexOf(b.slot));
 
   return {
