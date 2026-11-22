@@ -11,6 +11,7 @@ export function MealCard({ meal }: { meal: Meal }): React.JSX.Element {
   return (
     <article
       aria-labelledby={titleId}
+      data-testid="meal-card"
       data-slot={meal.slot}
       className="bg-surface-raised text-text min-h-touch rounded-card shadow-card flex items-center gap-4 p-3"
     >

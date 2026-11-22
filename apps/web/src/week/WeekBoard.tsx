@@ -91,7 +91,7 @@ function WeekColumn({
     <section
       aria-labelledby={headingId}
       aria-current={day.isToday ? "date" : undefined}
-      data-testid="week-day"
+      data-testid="day-column"
       data-date={day.date}
       data-weekend={day.isWeekend}
       data-today={day.isToday}

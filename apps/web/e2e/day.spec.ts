@@ -32,8 +32,9 @@ async function expectNoOverflow(page: Page): Promise<void> {
     const root = document.documentElement;
     const clipped: string[] = [];
     const outside: string[] = [];
+    // band-specific: day-band in the list below is replaced in T-30b
     for (const el of document.querySelectorAll<HTMLElement>(
-      "main, [data-testid=day-band], article",
+      "main, [data-testid=day-band], [data-testid=day-column], article",
     )) {
       // 1px tolerance for sub-pixel rounding.
       if (el.scrollHeight > el.clientHeight + 1) {
@@ -53,6 +54,7 @@ async function expectNoOverflow(page: Page): Promise<void> {
       }
     }
     // Every event tile lies inside its band column.
+    // band-specific: replaced in T-30b
     const escaping: string[] = [];
     for (const band of document.querySelectorAll("[data-testid=day-band]")) {
       const box = band.getBoundingClientRect();
@@ -89,8 +91,9 @@ test.describe("day view", () => {
       page.getByRole("heading", { level: 1, name: "Sunday" }),
     ).toBeVisible();
     await expect(page.getByText("November 22, 2026")).toBeVisible();
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     // Clock fixed at 12:00: morning is past, midday current, evening upcoming.
+    // band-specific: replaced in T-30b
     await expect(
       page
         .locator("[data-testid=day-band]")
@@ -136,7 +139,7 @@ test.describe("day view", () => {
     }));
     await mockBoard(page, { agenda: agenda(crowded, MEALS) });
     await page.goto("/");
-    await expect(page.getByTestId("day-band").first()).toBeVisible();
+    await expect(page.getByTestId("event-tile").first()).toBeVisible();
     await expect(page.getByRole("article", { name: /Activity/ })).toHaveCount(
       8,
     );
@@ -179,6 +182,7 @@ test.describe("day view", () => {
     await expectNoOverflow(page);
   });
 
+  // band-specific: the band headings are replaced in T-30b
   test("each symbol has one meaning: no 🌙 or ☀️ in a band heading, 🌙 only counts sleeps", async ({
     page,
   }) => {
@@ -198,7 +202,8 @@ test.describe("day view", () => {
       ),
     });
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
+    // band-specific: replaced in T-30b
     const bandSymbols = await page
       .getByTestId("day-band")
       .evaluateAll((bands) =>

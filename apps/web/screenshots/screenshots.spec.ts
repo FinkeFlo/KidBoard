@@ -27,7 +27,7 @@ async function openBoard(
     now,
   });
   await page.goto(`/?burnin=0&night=${theme === "night" ? "1" : "0"}`);
-  await expect(page.getByTestId("day-band")).toHaveCount(3);
+  await expect(page.getByTestId("board-ready")).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
 }
 
@@ -52,7 +52,7 @@ for (const theme of ["light", "night"] as const) {
     await shoot(page, `day-${theme}`, size);
 
     await page.getByRole("button", { name: "Week view" }).click();
-    await expect(page.getByTestId("week-day")).toHaveCount(7);
+    await expect(page.getByTestId("day-column")).toHaveCount(7);
     await shoot(page, `week-${theme}`, size);
   });
 }

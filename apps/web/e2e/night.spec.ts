@@ -47,8 +47,9 @@ async function expectNoOverflow(page: Page): Promise<void> {
     const root = document.documentElement;
     const clipped: string[] = [];
     const outside: string[] = [];
+    // band-specific: day-band in the list below is replaced in T-30b
     for (const el of document.querySelectorAll<HTMLElement>(
-      "main, header, [data-testid=day-band], [data-testid=week-board], [data-testid=week-day], article",
+      "main, header, [data-testid=day-band], [data-testid=week-board], [data-testid=day-column], article",
     )) {
       if (
         el.scrollHeight > el.clientHeight + 1 ||
@@ -88,7 +89,7 @@ test.describe("night mode", () => {
       now: NIGHT_NOW,
     });
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     expect(await theme(page)).toBe("night");
     expect(await bodyBackground(page)).toBe(NIGHT_BG);
     await expectNoOverflow(page);
@@ -99,7 +100,7 @@ test.describe("night mode", () => {
     }
 
     await page.getByRole("button", { name: "Week view" }).click();
-    await expect(page.getByTestId("week-day")).toHaveCount(7);
+    await expect(page.getByTestId("day-column")).toHaveCount(7);
     expect(await theme(page)).toBe("night");
     await expectNoOverflow(page);
     if (SHOT_DIR !== undefined) {
@@ -112,7 +113,7 @@ test.describe("night mode", () => {
   test("is off at midday", async ({ page }) => {
     await mockBoard(page, { agenda: agenda(EVENTS, MEALS) });
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     expect(await theme(page)).toBe("light");
     expect(await bodyBackground(page)).toBe(LIGHT_BG);
   });
@@ -122,19 +123,19 @@ test.describe("night mode", () => {
   }) => {
     await mockBoard(page, { agenda: agenda(EVENTS, MEALS) });
     await page.goto("/?night=1");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     expect(await theme(page)).toBe("night");
     await expectNoOverflow(page);
 
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     expect(await theme(page)).toBe("light");
   });
 
   test("?night=0 forces day inside the night window", async ({ page }) => {
     await mockBoard(page, { agenda: agenda(EVENTS, MEALS), now: NIGHT_NOW });
     await page.goto("/?night=0");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     expect(await theme(page)).toBe("light");
   });
 
@@ -145,21 +146,21 @@ test.describe("night mode", () => {
       config: config({ nightMode: { enabled: false } }),
     });
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     expect(await theme(page)).toBe("light");
   });
 
   test("updates <meta name=theme-color> with the theme", async ({ page }) => {
     await mockBoard(page, { agenda: agenda(EVENTS, MEALS) });
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     const meta = page.locator('meta[name="theme-color"]');
     const lightValue = await meta.getAttribute("content");
     expect(lightValue).toBe("#a63a08");
 
     await mockBoard(page, { agenda: agenda(EVENTS, MEALS), now: NIGHT_NOW });
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     await expect(meta).toHaveAttribute("content", "#14100c");
   });
 
@@ -173,7 +174,7 @@ test.describe("night mode", () => {
       now: at("19:29:55"),
     });
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     expect(await theme(page)).toBe("light");
     expect(await bodyBackground(page)).toBe(LIGHT_BG);
 
@@ -195,7 +196,7 @@ test.describe("night mode", () => {
       now: at("19:29:55"),
     });
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     const seconds = await page.evaluate(
       () =>
         new Promise<number>((resolve) => {
@@ -223,7 +224,7 @@ test.describe("night mode", () => {
         now: at("19:29:55"),
       });
       await page.goto("/");
-      await expect(page.getByTestId("day-band")).toHaveCount(3);
+      await expect(page.getByTestId("board-ready")).toBeVisible();
       const seconds = await page.evaluate(
         () =>
           new Promise<number>((resolve) => {
@@ -286,7 +287,7 @@ test.describe("theme before the config is known", () => {
         now: NIGHT_NOW,
       });
       await page.goto("/");
-      await expect(page.getByTestId("day-band")).toHaveCount(3);
+      await expect(page.getByTestId("board-ready")).toBeVisible();
       await expect.poll(() => rememberedTheme(page)).toBe("night");
 
       await coldStart(page);
@@ -316,11 +317,11 @@ test.describe("theme before the config is known", () => {
   test("the ?night override is never remembered", async ({ page }) => {
     await mockBoard(page, { agenda: agenda(EVENTS, MEALS) });
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     await expect.poll(() => rememberedTheme(page)).toBe("light");
 
     await page.goto("/?night=1");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     expect(await theme(page)).toBe("night");
     expect(await rememberedTheme(page)).toBe("light");
 
@@ -348,7 +349,7 @@ test.describe("theme before the config is known", () => {
     });
     await mockBoard(page, { agenda: agenda(EVENTS, MEALS), now: NIGHT_NOW });
     await page.goto("/");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     expect(
       await page.evaluate(() => {
         try {

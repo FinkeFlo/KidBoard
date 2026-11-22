@@ -116,7 +116,7 @@ function EventList({
   className: string;
 }): React.JSX.Element {
   return (
-    <ul className={className}>
+    <ul data-testid="all-day" className={className}>
       {items.map(({ event, status, continues }) => (
         <li key={event.id} className="min-w-0">
           <EventTile
@@ -268,7 +268,11 @@ export function DayBoard({
 }: DayBoardProps): React.JSX.Element {
   const { t } = useTranslation();
   return (
-    <div className="gap-gutter flex min-h-0 flex-1 flex-col">
+    <div
+      data-testid="day-column"
+      data-today="true"
+      className="gap-gutter flex min-h-0 flex-1 flex-col"
+    >
       {model.isEmpty ? (
         <DayEmpty />
       ) : (

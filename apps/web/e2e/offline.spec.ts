@@ -121,7 +121,10 @@ test("API reports stale: true: stale hint only after the 5 s delay", async ({
     const marks: Record<string, number> = {};
     (window as unknown as { __marks: Record<string, number> }).__marks = marks;
     new MutationObserver(() => {
-      if (marks["data"] === undefined && document.querySelector("article")) {
+      if (
+        marks["data"] === undefined &&
+        document.querySelector("[data-testid=event-tile]")
+      ) {
         marks["data"] = performance.now();
       }
       if (
@@ -194,7 +197,7 @@ test("API 502 without any data: the calm error state", async ({ page }) => {
     timeout: 15_000,
   });
   await expect(alert).toContainText("The plan could not be loaded.");
-  await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(page.getByTestId("event-tile")).toHaveCount(0);
   await expect(banner(page)).toHaveCount(0);
 });
 
@@ -255,7 +258,7 @@ test("401 with persisted data wipes the data, the storage and the token", async 
   const alert = page.getByRole("alert");
   await expect(alert).toHaveAttribute("data-error", "unauthorized");
   await expect(alert).toContainText("?key=");
-  await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(page.getByTestId("event-tile")).toHaveCount(0);
   await expect.poll(() => persistedTitles(page)).toEqual([]);
   expect(await storedToken()).toBeNull();
 
@@ -265,5 +268,5 @@ test("401 with persisted data wipes the data, the storage and the token", async 
     "data-error",
     "unauthorized",
   );
-  await expect(page.getByRole("article")).toHaveCount(0);
+  await expect(page.getByTestId("event-tile")).toHaveCount(0);
 });
