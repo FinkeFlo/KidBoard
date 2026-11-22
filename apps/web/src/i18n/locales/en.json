@@ -48,6 +48,10 @@
       "offline": "No internet and no saved plan yet."
     }
   },
+  "fullscreen": {
+    "enter": "Fullscreen on (press and hold)",
+    "exit": "Fullscreen off (press and hold)"
+  },
   "board": {
     "viewGroup": "View",
     "day": "Day view",
