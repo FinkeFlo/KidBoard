@@ -41,6 +41,8 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-14 | Sonnet → Opus | High-risk task (PWA/service worker, caching/offline) |
 | 2026-11-22 | T-16 | Sonnet → Opus | High-risk task (time zones/DST, day rollover) |
 | 2026-11-22 | T-19 | Sonnet → Opus | Structural finding from M3 review (31-day shared query) and caching/offline (persister superseding) |
+| 2026-11-22 | T-23 | Sonnet → Opus | High-risk task (caching/offline, token wipe) |
+| 2026-11-22 | M5 review fixes | Sonnet → Opus | Kiosk recovery (wake lock × error boundary) and layout fixes from the M5 milestone review |
 | 2026-11-22 | M2 date-only fix | Sonnet → Opus | Time-zone fix from the M2 milestone review |
 
 ## Milestone reviews

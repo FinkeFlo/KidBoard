@@ -373,7 +373,8 @@ operation, works offline with the last known state.
   and vars; `wrangler deploy --dry-run` in CI; step-by-step guide verified as far as
   possible without credentials. (M2 follow-up) Verify the Workers Static Assets default `Cache-Control` for `sw.js`,
   `index.html`, `manifest.webmanifest`, and whether Cloudflare logs record the first-visit
-  `/?key=` URL; document it.
+  `/?key=` URL; document it. (M5 follow-up) If security headers or a CSP are added, allow the hash of the
+  inline theme boot script in `apps/web/index.html`.
 
 - [ ] **T-26 Vercel alternative** (risk: medium, deps: T-25)
   Acceptance: `apps/worker/src/vercel.ts` adapter reusing the Hono app (Cache API absent →
@@ -384,7 +385,9 @@ operation, works offline with the last known state.
   to find the secret iCal address, creating separate calendars, sharing caveats), title
   conventions with examples, configuration reference, deploy (Cloudflare + Vercel), kiosk
   tips (Fully Kiosk settings, PWA install, screen dimming), troubleshooting, privacy note. (M2 follow-up) CONFIG.md EN + DE documents the tablet token flow: open `/?key=` once,
-  token stored + stripped from URL, forgotten after a 401.
+  token stored + stripped from URL, forgotten after a 401. (M5 follow-up) Kiosk tips explain the hidden
+  bottom-right fullscreen control (press and hold), wake-lock behaviour and its limits (battery
+  saver), Fully Kiosk "keep screen on" as backup; `?night=` / `?burnin=` in a short developer note.
 
 - [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27)
   Acceptance: full review by `reviewer-opus`; gitleaks over full history clean;
@@ -411,6 +414,7 @@ operation, works offline with the last known state.
 | 2026-11-22 | M4 review follow-ups: burn-in inner wrapper + fixed toggle place (T-22), glanceability pass (T-24), boundary reset test (T-20), night contrast for new surfaces (T-21), single fixture date constant (T-23) | M4 milestone review by reviewer-opus |
 | 2026-11-22 | T-18: the meal plan is shown inside the week columns instead of a separate meal screen | No extra screen, one glance: children and parents see events and meals of the whole week at once |
 | 2026-11-22 | M3 review: agenda `days` limit 14 → 31 and client range 8 → 31 (T-19, shared query for day/week/countdown); follow-ups to T-18 (shared frame, continuing events), T-20 (boundary auto-reset), T-21 (`useCurrentBand`), T-23 (e2e clock, `timezoneId`, docs), T-28 (release-please initial version) | M3 milestone review by reviewer-opus; countdown needs 30 days but `/api/agenda` capped at 14 |
+| 2026-11-22 | M5 review follow-ups: wake lock outside the error boundary, fullscreen glyph contrast token, dense day bands without clipping (+ e2e matrix), single error announcement, demo fixture weekdays (fixed before M5 exit); CSP hash for theme boot script (T-25); kiosk tips (T-27) | M5 milestone review by reviewer-opus |
 | 2026-11-22 | M2 review follow-ups: unauthorized state + boundary placement (T-15), shared today helper, offline midnight placeholder, pre-config behaviour (T-16), `formatTime` for timed events only (T-17), theme-color in night mode (T-21), offline-midnight + 401 e2e (T-23), static-asset Cache-Control + `?key=` logging check (T-25), token flow docs (T-27) | M2 milestone review by reviewer-opus |
 | 2026-11-22 | M1 review follow-ups: fresh-clone `pnpm dev` (T-11), locale fallback docs (T-12), client timeout (T-13), relative dev fixture (T-24) | M1 milestone review by reviewer-opus |
 | 2026-11-22 | T-10: worker cache uses an auto-provisioned KV binding (`KIDBOARD_CACHE`) with Cache API/memory fallback; cached window `[today−1, today+32)` | Cache API is a no-op on `*.workers.dev`; T-19 needs a 30-day countdown lookahead (T-10 review, structural) |
