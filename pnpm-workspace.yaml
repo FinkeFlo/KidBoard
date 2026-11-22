@@ -5,3 +5,8 @@ allowBuilds:
   esbuild: true
   workerd: true
   sharp: false
+# Security: workbox-build (build-time only) pins glob ^11, which pulls vulnerable
+# glob/minimatch (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249). glob 14 keeps the
+# globSync API workbox-build uses; drop this once workbox-build updates.
+overrides:
+  "workbox-build>glob": "^14.0.2"
