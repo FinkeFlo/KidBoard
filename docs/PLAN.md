@@ -158,7 +158,7 @@ operation, works offline with the last known state.
   8. works inside the Workers runtime (test runs in `@cloudflare/vitest-plugin`); fixtures are
      loaded via Vite `?raw` imports (no `fs` in workerd) with an ambient module declaration.
 
-- [ ] **T-09 Normalization** (risk: medium, deps: T-07, T-08)
+- [x] **T-09 Normalization** (risk: medium, deps: T-07, T-08)
   Acceptance:
   1. `normalize(occurrences, source, config)` → `CalendarEvent[]` / `Meal[]` using the title
      parser; `childIds` from source `childId` ∪ title prefix.
