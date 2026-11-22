@@ -28,8 +28,10 @@ One row per completed task. Escalations to Opus are logged with their reason.
 
 | Date | Milestone | Reviewer | Verdict | Notes |
 |---|---|---|---|---|
+| 2026-11-22 | M1 | Opus 5.5 (reviewer-opus) | PASS | Fresh clone + wrangler dev sanity green; CI green after gitleaks false-positive fix (missed for 3 commits → orchestrator now checks CI after each push). |
 | 2026-11-22 | M0 | Opus 5.5 (reviewer-opus) | PASS | Fresh clone green, CI run 45013616341 green. Follow-ups folded into T-06/T-08/T-10/T-11. |
 
 ## Open questions for the maintainer
 
-_None yet._
+1. **Repo setting needed (blocks releases, T-28):** Settings → Actions → General → Workflow permissions → enable "Allow GitHub Actions to create and approve pull requests". release-please fails on every push until then.
+2. Before M6: Cloudflare account/API token and the secret iCal URLs (only the maintainer can provide them).
