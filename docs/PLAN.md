@@ -194,7 +194,7 @@ operation, works offline with the last known state.
 
 ## M2 – App skeleton, i18n, data, PWA
 
-- [ ] **T-11 Web shell & design tokens** (risk: medium, deps: M1)
+- [x] **T-11 Web shell & design tokens** (risk: medium, deps: M1)
   Acceptance:
   1. Tailwind 4 via `@tailwindcss/vite`; all colors, radii, spacing, shadows, font sizes,
      motion durations defined as CSS variables in `apps/web/src/styles/tokens.css` and

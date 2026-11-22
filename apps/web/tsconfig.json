@@ -1,16 +1,7 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
-    "types": ["vite/client", "node"]
-  },
-  "include": [
-    "src",
-    "e2e",
-    "vite.config.ts",
-    "vitest.config.ts",
-    "vitest.setup.ts",
-    "playwright.config.ts"
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
   ]
 }

@@ -15,6 +15,11 @@ pnpm install
 pnpm dev            # web (Vite) + worker (wrangler dev)
 ```
 
+The worker serves `apps/web/dist` (`assets.directory`). `pnpm dev` therefore first runs
+`scripts/ensure-web-dist.mjs`, which builds the web app once if `apps/web/dist` is missing
+(fresh clone). Delete `apps/web/dist` or run `pnpm build` to refresh it; use the Vite dev
+server URL for live reload.
+
 For local worker secrets copy `apps/worker/.dev.vars.example` to `apps/worker/.dev.vars`
 (see [docs/CONFIG.md](docs/CONFIG.md)).
 
@@ -57,7 +62,9 @@ Danke für deine Hilfe! Bitte lies zuerst den [Verhaltenskodex](CODE_OF_CONDUCT.
 
 ### Einrichtung
 
-Benötigt Node 22 und pnpm 10 (über corepack): `pnpm install`, dann `pnpm dev`. Lokale
+Benötigt Node 22 und pnpm 10 (über corepack): `pnpm install`, dann `pnpm dev`. Der Worker
+liefert `apps/web/dist` aus; `pnpm dev` baut die Web-App daher einmalig, falls das Verzeichnis
+fehlt (frischer Klon, `scripts/ensure-web-dist.mjs`). Lokale
 Worker-Secrets: `apps/worker/.dev.vars.example` nach `apps/worker/.dev.vars` kopieren
 (siehe [docs/CONFIG.md](docs/CONFIG.md)).
 
