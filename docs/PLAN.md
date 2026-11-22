@@ -76,7 +76,7 @@ operation, works offline with the last known state.
   4. `fixtures/ics/` with synthetic `.ics` files (README states: synthetic only, never real
      URLs or personal data).
 
-- [ ] **T-04 CI, release, dependency updates** (risk: high, deps: T-02, T-03)
+- [x] **T-04 CI, release, dependency updates** (risk: high, deps: T-02, T-03)
   Acceptance:
   1. `.github/workflows/ci.yml` on push/PR to `main`: checkout, pnpm setup, Node from
      `.nvmrc`, install with cache (`--frozen-lockfile`), lint, format:check, typecheck,
