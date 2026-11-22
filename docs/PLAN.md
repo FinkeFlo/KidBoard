@@ -56,7 +56,7 @@ operation, works offline with the last known state.
   6. `.gitignore` covers `node_modules`, `dist`, `.wrangler`, `.env*` except `.env.example`,
      `.dev.vars*` except `.dev.vars.example`, Playwright output.
 
-- [ ] **T-02 Lint, format, git hooks** (risk: low, deps: T-01)
+- [x] **T-02 Lint, format, git hooks** (risk: low, deps: T-01)
   Acceptance:
   1. ESLint 9 flat config per ADR-0007 incl. `react/no-danger` as error; `pnpm lint` green.
   2. Prettier + Tailwind plugin; `pnpm format:check` green; `.editorconfig`.
