@@ -273,6 +273,48 @@ describe("Board", () => {
     expect(screen.getByRole("status")).toHaveTextContent(en.status.stale);
   });
 
+  describe("burn-in shift and banner slot (T-22)", () => {
+    afterEach(() => {
+      window.history.replaceState(null, "", "/");
+    });
+
+    it("moves only the inner wrapper, not <main>, as pinned by ?burnin", async () => {
+      window.history.replaceState(null, "", "/?burnin=5");
+      fake.setReplies("/api/agenda", { status: 200, body: agendaFixture() });
+      renderDay();
+      const shift = await screen.findByTestId("burn-in-shift");
+      expect(shift).toHaveAttribute("data-burn-in-x", "-1");
+      expect(shift).toHaveAttribute("data-burn-in-y", "1");
+      expect(shift.style.transform).toBe(
+        "translate(calc(var(--spacing-burn-in) * -1), calc(var(--spacing-burn-in) * 1))",
+      );
+      const main = screen.getByRole("main");
+      expect(main.style.transform).toBe("");
+      expect(main).toContainElement(shift);
+      expect(shift).toContainElement(screen.getByRole("banner"));
+    });
+
+    it("shows the status banner outside the header, so the toggle keeps its row", async () => {
+      fake.setReplies("/api/agenda", {
+        status: 200,
+        body: agendaFixture({ stale: true }),
+      });
+      vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+      vi.setSystemTime(Date.parse("2026-11-22T12:00:00+01:00"));
+      renderDay();
+      await vi.waitFor(() => {
+        expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(STALE_BANNER_DELAY_MS);
+      });
+      const banner = screen.getByRole("status");
+      expect(banner).toHaveTextContent(en.status.stale);
+      expect(screen.getByRole("banner")).not.toContainElement(banner);
+      expect(screen.getByRole("main")).toContainElement(banner);
+    });
+  });
+
   describe("day / week toggle", () => {
     const agenda = (): void => {
       fake.setReplies("/api/agenda", {

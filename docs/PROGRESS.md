@@ -26,6 +26,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-19 "How many sleeps?" countdown | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; persister drops superseded agendas (payload size) |
 | 2026-11-22 | T-20 Wake lock & fullscreen | Sonnet (builder) | Sonnet (reviewer) | 2 | PASS round 2; wake lock re-acquired while visible, control strip reserved |
 | 2026-11-22 | T-21 Night mode | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; useCurrentBand removed |
+| 2026-11-22 | T-22 Burn-in protection | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; banner moved to bottom slot so the toggle never moves |
 
 ## Escalations
 
