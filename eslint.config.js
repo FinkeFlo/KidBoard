@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import { defineConfig, globalIgnores } from "eslint/config";
+import i18next from "eslint-plugin-i18next";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
@@ -52,6 +53,27 @@ export default defineConfig(
     rules: {
       // Calendar titles are untrusted text (CLAUDE.md): never inject HTML.
       "react/no-danger": "error",
+    },
+  },
+  {
+    // Guard against hard-coded UI strings: JSX text and JSX attribute values must go
+    // through i18n. Only emoji-only strings are allowed. Tests render fixtures, not UI.
+    files: ["apps/web/src/**/*.tsx"],
+    ignores: ["**/*.test.tsx"],
+    extends: [i18next.configs["flat/recommended"]],
+    rules: {
+      "i18next/no-literal-string": [
+        "error",
+        {
+          mode: "jsx-only",
+          words: {
+            // Emoji-only strings (surrogate pairs, ZWJ, variation selector, BMP symbols).
+            exclude: [
+              "^[\\uD800-\\uDBFF\\uDC00-\\uDFFF\\u200D\\uFE0F\\u2600-\\u27BF\\s]+$",
+            ],
+          },
+        },
+      ],
     },
   },
   {

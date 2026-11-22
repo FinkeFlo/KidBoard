@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { App } from "./App";
-import { PLACEHOLDER_TEXT } from "./placeholder-text";
+import en from "./i18n/locales/en.json";
 
 describe("App", () => {
   it("renders the placeholder heading", () => {
@@ -10,6 +10,6 @@ describe("App", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "KidBoard" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(PLACEHOLDER_TEXT.placeholderPage)).toBeVisible();
+    expect(screen.getByText(en.app.placeholderPage)).toBeVisible();
   });
 });

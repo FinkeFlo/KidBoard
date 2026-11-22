@@ -59,3 +59,15 @@ test("applies the self-hosted Nunito font and token colors", async ({
   expect(style.nunitoLoaded).toBe(true);
   expect(style.background).toBe("rgb(255, 248, 240)");
 });
+
+test.describe("language", () => {
+  test.use({ locale: "de-DE" });
+
+  test("follows the browser language and sets <html lang>", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.getByText("Platzhalterseite")).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
+  });
+});

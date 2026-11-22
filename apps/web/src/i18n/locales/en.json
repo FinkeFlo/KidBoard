@@ -1,0 +1,10 @@
+{
+  "app": {
+    "placeholderPage": "Placeholder page"
+  },
+  "error": {
+    "title": "Oops, something went wrong",
+    "hint": "Nothing is lost. Please try again.",
+    "retry": "Try again"
+  }
+}

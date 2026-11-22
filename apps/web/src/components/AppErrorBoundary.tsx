@@ -4,13 +4,13 @@ import {
   type FallbackProps,
   getErrorMessage,
 } from "react-error-boundary";
-
-import { PLACEHOLDER_TEXT } from "../placeholder-text";
+import { useTranslation } from "react-i18next";
 
 function ErrorFallback({
   error,
   resetErrorBoundary,
 }: FallbackProps): React.JSX.Element {
+  const { t } = useTranslation();
   return (
     <main
       role="alert"
@@ -19,14 +19,14 @@ function ErrorFallback({
       <span aria-hidden="true" className="text-display">
         🌙
       </span>
-      <h1 className="text-heading font-bold">{PLACEHOLDER_TEXT.errorTitle}</h1>
-      <p className="text-title text-text-muted">{PLACEHOLDER_TEXT.errorHint}</p>
+      <h1 className="text-heading font-bold">{t("error.title")}</h1>
+      <p className="text-title text-text-muted">{t("error.hint")}</p>
       <button
         type="button"
         onClick={resetErrorBoundary}
         className="bg-accent text-on-accent text-title rounded-pill min-h-touch min-w-touch px-page font-bold"
       >
-        {PLACEHOLDER_TEXT.errorRetry}
+        {t("error.retry")}
       </button>
       {/* Technical detail for the parent; plain text only. */}
       <p className="text-caption text-text-muted">{getErrorMessage(error)}</p>
