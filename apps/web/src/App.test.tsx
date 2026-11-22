@@ -1,15 +1,15 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
-import en from "./i18n/locales/en.json";
+
+vi.mock("./day/DayView", () => ({
+  DayView: (): React.JSX.Element => <main>day view</main>,
+}));
 
 describe("App", () => {
-  it("renders the placeholder heading", () => {
+  it("renders the day view", () => {
     render(<App />);
-    expect(
-      screen.getByRole("heading", { level: 1, name: "KidBoard" }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(en.app.placeholderPage)).toBeVisible();
+    expect(screen.getByRole("main")).toHaveTextContent("day view");
   });
 });

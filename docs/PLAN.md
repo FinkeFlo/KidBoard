@@ -271,7 +271,7 @@ operation, works offline with the last known state.
      agenda whose range covers the new day; status stays `offline`/`stale`, never empty/`loading`.
   7. (M2 follow-up) Documented behaviour before the config (time zone) has loaded.
 
-- [ ] **T-17 Day view** (risk: medium, deps: T-15, T-16)
+- [x] **T-17 Day view** (risk: medium, deps: T-15, T-16)
   Acceptance:
   1. Header: localized weekday + date large.
   2. Three bands morning/midday/evening (config boundaries, symbols 🌅 ☀️ 🌙), events placed

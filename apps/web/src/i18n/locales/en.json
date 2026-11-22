@@ -1,7 +1,4 @@
 {
-  "app": {
-    "placeholderPage": "Placeholder page"
-  },
   "error": {
     "title": "Oops, something went wrong",
     "hint": "Nothing is lost. Please try again.",
@@ -31,5 +28,22 @@
     "stale": "The plan may be out of date.",
     "error": "The plan could not be loaded.",
     "unauthorized": "The access link has expired. Please open the new link with ?key=… on this tablet."
+  },
+  "day": {
+    "band": {
+      "morning": "Morning",
+      "midday": "Midday",
+      "evening": "Evening"
+    },
+    "meals": "Meals",
+    "loading": "Loading the plan",
+    "empty": {
+      "title": "Nothing planned today",
+      "hint": "A free day. Have fun!"
+    },
+    "error": {
+      "title": "The plan isn't here right now",
+      "hint": "KidBoard keeps trying on its own. A grown-up can check the details below."
+    }
   }
 }

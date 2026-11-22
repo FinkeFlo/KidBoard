@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { agenda } from "./mockApi";
+
 /** Low-entropy synthetic token (gitleaks-friendly). */
 const TOKEN = "TESTONLY-not-a-secret";
 
@@ -19,15 +21,15 @@ test("takes the token from ?key= once, sends it as Bearer and applies the config
     requestUrls.push(request.url());
     authHeaders.push(request.headers()["authorization"]);
     const path = new URL(request.url()).pathname;
-    return path === "/api/config"
-      ? route.fulfill({ json: CONFIG })
-      : route.fulfill({ status: 404, json: { error: "not_found" } });
+    if (path === "/api/config") return route.fulfill({ json: CONFIG });
+    if (path === "/api/agenda") return route.fulfill({ json: agenda([], []) });
+    return route.fulfill({ status: 404, json: { error: "not_found" } });
   });
 
   await page.goto(`/?key=${TOKEN}`);
 
   // Config locale "de" wins over the browser language.
-  await expect(page.getByText("Platzhalterseite")).toBeVisible();
+  await expect(page.getByText("Heute ist nichts geplant")).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
   expect(new URL(page.url()).search).toBe("");
   expect(authHeaders[0]).toBe(`Bearer ${TOKEN}`);
@@ -47,6 +49,6 @@ test("takes the token from ?key= once, sends it as Bearer and applies the config
   const configRequest = page.waitForRequest("**/api/config");
   await page.goto("/");
   await configRequest;
-  await expect(page.getByText("Platzhalterseite")).toBeVisible();
+  await expect(page.getByText("Heute ist nichts geplant")).toBeVisible();
   expect(authHeaders[0]).toBe(`Bearer ${TOKEN}`);
 });
