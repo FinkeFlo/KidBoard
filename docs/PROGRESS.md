@@ -32,6 +32,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 
 | Date | Milestone | Reviewer | Verdict | Notes |
 |---|---|---|---|---|
+| 2026-11-22 | M2 | Opus 5.5 (reviewer-opus) | PASS (round 2) | Round 1 found date-only keys formatted a day early west of UTC (fixed in 4fa65c3). Context7 unreachable for reviewers; APIs checked against installed sources. Follow-ups folded into T-15/16/17/21/23/25/27. |
 | 2026-11-22 | M1 | Opus 5.5 (reviewer-opus) | PASS | Fresh clone + wrangler dev sanity green; CI green after gitleaks false-positive fix (missed for 3 commits → orchestrator now checks CI after each push). |
 | 2026-11-22 | M0 | Opus 5.5 (reviewer-opus) | PASS | Fresh clone green, CI run 45013616341 green. Follow-ups folded into T-06/T-08/T-10/T-11. |
 

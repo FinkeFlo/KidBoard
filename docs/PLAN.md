@@ -253,6 +253,9 @@ operation, works offline with the last known state.
   variants, long titles clamp to 2 lines), `MealCard`, `ChildLegend`, `StatusBanner`
   (offline/stale/error, discreet). Component tests incl. a11y roles; touch targets ≥ 64 px;
   titles rendered as text (XSS test with HTML-looking title).
+  M2 follow-ups: `StatusBanner`/error state distinguishes `useApiErrorKind() === "unauthorized"`
+  (parent-readable "access link expired, open the new `?key=` link", de + en); move
+  `AppErrorBoundary` above `DataProvider` in `main.tsx`.
 
 - [ ] **T-16 Clock & day rollover** (risk: **high** → Opus, deps: T-12)
   Acceptance:
@@ -262,6 +265,11 @@ operation, works offline with the last known state.
   3. Tests with fake timers: normal midnight, DST spring-forward and fall-back nights,
      device zone ≠ config zone, tab sleeping across midnight (`visibilitychange`).
   4. Current-band computation tested at band boundaries.
+  5. (M2 follow-up) Shared, runtime-agnostic "today as `YYYY-MM-DD` in zone" helper in
+     `packages/shared`, used by worker and web so `range.from` matches the worker window.
+  6. (M2 follow-up) Midnight while offline: `useAgenda` gets placeholder data from a cached
+     agenda whose range covers the new day; status stays `offline`/`stale`, never empty/`loading`.
+  7. (M2 follow-up) Documented behaviour before the config (time zone) has loaded.
 
 - [ ] **T-17 Day view** (risk: medium, deps: T-15, T-16)
   Acceptance:
@@ -273,6 +281,8 @@ operation, works offline with the last known state.
   5. States: loading skeleton, empty day ("Heute ist nichts geplant" with friendly emoji
      illustration), offline/stale banner, error state (parent-readable, child-calm).
   6. Fits 1280×800 and 2000×1200 with 8 events + 3 meals without scrolling (Playwright).
+  7. (M2 follow-up) `formatTime` throws for date keys: only call it for timed events
+     (`allDay === false`); format helpers need ISO instants with offset or `YYYY-MM-DD`.
 
 **M3 exit:** milestone review, CI green.
 
@@ -310,7 +320,8 @@ operation, works offline with the last known state.
 - [ ] **T-21 Night mode** (risk: medium, deps: T-11, T-16)
   Acceptance: automatic switch by `config.nightMode` times (spanning midnight works),
   dimmed warm token set, smooth transition (none under reduced motion), optional manual
-  toggle via URL param `?night=1|0` for testing; contrast of night tokens meets AA.
+  toggle via URL param `?night=1|0` for testing; contrast of night tokens meets AA. (M2 follow-up) `<meta name="theme-color">` follows night mode, or the reason it doesn't is
+  documented.
 
 - [ ] **T-22 Burn-in protection** (risk: low, deps: T-11)
   Acceptance: whole layout shifts by a few px on a slow orbit every few minutes, never
@@ -321,7 +332,8 @@ operation, works offline with the last known state.
   Acceptance: Playwright: load online → go offline → reload → last state + discreet
   offline hint; API returns `stale: true` → stale hint; API 502 with persisted data →
   data + hint; API 502 without data → error state; back online → hint disappears after
-  refetch.
+  refetch. (M2 follow-ups) offline across midnight keeps showing data; 401 with persisted
+  data wipes storage and `kidboard.accessToken`.
 
 - [ ] **T-24 Visual screenshots** (risk: medium, deps: T-21, T-23)
   Acceptance: a dev/screenshot fixture with dates relative to "today" (or recurring) exists so manual dev
@@ -338,7 +350,9 @@ operation, works offline with the last known state.
   Acceptance: root `pnpm deploy:cloudflare` builds web + deploys worker; "Deploy to
   Cloudflare" button in README; documented secrets (`wrangler secret put CAL_KINDER_URL`)
   and vars; `wrangler deploy --dry-run` in CI; step-by-step guide verified as far as
-  possible without credentials.
+  possible without credentials. (M2 follow-up) Verify the Workers Static Assets default `Cache-Control` for `sw.js`,
+  `index.html`, `manifest.webmanifest`, and whether Cloudflare logs record the first-visit
+  `/?key=` URL; document it.
 
 - [ ] **T-26 Vercel alternative** (risk: medium, deps: T-25)
   Acceptance: `apps/worker/src/vercel.ts` adapter reusing the Hono app (Cache API absent →
@@ -348,7 +362,8 @@ operation, works offline with the last known state.
   Acceptance: README EN + DE complete: features, screenshots, Google Calendar setup (where
   to find the secret iCal address, creating separate calendars, sharing caveats), title
   conventions with examples, configuration reference, deploy (Cloudflare + Vercel), kiosk
-  tips (Fully Kiosk settings, PWA install, screen dimming), troubleshooting, privacy note.
+  tips (Fully Kiosk settings, PWA install, screen dimming), troubleshooting, privacy note. (M2 follow-up) CONFIG.md EN + DE documents the tablet token flow: open `/?key=` once,
+  token stored + stripped from URL, forgotten after a 401.
 
 - [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27)
   Acceptance: full review by `reviewer-opus`; gitleaks over full history clean;
@@ -371,6 +386,7 @@ operation, works offline with the last known state.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | M2 review follow-ups: unauthorized state + boundary placement (T-15), shared today helper, offline midnight placeholder, pre-config behaviour (T-16), `formatTime` for timed events only (T-17), theme-color in night mode (T-21), offline-midnight + 401 e2e (T-23), static-asset Cache-Control + `?key=` logging check (T-25), token flow docs (T-27) | M2 milestone review by reviewer-opus |
 | 2026-11-22 | M1 review follow-ups: fresh-clone `pnpm dev` (T-11), locale fallback docs (T-12), client timeout (T-13), relative dev fixture (T-24) | M1 milestone review by reviewer-opus |
 | 2026-11-22 | T-10: worker cache uses an auto-provisioned KV binding (`KIDBOARD_CACHE`) with Cache API/memory fallback; cached window `[today−1, today+32)` | Cache API is a no-op on `*.workers.dev`; T-19 needs a 30-day countdown lookahead (T-10 review, structural) |
 | 2026-11-22 | M0 milestone review follow-ups: `autoReturnSeconds` in T-06, `format:check` in DoD, fixture loading note in T-08, typed `Env` in T-10, tsconfig split in T-11 | Findings of the M0 review by reviewer-opus |
