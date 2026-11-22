@@ -119,4 +119,27 @@ describe("AgendaResponseSchema", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("accepts an optional boolean truncated flag per source", () => {
+    const base = {
+      generatedAt: "2026-11-22T10:00:00Z",
+      timeZone: "Europe/Berlin",
+      range: { from: "2026-11-22", to: "2026-11-29" },
+      stale: false,
+      events: [],
+      meals: [],
+    };
+    expect(
+      AgendaResponseSchema.safeParse({
+        ...base,
+        sources: [{ id: "kinder", status: "ok", truncated: true }],
+      }).success,
+    ).toBe(true);
+    expect(
+      AgendaResponseSchema.safeParse({
+        ...base,
+        sources: [{ id: "kinder", status: "ok", truncated: "yes" }],
+      }).success,
+    ).toBe(false);
+  });
 });

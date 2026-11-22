@@ -6,12 +6,15 @@ import { EmojiSchema, TimeOfDaySchema, TimeZoneSchema } from "./primitives";
 export const LocaleSchema = z.enum(["de", "en", "auto"]);
 export type Locale = z.infer<typeof LocaleSchema>;
 
+/** Shape of a calendar secret name, see {@link calendarSecretName}. */
+export type CalendarSecretName = `CAL_${string}_URL`;
+
 /**
  * Name of the secret that holds the iCal URL of calendar `id`.
  * Mapping: upper-case the id and replace `-` by `_`, e.g. `kinder` -> `CAL_KINDER_URL`,
  * `school-a` -> `CAL_SCHOOL_A_URL`. (Ids are restricted to `[a-z0-9_-]`.)
  */
-export function calendarSecretName(id: string): string {
+export function calendarSecretName(id: string): CalendarSecretName {
   return `CAL_${id.toUpperCase().replaceAll("-", "_")}_URL`;
 }
 

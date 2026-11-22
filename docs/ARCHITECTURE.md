@@ -22,7 +22,7 @@ flowchart LR
     F["fetch feeds<br/>(timeout, size limit)"]
     P["parse + expand<br/>(ical.js: RRULE, EXDATE,<br/>RECURRENCE-ID, VTIMEZONE)"]
     N["normalize<br/>(title conventions,<br/>children, meals)"]
-    C[("Cache API<br/>fresh ≈1h<br/>last-good ≈7d")]
+    C[("KV or Cache API<br/>fresh ≈1h<br/>last-good ≈7d")]
     A["/api/agenda<br/>/api/config<br/>/api/health"]
     S["static assets<br/>(apps/web/dist)"]
   end
@@ -113,7 +113,12 @@ export interface AgendaResponse {
   timeZone: string;      // e.g. "Europe/Berlin"
   range: { from: string; to: string };  // YYYY-MM-DD, `to` exclusive
   stale: boolean;        // true = at least one source served from last-good cache
-  sources: Array<{ id: string; status: 'ok' | 'stale' | 'error'; fetchedAt?: string }>;
+  sources: Array<{
+    id: string;
+    status: 'ok' | 'stale' | 'error';
+    fetchedAt?: string;  // when the served data was fetched (absent for 'error')
+    truncated?: boolean; // true = recurrence expansion hit a cap (ADR-0003)
+  }>;
   events: CalendarEvent[];
   meals: Meal[];
 }
@@ -172,9 +177,44 @@ Order of operations on the raw `SUMMARY`:
 
 | Layer | What | Lifetime |
 |---|---|---|
-| Worker Cache API "fresh" | normalized per-source result | ~1 h (configurable) |
-| Worker Cache API "last-good" | last successful result per source | ~7 days |
+| Worker KV (or Cache API) "fresh" | normalized per-source result for the window | ~1 h (configurable) |
+| Worker KV (or Cache API) "last-good" | same entry, after the TTL | ~7 days |
 | Service worker (Workbox precache) | app shell, fonts, icons | until next deploy |
 | TanStack Query persisted cache | last `/api/agenda` + `/api/config` | 7 days |
 
 The client refetches hourly, on `visibilitychange`/`online`, and after midnight.
+
+### Worker API details (T-10)
+
+- **Window:** per source the worker expands and normalizes a fixed rolling window
+  `[today − 1, today + 32)` (config zone; 32 days ahead so countdowns up to 30 days
+  ahead are covered, T-19) once per TTL and caches the result; `/api/agenda` only
+  filters it. `[from, from + days)` must lie inside the window (`days` ≤ 14), otherwise
+  `400`. No on-demand expansion outside it (CPU budget, ADR-0003).
+- **Storage (ADR-0006):** one JSON entry per source (validated with the shared zod
+  schemas on read) under the key `v1/source/<sourceId>/<hash>`, kept 7 days. It is
+  *fresh* while it was expanded for the current window and is younger than the TTL, and
+  serves as *last-good* otherwise. `<hash>` = SHA-256 (truncated) of the validated
+  config, the source id and the feed URL: a config or URL change starts with an empty
+  cache; the URL itself never appears in a key, log or response. Backend: Workers KV
+  (`KIDBOARD_CACHE`, auto-provisioned) when bound, else the Cache API (synthetic key
+  `https://cache.kidboard.invalid/<key>`; only functional on custom domains). A
+  per-isolate memory map (≤ 64 entries) sits in front, and concurrent misses in an
+  isolate share one upstream fetch (single flight).
+- **KV write budget:** one write per source per refresh. With KV the fresh TTL is at
+  least `ceil(sources × 86 400 / 500)` s (half of the Free plan's 1 000 writes/day; e.g.
+  2 sources → 346 s); a lower `KIDBOARD_CACHE_TTL` is raised with a log warning.
+- **Failures:** non-2xx, timeout (10 s, headers and body), > 5 MB (Content-Length and
+  streamed byte count), network errors and `FeedParseError` → the stored entry as
+  `stale` (an old entry may cover only part of the requested range, e.g. after several
+  days offline), else `error`. Logs contain source ids, secret _names_, reason codes
+  and expansion warning codes only. Response `200` if any source is `ok`/`stale`, `502`
+  otherwise; `generatedAt` = oldest `fetchedAt` served.
+- **Security:** optional `KIDBOARD_ACCESS_TOKEN` (Bearer or `?key=`, SHA-256 +
+  `crypto.subtle.timingSafeEqual`); `/api/health` is public and returns only
+  `{ ok: true }`. CORS only for `KIDBOARD_ALLOWED_ORIGINS` (preflights are answered before
+  the token check). Hono `secureHeaders()` (nosniff, `Referrer-Policy: no-referrer`, …) and
+  `Cache-Control: no-store` on every API response (the client owns caching, ADR-0006).
+- **Config:** `KIDBOARD_CONFIG` is parsed once per isolate (memoized by raw string);
+  invalid → `500 { error: "server_misconfigured" }` and a log line with the validation
+  errors.

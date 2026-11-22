@@ -98,7 +98,10 @@ export const AgendaResponseSchema = z.object({
     z.object({
       id: z.string().min(1),
       status: SourceStatusSchema,
+      /** When the served data was fetched from upstream (absent for `error`). */
       fetchedAt: DateTimeStringSchema.optional(),
+      /** True if recurrence expansion hit a cap: some occurrences may be missing. */
+      truncated: z.boolean().optional(),
     }),
   ),
   events: z.array(CalendarEventSchema),
