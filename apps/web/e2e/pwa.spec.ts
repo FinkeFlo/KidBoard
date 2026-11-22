@@ -157,9 +157,7 @@ test("loads the app shell offline after the first visit and never caches API or 
 }) => {
   const apiRequests = await mockApi(context);
   await page.goto(`/?key=${TOKEN}`);
-  await expect(
-    page.getByRole("heading", { level: 1, name: "KidBoard" }),
-  ).toBeVisible();
+  await expect(page.getByRole("main")).toBeVisible();
   await waitForControl(page);
 
   // An API call made while the worker is in control goes through it to the network.
@@ -175,7 +173,7 @@ test("loads the app shell offline after the first visit and never caches API or 
   // API navigations bypass the SPA fallback: the worker answers, not the cached shell.
   await page.goto("/api/health");
   await expect(page.locator("body")).toContainText('"ok":true');
-  await expect(page.getByRole("heading", { name: "KidBoard" })).toHaveCount(0);
+  await expect(page.getByRole("main")).toHaveCount(0);
   await page.goto("/");
   await waitForControl(page);
 
@@ -193,10 +191,7 @@ test("loads the app shell offline after the first visit and never caches API or 
 
   await context.setOffline(true);
   await page.reload();
-  await expect(
-    page.getByRole("heading", { level: 1, name: "KidBoard" }),
-  ).toBeVisible();
-  await expect(page.getByText("Placeholder page")).toBeVisible();
+  await expect(page.getByRole("main")).toBeVisible();
   const offlineStyle = await page.evaluate(async () => {
     await document.fonts.ready;
     return {
@@ -208,9 +203,7 @@ test("loads the app shell offline after the first visit and never caches API or 
 
   // Deep links fall back to the cached shell as well.
   await page.goto("/some/deep/link");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "KidBoard" }),
-  ).toBeVisible();
+  await expect(page.getByRole("main")).toBeVisible();
 
   const storedAfter = await cachedUrls(page);
   expect(

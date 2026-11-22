@@ -1,26 +1,26 @@
 import { expect, test } from "@playwright/test";
 
+import { mockBoard } from "./mockApi";
+
 // The API is never contacted for real in E2E: intercept every call (also avoids the
-// preview proxy's ECONNREFUSED noise).
+// preview proxy's ECONNREFUSED noise). The clock is fixed to Sunday 2026-11-22.
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/**", (route) =>
-    route.fulfill({ json: { ok: true } }),
-  );
+  await mockBoard(page);
 });
 
-test("renders the placeholder page", async ({ page }) => {
+test("renders the day view", async ({ page }) => {
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", { level: 1, name: "KidBoard" }),
+    page.getByRole("heading", { level: 1, name: "Sunday" }),
   ).toBeVisible();
-  await expect(page.getByText("Placeholder page")).toBeVisible();
+  await expect(page.getByText("Nothing planned today")).toBeVisible();
 });
 
 test("fits the viewport without scrolling", async ({ page }) => {
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { level: 1, name: "KidBoard" }),
+    page.getByRole("heading", { level: 1, name: "Sunday" }),
   ).toBeVisible();
 
   const metrics = await page.evaluate(() => ({
@@ -45,6 +45,7 @@ test("applies the self-hosted Nunito font and token colors", async ({
   page,
 }) => {
   await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   const style = await page.evaluate(async () => {
     await document.fonts.ready;
     const heading = document.querySelector("h1");
@@ -66,7 +67,9 @@ test.describe("language", () => {
     page,
   }) => {
     await page.goto("/");
-    await expect(page.getByText("Platzhalterseite")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Sonntag" }),
+    ).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
   });
 });

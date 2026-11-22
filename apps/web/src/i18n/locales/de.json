@@ -1,7 +1,4 @@
 {
-  "app": {
-    "placeholderPage": "Platzhalterseite"
-  },
   "error": {
     "title": "Hoppla, da ist etwas schiefgelaufen",
     "hint": "Nichts ist verloren. Bitte versuche es noch einmal.",
@@ -31,5 +28,22 @@
     "stale": "Der Plan ist vielleicht nicht aktuell.",
     "error": "Der Plan konnte nicht geladen werden.",
     "unauthorized": "Der Zugangslink ist abgelaufen. Bitte den neuen Link mit ?key=… auf diesem Tablet öffnen."
+  },
+  "day": {
+    "band": {
+      "morning": "Morgen",
+      "midday": "Mittag",
+      "evening": "Abend"
+    },
+    "meals": "Essen",
+    "loading": "Der Plan wird geladen",
+    "empty": {
+      "title": "Heute ist nichts geplant",
+      "hint": "Ein freier Tag. Viel Spaß!"
+    },
+    "error": {
+      "title": "Der Plan ist gerade nicht da",
+      "hint": "KidBoard versucht es von selbst weiter. Ein Erwachsener kann unten die Einzelheiten lesen."
+    }
   }
 }
