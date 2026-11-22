@@ -1,6 +1,9 @@
+import type { Child } from "@kidboard/shared";
 import { useTranslation } from "react-i18next";
 
+import { resolveTileTint, tileTintStyle } from "../components/childTint";
 import { Emoji } from "../components/Emoji";
+import { childrenOf } from "../components/EventTile";
 import type { Countdown } from "./buildCountdown";
 
 /** Up to this many nights every night is its own 🌙; beyond, one 🌙 with a number. */
@@ -10,7 +13,7 @@ export const MOONS_PER_ROW = 7;
 /** Event icons shown when several countdown events fall on the same day. */
 export const MAX_COUNTDOWN_ICONS = 3;
 
-/** 🌙 means "one sleep" and nothing else on the board (the day bands use other symbols). */
+/** 🌙 means "one sleep" and nothing else on the board (tiles use 🌅 🌞 🌆, merge rule 1). */
 const MOON = "🌙";
 /** Pictorial "today!" cue next to the word, so non-readers see that the day has come. */
 export const TODAY_CUE = "🎉";
@@ -20,20 +23,22 @@ export type CountdownVariant = "full" | "compact";
 // Full class names so Tailwind can see them.
 const SIZES: Record<
   CountdownVariant,
-  { icon: string; moon: string; text: string; box: string }
+  { icon: string; disc: string; moon: string; text: string; box: string }
 > = {
   full: {
     icon: "text-heading",
+    disc: "size-14",
     moon: "text-heading",
     text: "text-title",
-    box: "gap-3 px-4 py-2",
+    box: "gap-3 py-2 ps-2 pe-5",
   },
   // Moons are the part a child counts at a glance, so they stay big (heading, not body).
   compact: {
     icon: "text-title",
+    disc: "size-12",
     moon: "text-heading",
     text: "text-body",
-    box: "gap-2 px-3 py-1",
+    box: "gap-2 py-1.5 ps-1.5 pe-4",
   },
 };
 
@@ -83,6 +88,8 @@ export interface CountdownBadgeProps {
   countdown: Countdown;
   /** `full` on the week view, `compact` (smaller) on the day view. */
   variant: CountdownVariant;
+  /** Configured children: the awaited event sits in its child's tint and edge. */
+  childList?: readonly Child[];
 }
 
 /**
@@ -94,6 +101,7 @@ export interface CountdownBadgeProps {
 export function CountdownBadge({
   countdown,
   variant,
+  childList = [],
 }: CountdownBadgeProps): React.JSX.Element {
   const { t } = useTranslation();
   const size = SIZES[variant];
@@ -109,13 +117,29 @@ export function CountdownBadge({
       data-testid="countdown"
       data-variant={variant}
       data-nights={countdown.nights}
-      className={`${isToday ? "bg-band-morning" : "bg-band-evening"} text-text rounded-card shadow-card flex shrink-0 items-center ${size.box}`}
+      className={`${isToday ? "ring-today-ring ring-4" : ""} bg-surface-raised text-text rounded-pill shadow-card flex shrink-0 items-center ${size.box}`}
     >
       <p className="sr-only">{label}</p>
-      <span aria-hidden="true" className="flex items-center gap-1">
-        {countdown.events.slice(0, MAX_COUNTDOWN_ICONS).map((event) => (
-          <Emoji key={event.id} emoji={event.icon} className={size.icon} />
-        ))}
+      <span aria-hidden="true" className="flex items-center">
+        {countdown.events.slice(0, MAX_COUNTDOWN_ICONS).map((event) => {
+          // The awaited event in its children's tint, with the child's edge (one child).
+          const tint = resolveTileTint(childrenOf(event, childList));
+          return (
+            <span
+              key={event.id}
+              data-testid="countdown-target"
+              data-tint={tint.kind}
+              style={tileTintStyle(tint)}
+              className={`${
+                tint.edge === null
+                  ? "inset-ring-border"
+                  : "inset-ring-(color:--child-color)"
+              } rounded-pill -ms-2 inline-flex shrink-0 items-center justify-center inset-ring-3 first:ms-0 ${size.disc}`}
+            >
+              <Emoji emoji={event.icon} className={size.icon} />
+            </span>
+          );
+        })}
       </span>
       <span aria-hidden="true" className="flex items-center">
         {isToday ? (

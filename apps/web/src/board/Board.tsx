@@ -8,10 +8,10 @@ import {
   useConnectionStatus,
   useTodayAgenda,
 } from "../data";
-import { buildDayModel } from "../day/buildDayModel";
-import { DayBoard } from "../day/DayBoard";
+import { buildOverviewModel } from "../day/buildOverviewModel";
 import { DayError, type DayErrorKind, DayLoading } from "../day/DayStates";
-import { useFormatContext } from "../i18n/format";
+import { OverviewBoard } from "../day/OverviewBoard";
+import { formatTime, useFormatContext } from "../i18n/format";
 import { useNightTheme } from "../theme";
 import { useNow } from "../time";
 import { buildWeekModel } from "../week/buildWeekModel";
@@ -34,13 +34,15 @@ function errorKindOf(
 const DEFAULT_AUTO_RETURN_SECONDS = 120;
 
 /**
- * The board: day or week view inside the shared {@link BoardFrame}. Until the config
+ * The board: the four-day overview ("Today") or the week view inside the shared
+ * {@link BoardFrame}. Until the config
  * (time zone, bands) and the agenda are known it shows the loading skeleton; without
  * any data a failure shows {@link DayError}. With data (also stale or offline) the board
  * stays up and only the discreet banner reports it.
- * The week view returns to the day view after `config.autoReturnSeconds` of inactivity.
+ * The week view returns to the overview after `config.autoReturnSeconds` of inactivity.
  * The "How many sleeps?" countdown (T-19) sits in the header: full on the week view, a
- * compact badge on the day view; it is built from the same agenda query (31 days).
+ * compact badge on the overview; it is built from the same agenda query (31 days), whose
+ * `dataUpdatedAt` is the rail's "Stand" time.
  */
 export function Board(): React.JSX.Element {
   const config = useConfig().data;
@@ -66,7 +68,7 @@ export function Board(): React.JSX.Element {
       config === undefined || today === undefined || data === undefined
         ? undefined
         : {
-            day: buildDayModel(data, config, today, now),
+            overview: buildOverviewModel(data, config, today, now),
             week: buildWeekModel(data, config, today, now),
             countdown: buildCountdown(data.events, today, config.timeZone),
           },
@@ -84,20 +86,23 @@ export function Board(): React.JSX.Element {
       format={format}
       view={view}
       onViewChange={setView}
+      updatedAt={agenda.dataUpdatedAt}
       countdown={
         models.countdown === undefined ? undefined : (
           <CountdownBadge
             countdown={models.countdown}
             variant={view === "day" ? "compact" : "full"}
+            childList={config.children}
           />
         )
       }
     >
       {view === "day" ? (
-        <DayBoard
-          model={models.day}
+        <OverviewBoard
+          model={models.overview}
           childList={config.children}
           format={format}
+          nowTime={formatTime(now, format)}
         />
       ) : (
         <WeekBoard

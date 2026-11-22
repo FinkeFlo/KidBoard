@@ -8,10 +8,13 @@
     "allDay": "Ganztägig",
     "status": {
       "past": "Schon vorbei",
-      "current": "Gerade jetzt"
+      "current": "Gerade jetzt",
+      "next": "Als Nächstes"
     },
     "forEveryone": "Für alle",
-    "continues": "Geht weiter"
+    "continues": "Geht weiter",
+    "forChildren": "Für {{names, list}}",
+    "moreChildren": "+{{count}}"
   },
   "meal": {
     "slot": {
@@ -19,7 +22,8 @@
       "lunch": "Mittagessen",
       "dinner": "Abendessen",
       "unspecified": "Essen"
-    }
+    },
+    "plate": "{{slot}}: {{title}}"
   },
   "legend": {
     "label": "Wer ist wer"
@@ -31,11 +35,6 @@
     "unauthorized": "Der Zugangslink ist abgelaufen. Bitte den neuen Link mit ?key=… auf diesem Tablet öffnen."
   },
   "day": {
-    "band": {
-      "morning": "Morgen",
-      "midday": "Mittag",
-      "evening": "Abend"
-    },
     "meals": "Essen",
     "loading": "Der Plan wird geladen",
     "empty": {
@@ -49,8 +48,17 @@
     },
     "hidden": {
       "badge": "+{{count}}",
-      "earlier": "{{count}} schon vorbei",
-      "later": "{{count}} weitere später"
+      "earlier": "{{count}} weitere schon vorbei",
+      "later": "{{count}} weitere später: {{titles, list}}",
+      "allDay": "{{count}} weitere ganztägig: {{titles, list}}"
+    },
+    "today": "Heute",
+    "todayDate": "{{weekday}}, {{date}}",
+    "now": "jetzt",
+    "nowLabel": "jetzt, {{time}}",
+    "past": {
+      "label": "vorbei",
+      "list": "Schon vorbei: {{titles, list}}"
     }
   },
   "fullscreen": {
@@ -59,8 +67,9 @@
   },
   "board": {
     "viewGroup": "Ansicht",
-    "day": "Tagesansicht",
-    "week": "Wochenansicht"
+    "day": "Heute",
+    "week": "Woche",
+    "updated": "Stand {{time}}"
   },
   "week": {
     "label": "Die nächsten sieben Tage",

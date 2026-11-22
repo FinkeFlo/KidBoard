@@ -19,7 +19,9 @@ describe("ChildLegend", () => {
       "aria-hidden",
       "true",
     );
-    expect(items[0]).toHaveClass("min-h-touch");
+    // Compact chip (40px sign, design spec); not a touch target, it is not interactive.
+    expect(items[0]?.querySelector(".size-10")).not.toBeNull();
+    expect(items[0]?.querySelector("button")).toBeNull();
   });
 
   it("renders nothing without children", () => {

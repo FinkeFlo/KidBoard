@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
 import { agenda, type MockEvent } from "./mockApi";
@@ -48,9 +48,9 @@ export async function expectNoOverflow(page: Page): Promise<void> {
       rect.right <= box.right + 0.5 &&
       rect.bottom <= box.bottom + 0.5;
     const screen = new DOMRect(0, 0, viewport.width, viewport.height);
-    // band-specific: day-band in the list below is replaced in T-30b
+    // `column-events` clips (overflow hidden), so its own scroll size reveals a cut tile.
     for (const el of document.querySelectorAll<HTMLElement>(
-      "main, header, [data-testid=countdown], [data-testid=day-band], [data-testid=day-column], article",
+      "main, header, [data-testid=countdown], [data-testid=day-column], [data-testid=column-events], [data-testid=nav-rail], article",
     )) {
       const name = `${el.tagName}[${el.dataset["testid"] ?? ""}] ${el.textContent.slice(0, 24)}`;
       if (el.scrollHeight > el.clientHeight + 1) problems.push(`${name} h`);
@@ -73,13 +73,14 @@ export async function expectNoOverflow(page: Page): Promise<void> {
         }
       }
     }
-    // Every list item lies inside its day column / band.
-    // band-specific: day-band is replaced in T-30b
+    // Every list item, tile, badge, strip and now line lies inside its day column.
     for (const column of document.querySelectorAll(
-      "[data-testid=day-column], [data-testid=day-band]",
+      "[data-testid=day-column]",
     )) {
       const box = column.getBoundingClientRect();
-      for (const item of column.querySelectorAll("li")) {
+      for (const item of column.querySelectorAll(
+        "li, article, [data-testid=child-badges], [data-testid=past-strip], [data-testid=now-line]",
+      )) {
         if (!inside(item.getBoundingClientRect(), box)) {
           problems.push(`escaping ${item.textContent.slice(0, 24)}`);
         }
@@ -103,4 +104,44 @@ export async function moons(page: Page): Promise<number> {
     .locator(".font-emoji")
     .filter({ hasText: /^🌙$/u })
     .count();
+}
+
+export interface ColumnAccount {
+  /** Accessible names of the timed tiles shown. */
+  shown: string[];
+  /** Events folded into the "vorbei" strip, and the strip's accessible name. */
+  folded: number;
+  stripName: string;
+  /** Events summed up in the trailing "+N", and its screen-reader text. */
+  hidden: number;
+  hiddenText: string;
+}
+
+/** What a day column does with its timed events: shown, folded, summed up. */
+export async function columnAccount(column: Locator): Promise<ColumnAccount> {
+  const list = column.getByTestId("column-events");
+  const shown = await list
+    .getByTestId("event-tile")
+    .evaluateAll((tiles) =>
+      tiles.map((tile) => tile.getAttribute("aria-label") ?? ""),
+    );
+  const strip = list.getByTestId("past-strip");
+  const more = list.getByTestId("column-more");
+  const folded =
+    (await strip.count()) > 0
+      ? Number(await strip.getAttribute("data-count"))
+      : 0;
+  const hidden =
+    (await more.count()) > 0
+      ? Number(await more.getAttribute("data-count"))
+      : 0;
+  return {
+    shown,
+    folded,
+    stripName:
+      folded > 0 ? ((await strip.getAttribute("aria-label")) ?? "") : "",
+    hidden,
+    hiddenText:
+      hidden > 0 ? ((await more.locator(".sr-only").textContent()) ?? "") : "",
+  };
 }

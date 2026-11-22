@@ -1,13 +1,112 @@
 import type { CalendarEvent, Child } from "@kidboard/shared";
-import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type FormatContext, formatTime } from "../i18n/format";
-import { ChildAvatar } from "./ChildAvatar";
-import { childColorStyle } from "./childColor";
+import type { DayBand } from "../time";
+import { ChildBadges } from "./ChildBadges";
+import { resolveTileTint, type TileTint, tileTintStyle } from "./childTint";
 import { Emoji } from "./Emoji";
+import { AllDayIcon, TimeOfDayIcon } from "./TimeOfDayIcon";
 
 export type EventStatus = "upcoming" | "current" | "past";
+
+/**
+ * Tile sizes: `large` / `dense` in today's column (dense from 6 events or when space is
+ * short), `compact` / `compact-dense` on the other days. Heights are fixed, so a column
+ * can derive how many tiles fit from its height ({@link TILE_HEIGHT_REM}).
+ */
+export type TileSize = "large" | "dense" | "compact" | "compact-dense";
+
+/** Tile heights in rem; `large` and `compact` are `--spacing-tile(-compact)`. */
+export const TILE_HEIGHT_REM: Record<TileSize, number> = {
+  large: 5,
+  dense: 4,
+  compact: 4.75,
+  "compact-dense": 3.75,
+};
+
+// Full class names so Tailwind can see them. Today's emoji stay >= 3.5rem in both sizes.
+const SIZES: Record<
+  TileSize,
+  {
+    tile: string;
+    emoji: string;
+    title: string;
+    badge: string;
+    badgeText: string;
+  }
+> = {
+  large: {
+    tile: "h-tile gap-3 ps-3 pe-4",
+    emoji: "text-[3.5rem]",
+    title: "text-tile",
+    badge: "size-badge",
+    badgeText: "text-title",
+  },
+  dense: {
+    tile: "h-16 gap-3 ps-3 pe-4",
+    emoji: "text-[3.5rem]",
+    title: "text-tile-compact",
+    badge: "size-8",
+    badgeText: "text-body",
+  },
+  compact: {
+    tile: "h-tile-compact gap-2 ps-2.5 pe-3",
+    emoji: "text-[2.5rem]",
+    title: "text-tile-compact",
+    badge: "size-9",
+    badgeText: "text-body",
+  },
+  "compact-dense": {
+    tile: "h-15 gap-2 ps-2.5 pe-3",
+    emoji: "text-[2.25rem]",
+    title: "text-tile-compact",
+    badge: "size-8",
+    badgeText: "text-body",
+  },
+};
+
+/**
+ * Status look. Past events recede through surface/text tokens, never opacity (merge
+ * rule 4); the current event keeps its accent ring and the next upcoming one gets a ring
+ * in the "now" colour (merge rule 3), so "now" and "next" read without words.
+ */
+function statusClasses(
+  status: EventStatus,
+  next: boolean,
+  tint: TileTint,
+): string {
+  if (status === "past") return "bg-surface-sunken text-text-muted";
+  const edge =
+    tint.edge !== null
+      ? "inset-ring-4 inset-ring-(color:--child-color)"
+      : tint.kind === "split"
+        ? ""
+        : "inset-ring-2 inset-ring-border";
+  const emphasis =
+    status === "current"
+      ? "ring-accent shadow-raised ring-4"
+      : next
+        ? "ring-now ring-offset-surface-raised shadow-raised ring-3 ring-offset-2"
+        : "";
+  return `text-text ${edge} ${emphasis}`;
+}
+
+/** Configured children of an event, in the event's order (unknown ids skipped). */
+export function childrenOf(
+  event: CalendarEvent,
+  childList: readonly Child[],
+): Child[] {
+  return event.childIds.flatMap((id) => {
+    const child = childList.find((c) => c.id === id);
+    return child === undefined ? [] : [child];
+  });
+}
+
+/** Joins the parts of a tile's accessible name ("Ballett, 15:30, For Mia"), skipping gaps. */
+export function tileName(parts: readonly (string | undefined)[]): string {
+  return parts.filter((part) => part !== undefined).join(", ");
+}
 
 export interface EventTileProps {
   event: CalendarEvent;
@@ -18,104 +117,86 @@ export interface EventTileProps {
   status?: EventStatus;
   /** Timed event that began on an earlier day: shows "continues" instead of the start. */
   continues?: boolean;
-  /**
-   * Fill the parent, which must be a size container (`@container-size`) with a definite
-   * height: icon, padding and avatars scale with its height (`cqh`), the title drops to
-   * one line and the time hides on short tiles, so the tile shrinks instead of clipping.
-   */
-  fit?: boolean;
+  /** Time of day for the icon next to the time; `null` for all-day events. */
+  timeOfDay?: DayBand | null;
+  size?: TileSize;
+  /** The next event that has not started yet (today only). */
+  next?: boolean;
 }
 
-const STATUS_CLASSES: Record<EventStatus, string> = {
-  upcoming: "bg-surface-raised text-text shadow-card",
-  current: "bg-surface-raised text-text shadow-raised ring-accent ring-4",
-  // Receded via surface/text tokens, not opacity (keeps WCAG AA contrast).
-  past: "bg-surface-sunken text-text-muted",
-};
-
-/** Natural tile vs. a tile that scales with its size-container parent (`fit`). */
-const LAYOUT = {
-  natural: {
-    tile: "min-h-touch gap-3 p-3",
-    icon: "text-display",
-    title: "line-clamp-2",
-    time: "",
-    kids: "flex flex-col gap-1",
-    avatar: "size-8 text-body",
-  },
-  fit: {
-    tile: "h-full gap-[clamp(--spacing(1),5cqh,--spacing(3))] p-[clamp(--spacing(1),8cqh,--spacing(3))]",
-    // Bounded by height and width, so a narrow two-column cell keeps room for the title.
-    icon: "text-[length:clamp(1.25rem,min(50cqh,20cqw),var(--text-display))]",
-    // Two lines need about 5.5rem of tile height; narrow cells use the smaller type.
-    title:
-      "line-clamp-2 hyphens-auto [@container(max-height:5.5rem)]:line-clamp-1 [@container(max-width:14rem)]:text-caption",
-    // The time line needs about 3.5rem of tile height.
-    time: "[@container(max-height:3.5rem)]:hidden",
-    // Two rows at most (more children add columns), sized by the tile.
-    kids: "grid grid-flow-col grid-rows-2 gap-[2cqh]",
-    avatar:
-      "size-[clamp(1rem,min(40cqh,13cqw),--spacing(8))] text-[length:clamp(0.625rem,min(22cqh,7cqw),var(--text-body))]",
-  },
-} as const;
-
+/**
+ * An event as a picture tile: emoji, one-line title, time-of-day icon with the time, and
+ * the children's signs in the corner. The fill is the child's tint (one child, with an
+ * edge), split tints (two) or neutral (none, three and more). The accessible name says
+ * title, time, children and state ("Ballett, 15:30, Für Mia"); emoji and badges are
+ * decorative. Not interactive.
+ */
 export function EventTile({
   event,
   childList,
   format,
   status = "upcoming",
   continues = false,
-  fit = false,
+  timeOfDay = null,
+  size = "large",
+  next = false,
 }: EventTileProps): React.JSX.Element {
   const { t } = useTranslation();
-  const layout = LAYOUT[fit ? "fit" : "natural"];
-  const titleId = useId();
-  const kids = event.childIds.flatMap((id) => {
-    const child = childList.find((c) => c.id === id);
-    return child === undefined ? [] : [child];
-  });
+  const kids = childrenOf(event, childList);
+  const tint = resolveTileTint(kids);
+  const sizes = SIZES[size];
+  const past = status === "past";
+  const time = event.allDay
+    ? t("event.allDay")
+    : continues
+      ? t("event.continues")
+      : formatTime(event.start, format);
+  const name = tileName([
+    event.title,
+    time,
+    kids.length === 0
+      ? t("event.forEveryone")
+      : t("event.forChildren", { names: kids.map((child) => child.name) }),
+    status === "upcoming"
+      ? next
+        ? t("event.status.next")
+        : undefined
+      : t(`event.status.${status}`),
+  ]);
   return (
-    <article
-      aria-labelledby={titleId}
-      data-testid="event-tile"
-      data-status={status}
-      data-all-day={event.allDay}
-      style={childColorStyle(kids[0]?.color)}
-      data-fit={fit}
-      className={`${STATUS_CLASSES[status]} ${layout.tile} rounded-tile flex items-center border-s-8 border-(color:--child-color)`}
-    >
-      <Emoji emoji={event.icon} className={layout.icon} />
-      <div className="min-w-0 flex-1">
-        <p
-          id={titleId}
-          className={`text-body font-bold break-words ${layout.title}`}
-        >
-          {event.title}
-        </p>
-        <p className={`text-caption text-text-muted ${layout.time}`}>
-          {event.allDay
-            ? t("event.allDay")
-            : continues
-              ? t("event.continues")
-              : formatTime(event.start, format)}
-        </p>
-        {/* Also when every id is unconfigured: no avatar is shown, so it reads as "everyone". */}
-        {kids.length === 0 && (
-          <p className="sr-only">{t("event.forEveryone")}</p>
-        )}
-        {status !== "upcoming" && (
-          <p className="sr-only">{t(`event.status.${status}`)}</p>
-        )}
-      </div>
-      {kids.length > 0 && (
-        <ul className={`${layout.kids} shrink-0`}>
-          {kids.map((child) => (
-            <li key={child.id}>
-              <ChildAvatar child={child} className={layout.avatar} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </article>
+    // The badges sit beside the tile (not inside), so they may poke over its corner
+    // without making the tile itself overflow.
+    <div className="relative min-w-0">
+      <article
+        aria-label={name}
+        data-testid="event-tile"
+        data-status={status}
+        data-next={next}
+        data-all-day={event.allDay}
+        data-size={size}
+        data-tint={past ? "past" : tint.kind}
+        style={past ? undefined : tileTintStyle(tint)}
+        className={`${statusClasses(status, next, tint)} ${sizes.tile} rounded-tile flex items-center`}
+      >
+        <Emoji
+          emoji={event.icon}
+          className={`${sizes.emoji} ${past ? "grayscale" : ""}`}
+        />
+        <div className="min-w-0 flex-1">
+          <p className={`${sizes.title} truncate pe-5`}>{event.title}</p>
+          <p className="text-meta text-text-muted flex min-w-0 items-center gap-1.5">
+            {event.allDay ? (
+              <AllDayIcon />
+            ) : timeOfDay !== null ? (
+              <TimeOfDayIcon timeOfDay={timeOfDay} />
+            ) : null}
+            <span className="truncate">{time}</span>
+          </p>
+        </div>
+      </article>
+      <span className="pointer-events-none absolute -end-1.5 -top-2">
+        <ChildBadges tint={tint} size={sizes.badge} text={sizes.badgeText} />
+      </span>
+    </div>
   );
 }

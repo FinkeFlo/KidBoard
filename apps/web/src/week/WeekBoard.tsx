@@ -83,7 +83,7 @@ function WeekColumn({
   const { t } = useTranslation();
   const headingId = useId();
   const surface = day.isWeekend
-    ? "bg-band-morning text-text"
+    ? "bg-surface-weekend text-text"
     : "bg-surface-raised text-text";
   const ring = day.isToday ? "ring-accent shadow-raised ring-4" : "shadow-card";
   const label = day.isWeekend ? "text-band-morning-accent" : "text-text";

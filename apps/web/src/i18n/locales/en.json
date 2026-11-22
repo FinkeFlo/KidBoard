@@ -8,10 +8,13 @@
     "allDay": "All day",
     "status": {
       "past": "Already over",
-      "current": "Happening now"
+      "current": "Happening now",
+      "next": "Next"
     },
     "forEveryone": "For everyone",
-    "continues": "Continues"
+    "continues": "Continues",
+    "forChildren": "For {{names, list}}",
+    "moreChildren": "+{{count}}"
   },
   "meal": {
     "slot": {
@@ -19,7 +22,8 @@
       "lunch": "Lunch",
       "dinner": "Dinner",
       "unspecified": "Meal"
-    }
+    },
+    "plate": "{{slot}}: {{title}}"
   },
   "legend": {
     "label": "Who is who"
@@ -31,11 +35,6 @@
     "unauthorized": "The access link has expired. Please open the new link with ?key=… on this tablet."
   },
   "day": {
-    "band": {
-      "morning": "Morning",
-      "midday": "Midday",
-      "evening": "Evening"
-    },
     "meals": "Meals",
     "loading": "Loading the plan",
     "empty": {
@@ -49,8 +48,17 @@
     },
     "hidden": {
       "badge": "+{{count}}",
-      "earlier": "{{count}} already over",
-      "later": "{{count}} more later"
+      "earlier": "{{count}} more already over",
+      "later": "{{count}} more later: {{titles, list}}",
+      "allDay": "{{count}} more all day: {{titles, list}}"
+    },
+    "today": "Today",
+    "todayDate": "{{weekday}}, {{date}}",
+    "now": "now",
+    "nowLabel": "now, {{time}}",
+    "past": {
+      "label": "over",
+      "list": "Already over: {{titles, list}}"
     }
   },
   "fullscreen": {
@@ -59,8 +67,9 @@
   },
   "board": {
     "viewGroup": "View",
-    "day": "Day view",
-    "week": "Week view"
+    "day": "Today",
+    "week": "Week",
+    "updated": "Updated {{time}}"
   },
   "week": {
     "label": "Next seven days",

@@ -25,7 +25,7 @@ const BUSY_MEALS = Array.from({ length: 7 }, (_, day) => [
 ]).flat();
 
 test.describe("fullscreen control", () => {
-  test("is a quiet 64px corner target that causes no overflow", async ({
+  test("is a quiet 64px target in the rail's bottom slot that causes no overflow", async ({
     page,
   }) => {
     await mockBoard(page, {
@@ -44,11 +44,20 @@ test.describe("fullscreen control", () => {
     if (box === null || viewport === null) return;
     expect(box.width).toBeGreaterThanOrEqual(64);
     expect(box.height).toBeGreaterThanOrEqual(64);
-    // Fully inside the viewport, in the bottom-right corner.
+    // Fully inside the viewport, at the bottom, in the rail's column (merge rule 6):
+    // centred under the rail and below its last element, so the rail never covers it.
     expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 0.5);
     expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 0.5);
-    expect(box.x + box.width).toBeGreaterThan(viewport.width - 1);
     expect(box.y + box.height).toBeGreaterThan(viewport.height - 1);
+    const rail = await page.getByTestId("nav-rail").boundingBox();
+    expect(rail).not.toBeNull();
+    if (rail === null) return;
+    const centre = box.x + box.width / 2;
+    expect(Math.abs(centre - (rail.x + rail.width / 2))).toBeLessThanOrEqual(
+      // At most the burn-in amplitude (the rail drifts, the control does not).
+      12.5,
+    );
+    expect(box.y).toBeGreaterThanOrEqual(rail.y + rail.height - 0.5);
 
     // It is an overlay: the document does not grow and the header keeps its place.
     const scroll = await page.evaluate(() => ({
@@ -85,8 +94,8 @@ test.describe("fullscreen control", () => {
     await expect(control).toBeVisible();
   });
 
-  for (const view of ["Day view", "Week view"] as const) {
-    test(`never covers content on a busy ${view.toLowerCase()}`, async ({
+  for (const view of ["Today", "Week"] as const) {
+    test(`never covers content on a busy board (${view} view)`, async ({
       page,
     }) => {
       await mockBoard(page, { agenda: agenda(BUSY_EVENTS, BUSY_MEALS) });

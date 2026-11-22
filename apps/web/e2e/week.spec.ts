@@ -91,17 +91,18 @@ test.describe("week view", () => {
     await mockBoard(page, { agenda: agenda(EVENTS, MEALS) });
     await page.goto("/");
 
-    const toWeek = page.getByRole("button", { name: "Week view" });
-    const toDay = page.getByRole("button", { name: "Day view" });
+    const toWeek = page.getByRole("button", { name: "Week" });
+    const toDay = page.getByRole("button", { name: "Today" });
     await expect(toDay).toHaveAttribute("aria-pressed", "true");
-    // Pictorial and big: at least 64 x 64 px (CSS px), no visible words.
+    // Picture plus a short word, big: at least 64 x 64 px (CSS px).
     for (const button of [toWeek, toDay]) {
       const box = await button.boundingBox();
       expect(box?.width).toBeGreaterThanOrEqual(64);
       expect(box?.height).toBeGreaterThanOrEqual(64);
     }
-    await expect(toWeek).toHaveText("🗓️");
-    await expect(toDay).toHaveText("☀️");
+    await expect(toWeek.getByTestId("week-bars")).toBeVisible();
+    await expect(toWeek).toHaveText("Week");
+    await expect(toDay).toHaveText("☀️Today");
 
     await toWeek.click();
     await expect(toWeek).toHaveAttribute("aria-pressed", "true");
@@ -157,7 +158,8 @@ test.describe("week view", () => {
     await expect(
       page.locator('[data-testid=day-column][data-today="true"]'),
     ).toHaveCount(1);
-    await expect(page.getByTestId("day-column")).toHaveCount(1);
+    // Back on the four-day overview.
+    await expect(page.getByTestId("day-column")).toHaveCount(4);
     await expect(page.getByTestId("week-board")).toHaveCount(0);
   });
 
@@ -174,7 +176,7 @@ test.describe("week view", () => {
       await page.goto("/");
       await page
         .getByRole("button", {
-          name: locale === "en" ? "Week view" : "Wochenansicht",
+          name: locale === "en" ? "Week" : "Woche",
         })
         .click();
       await expect(page.getByTestId("day-column")).toHaveCount(7);
@@ -198,7 +200,7 @@ test.describe("week view", () => {
       agenda: agenda([{ title: "Swimming", icon: "🏊", time: "10:00" }], []),
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Week view" }).click();
+    await page.getByRole("button", { name: "Week" }).click();
     await expect(page.getByTestId("day-column")).toHaveCount(7);
     await expect(
       page
@@ -234,7 +236,7 @@ test.describe("week view", () => {
       ),
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Week view" }).click();
+    await page.getByRole("button", { name: "Week" }).click();
     const columns = page.getByTestId("day-column");
     const today = columns.first();
     await expect(

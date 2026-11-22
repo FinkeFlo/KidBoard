@@ -1,27 +1,38 @@
-import { render, screen } from "@testing-library/react";
+import type { Child } from "@kidboard/shared";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { FormatContext } from "../i18n/format";
 import en from "../i18n/locales/en.json";
-import { EventTile } from "./EventTile";
+import tokensCss from "../styles/tokens.css?raw";
+import { EventTile, TILE_HEIGHT_REM } from "./EventTile";
 import { BEN, eventFixture, MIA } from "./fixtures.test-utils";
 
 const format: FormatContext = { locale: "en", timeZone: "Europe/Berlin" };
+const LEO: Child = { id: "leo", name: "Leo", color: "child-3", avatar: "🦁" };
+const ZOE: Child = { id: "zoe", name: "Zoe", color: "child-4", avatar: "🐼" };
+
+const tile = (): HTMLElement => screen.getByTestId("event-tile");
+const badges = (): HTMLElement => screen.getByTestId("child-badges");
 
 describe("EventTile", () => {
-  it("shows icon, title and formatted time in the configured zone", () => {
+  it("shows icon, one-line title and the time in the configured zone; named title, time, children", () => {
     render(
       <EventTile
-        event={eventFixture()}
+        event={eventFixture({ childIds: ["mia"] })}
         childList={[MIA, BEN]}
         format={format}
+        timeOfDay="midday"
       />,
     );
-    expect(screen.getByRole("article", { name: "Swimming" })).toBeVisible();
+    const article = screen.getByRole("article", {
+      name: "Swimming, 2:30 PM, For Mia",
+    });
+    expect(article).toBeVisible();
     // Decorative icon: the title is announced once, via the article name.
-    expect(screen.queryByRole("img", { name: "Swimming" })).toBeNull();
     expect(screen.getByText("🏊")).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByText("2:30 PM")).toBeInTheDocument();
+    expect(screen.getByText("Swimming")).toHaveClass("truncate");
   });
 
   it("uses the zone, not the instant's offset or device zone", () => {
@@ -35,7 +46,36 @@ describe("EventTile", () => {
     expect(screen.getByText("2:30 PM")).toBeInTheDocument();
   });
 
-  it("renders all-day events with a label and never formats the date key", () => {
+  it("shows the time-of-day symbol: 🌅 morning, 🌞 midday, 🌆 evening, never the moon", () => {
+    const { rerender } = render(
+      <EventTile
+        event={eventFixture()}
+        childList={[]}
+        format={format}
+        timeOfDay="morning"
+      />,
+    );
+    const seen: string[] = [];
+    for (const timeOfDay of ["morning", "midday", "evening"] as const) {
+      rerender(
+        <EventTile
+          event={eventFixture()}
+          childList={[]}
+          format={format}
+          timeOfDay={timeOfDay}
+        />,
+      );
+      const symbols = [...tile().querySelectorAll(".font-emoji")].map(
+        (el) => el.textContent,
+      );
+      seen.push(symbols[1] ?? "");
+      expect(symbols).not.toContain("🌙");
+      expect(symbols).not.toContain("☀️");
+    }
+    expect(seen).toEqual(["🌅", "🌞", "🌆"]);
+  });
+
+  it("gives all-day events the all-day icon and label, never a formatted date key", () => {
     render(
       <EventTile
         event={eventFixture({
@@ -48,62 +88,95 @@ describe("EventTile", () => {
       />,
     );
     expect(screen.getByText(en.event.allDay)).toBeInTheDocument();
-    expect(screen.getByRole("article")).toHaveAttribute("data-all-day", "true");
+    expect(tile()).toHaveAttribute("data-all-day", "true");
+    expect(screen.getByTestId("all-day-icon")).toBeInTheDocument();
+    expect(tile().querySelectorAll(".font-emoji")).toHaveLength(1);
   });
 
-  it("shows an avatar dot per known child and skips unknown ids", () => {
+  it("one child: the child's tint, an edge in the child colour and one badge", () => {
     render(
       <EventTile
-        event={eventFixture({ childIds: ["mia", "ben", "ghost"] })}
+        event={eventFixture({ childIds: ["mia", "ghost"] })}
         childList={[MIA, BEN]}
         format={format}
       />,
     );
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
-    expect(screen.getByRole("img", { name: "Mia" })).toHaveTextContent("🦊");
-    expect(screen.getByRole("img", { name: "Ben" })).toBeInTheDocument();
-    // Colour edge from the first child (token name -> design token variable).
-    expect(
-      screen.getByRole("article").style.getPropertyValue("--child-color"),
-    ).toBe("var(--color-child-1)");
+    expect(tile()).toHaveAttribute("data-tint", "single");
+    expect(tile().style.background).toBe("var(--color-child-1-tint)");
+    expect(tile().style.getPropertyValue("--child-color")).toBe(
+      "var(--color-child-1)",
+    );
+    expect(tile()).toHaveClass("inset-ring-4");
+    expect(within(badges()).getByText("🦊")).toBeInTheDocument();
+    expect(badges()).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("has a neutral edge and no dots for everyone", () => {
+  it("two children: split tint, no edge, two overlapping badges", () => {
     render(
-      <EventTile event={eventFixture()} childList={[MIA]} format={format} />,
+      <EventTile
+        event={eventFixture({ childIds: ["mia", "ben"] })}
+        childList={[MIA, BEN]}
+        format={format}
+      />,
     );
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("article").style.getPropertyValue("--child-color"),
-    ).toBe("var(--color-border)");
+    expect(tile()).toHaveAttribute("data-tint", "split");
+    expect(tile().style.background).toContain("linear-gradient");
+    expect(tile()).not.toHaveClass("inset-ring-4");
+    const shown = [...badges().children];
+    expect(shown.map((badge) => badge.textContent)).toEqual(["🦊", "🐻"]);
+    expect(shown[1]).toHaveClass("-ms-3");
+    expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For Mia and Ben");
   });
 
-  it("announces events without a child as for everyone (screen reader only)", () => {
-    const { rerender } = render(
-      <EventTile event={eventFixture()} childList={[MIA]} format={format} />,
-    );
-    expect(screen.getByText(en.event.forEveryone)).toHaveClass("sr-only");
-    rerender(
+  it("three and more children: neutral fill, three badges, then +N; the name lists all", () => {
+    render(
       <EventTile
-        event={eventFixture({ childIds: ["mia"] })}
+        event={eventFixture({ childIds: ["mia", "ben", "leo", "zoe"] })}
+        childList={[MIA, BEN, LEO, ZOE]}
+        format={format}
+      />,
+    );
+    expect(tile()).toHaveAttribute("data-tint", "neutral");
+    expect(tile().style.background).toBe("var(--color-surface-raised)");
+    expect(within(badges()).getByTestId("child-badges-more")).toHaveTextContent(
+      "+1",
+    );
+    expect(within(badges()).queryByText("🐼")).toBeNull();
+    expect(tile()).toHaveAccessibleName(
+      "Swimming, 2:30 PM, For Mia, Ben, Leo, and Zoe",
+    );
+  });
+
+  it("names events without a configured child 'for everyone', without badges", () => {
+    render(
+      <EventTile
+        event={eventFixture({ childIds: ["ghost"] })}
         childList={[MIA]}
         format={format}
       />,
     );
-    expect(screen.queryByText(en.event.forEveryone)).not.toBeInTheDocument();
+    expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For everyone");
+    expect(screen.queryByTestId("child-badges")).toBeNull();
+    expect(tile()).toHaveAttribute("data-tint", "none");
   });
 
-  it("marks past and current tiles for assistive tech and styling", () => {
+  it("past events recede through tokens, not opacity; current has a ring; next is emphasised", () => {
     const { rerender } = render(
       <EventTile
-        event={eventFixture()}
-        childList={[]}
+        event={eventFixture({ childIds: ["mia"] })}
+        childList={[MIA]}
         format={format}
         status="past"
       />,
     );
-    expect(screen.getByRole("article")).toHaveAttribute("data-status", "past");
-    expect(screen.getByText(en.event.status.past)).toBeInTheDocument();
+    expect(tile()).toHaveAttribute("data-status", "past");
+    expect(tile()).toHaveClass("bg-surface-sunken", "text-text-muted");
+    expect(tile().className).not.toMatch(/opacity/);
+    expect(tile().style.background).toBe("");
+    expect(tile()).toHaveAccessibleName(
+      `Swimming, 2:30 PM, For Mia, ${en.event.status.past}`,
+    );
+
     rerender(
       <EventTile
         event={eventFixture()}
@@ -112,20 +185,50 @@ describe("EventTile", () => {
         status="current"
       />,
     );
-    expect(screen.getByRole("article")).toHaveClass("ring-4");
-    expect(screen.getByText(en.event.status.current)).toBeInTheDocument();
+    expect(tile()).toHaveClass("ring-4", "ring-accent");
+    expect(tile()).toHaveAccessibleName(
+      `Swimming, 2:30 PM, For everyone, ${en.event.status.current}`,
+    );
+
+    rerender(
+      <EventTile event={eventFixture()} childList={[]} format={format} next />,
+    );
+    expect(tile()).toHaveAttribute("data-next", "true");
+    expect(tile()).toHaveClass("ring-now");
+    expect(tile()).toHaveAccessibleName(
+      `Swimming, 2:30 PM, For everyone, ${en.event.status.next}`,
+    );
   });
 
-  it("clamps long titles to two lines and meets the touch-target size", () => {
-    render(
-      <EventTile
-        event={eventFixture({ title: "Very ".repeat(60) })}
-        childList={[]}
-        format={format}
-      />,
+  it("keeps today's emoji at 3.5rem in the large and the dense size", () => {
+    for (const size of ["large", "dense"] as const) {
+      const { unmount } = render(
+        <EventTile
+          event={eventFixture()}
+          childList={[]}
+          format={format}
+          size={size}
+        />,
+      );
+      expect(screen.getByText("🏊")).toHaveClass("text-[3.5rem]");
+      expect(tile()).toHaveAttribute("data-size", size);
+      unmount();
+    }
+  });
+
+  it("uses the tile height tokens it reports for the column capacity", () => {
+    const token = (name: string): number =>
+      parseFloat(
+        new RegExp(`${name}:\\s*([\\d.]+)rem`).exec(tokensCss)?.[1] ?? "NaN",
+      );
+    expect(TILE_HEIGHT_REM.large).toBe(token("--spacing-tile"));
+    expect(TILE_HEIGHT_REM.compact).toBe(token("--spacing-tile-compact"));
+    // Dense sizes are shorter, but still >= the 3.5rem emoji (today) they carry.
+    expect(TILE_HEIGHT_REM.dense).toBeLessThan(TILE_HEIGHT_REM.large);
+    expect(TILE_HEIGHT_REM.dense).toBeGreaterThanOrEqual(3.5);
+    expect(TILE_HEIGHT_REM["compact-dense"]).toBeLessThan(
+      TILE_HEIGHT_REM.compact,
     );
-    expect(screen.getByRole("article")).toHaveClass("min-h-touch");
-    expect(screen.getByText(/^Very/)).toHaveClass("line-clamp-2");
   });
 
   it("renders an HTML-looking title as text, never as markup", () => {
@@ -150,9 +253,10 @@ describe("EventTile", () => {
         format={format}
       />,
     );
-    expect(
-      screen.getByRole("article").style.getPropertyValue("--child-color"),
-    ).toBe("var(--color-border)");
+    expect(tile().style.getPropertyValue("--child-color")).toBe(
+      "var(--color-border)",
+    );
+    expect(tile().style.background).toBe("var(--color-surface-raised)");
   });
 
   it("shows a continues hint instead of the original start for a continuing event", () => {
@@ -166,28 +270,5 @@ describe("EventTile", () => {
     );
     expect(screen.getByText(en.event.continues)).toBeInTheDocument();
     expect(screen.queryByText("8:00 PM")).toBeNull();
-  });
-
-  it("announces 'for everyone' when no id of the event is a configured child", () => {
-    render(
-      <EventTile
-        event={eventFixture({ childIds: ["ghost"] })}
-        childList={[MIA]}
-        format={format}
-      />,
-    );
-    expect(screen.getByText(en.event.forEveryone)).toHaveClass("sr-only");
-    expect(screen.queryByRole("list")).toBeNull();
-  });
-
-  it("does not announce 'for everyone' when at least one configured child is shown", () => {
-    render(
-      <EventTile
-        event={eventFixture({ childIds: ["ghost", "mia"] })}
-        childList={[MIA]}
-        format={format}
-      />,
-    );
-    expect(screen.queryByText(en.event.forEveryone)).toBeNull();
   });
 });

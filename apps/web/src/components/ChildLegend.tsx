@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { ChildAvatar } from "./ChildAvatar";
 
-/** Who-is-who legend: avatar in the child's colour plus the name. */
+/** Who-is-who legend: avatar in the child's colour plus the name. Not interactive. */
 export function ChildLegend({
   childList,
 }: {
@@ -14,17 +14,17 @@ export function ChildLegend({
   return (
     <ul
       aria-label={t("legend.label")}
-      className="gap-gutter flex flex-wrap items-center"
+      className="flex min-w-0 flex-wrap items-center justify-end gap-2"
     >
       {childList.map((child) => (
         <li
           key={child.id}
-          className="bg-surface-raised text-text min-h-touch rounded-pill shadow-card flex items-center gap-3 py-2 ps-2 pe-5"
+          className="bg-surface-raised text-text rounded-pill shadow-card flex items-center gap-2 py-1 ps-1 pe-4"
         >
           <ChildAvatar
             decorative
             child={child}
-            className="text-title size-12"
+            className="text-title size-10"
           />
           <span className="text-body font-bold">{child.name}</span>
         </li>

@@ -2,7 +2,7 @@ import type { CalendarEvent } from "@kidboard/shared";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { eventFixture } from "../components/fixtures.test-utils";
+import { BEN, eventFixture, MIA } from "../components/fixtures.test-utils";
 import { applyLocale } from "../i18n";
 import type { Countdown } from "./buildCountdown";
 import {
@@ -186,5 +186,39 @@ describe("CountdownBadge", () => {
     renderBadge(20, [party()], "compact");
     const grouped = screen.getByTestId("countdown-grouped");
     expect(grouped.querySelector(".font-emoji")).toHaveClass("text-heading");
+  });
+
+  it("puts the awaited event in its child's tint and edge (neutral without a child)", () => {
+    const countdown: Countdown = {
+      date: "2026-11-25",
+      nights: 3,
+      events: [
+        party({ childIds: ["mia"] }),
+        party({ id: "fair", icon: "🎡", childIds: [] }),
+      ],
+    };
+    render(
+      <CountdownBadge
+        countdown={countdown}
+        variant="compact"
+        childList={[MIA, BEN]}
+      />,
+    );
+    const [mine, everyone] = screen.getAllByTestId("countdown-target");
+    expect(mine).toHaveAttribute("data-tint", "single");
+    expect(mine?.style.background).toBe("var(--color-child-1-tint)");
+    expect(mine?.style.getPropertyValue("--child-color")).toBe(
+      "var(--color-child-1)",
+    );
+    expect(mine).toHaveClass("inset-ring-(color:--child-color)");
+    expect(everyone).toHaveAttribute("data-tint", "none");
+    expect(everyone).toHaveClass("inset-ring-border");
+  });
+
+  it("marks the 0-night state with the today ring besides 🎉", () => {
+    const badge = renderBadge(0);
+    expect(badge).toHaveClass("ring-today-ring");
+    cleanup();
+    expect(renderBadge(2)).not.toHaveClass("ring-today-ring");
   });
 });
