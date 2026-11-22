@@ -410,7 +410,7 @@ not address. These rules apply to every M5b task:
   `color-mix` with the surface, as `var()`/style, CSP-safe); all unit-tested incl. property-style
   sweep like `bandLayout`.
 
-- [ ] **T-30b Four-day overview as main screen** (risk: medium, deps: T-30a)
+- [x] **T-30b Four-day overview as main screen** (risk: medium, deps: T-30a)
   Acceptance: today + next 3 days as columns, today clearly the widest (about 2×) with emoji
   ≥ 3.5rem; events top to bottom, time-of-day icon (inline SVG or emoji per rule 1), now line
   with accessible name, `current` ring (rule 3); all-day banner per column; tiles with child

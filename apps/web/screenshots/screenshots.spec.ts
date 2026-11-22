@@ -51,7 +51,7 @@ for (const theme of ["light", "night"] as const) {
     );
     await shoot(page, `day-${theme}`, size);
 
-    await page.getByRole("button", { name: "Week view" }).click();
+    await page.getByRole("button", { name: "Week" }).click();
     await expect(page.getByTestId("day-column")).toHaveCount(7);
     await shoot(page, `week-${theme}`, size);
   });

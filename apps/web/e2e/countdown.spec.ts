@@ -27,7 +27,7 @@ test.describe("countdown", () => {
       });
     }
 
-    await page.getByRole("button", { name: "Week view" }).click();
+    await page.getByRole("button", { name: "Week" }).click();
     await expect(page.getByTestId("day-column")).toHaveCount(7);
     await expect(countdown).toHaveAttribute("data-variant", "full");
     await expect(countdown).toContainText(
@@ -61,7 +61,7 @@ test.describe("countdown", () => {
     expect(await moons(page)).toBe(14);
     await expectNoOverflow(page);
 
-    await page.getByRole("button", { name: "Week view" }).click();
+    await page.getByRole("button", { name: "Week" }).click();
     await expect(countdown).toHaveAttribute("data-variant", "full");
     expect(await moons(page)).toBe(14);
     await expectNoOverflow(page);
@@ -74,7 +74,7 @@ test.describe("countdown", () => {
     await context.setOffline(true);
     await expect(page.getByRole("status")).toContainText("No internet");
     await expectNoOverflow(page);
-    await page.getByRole("button", { name: "Day view" }).click();
+    await page.getByRole("button", { name: "Today" }).click();
     await expect(countdown).toHaveAttribute("data-variant", "compact");
     await expectNoOverflow(page);
     if (SHOT_DIR !== undefined) {
@@ -124,7 +124,7 @@ test.describe("countdown", () => {
     await expect(page.getByTestId("countdown-today")).toContainText("🎉");
     expect(await moons(page)).toBe(0);
     await expectNoOverflow(page);
-    await page.getByRole("button", { name: "Week view" }).click();
+    await page.getByRole("button", { name: "Week" }).click();
     await expect(countdown).toHaveAttribute("data-variant", "full");
     await expect(page.getByTestId("countdown-today")).toContainText("🎉");
     await expect(countdown).toContainText("Today is the day: Christmas party!");

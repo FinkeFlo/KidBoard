@@ -47,9 +47,8 @@ async function expectNoOverflow(page: Page): Promise<void> {
     const root = document.documentElement;
     const clipped: string[] = [];
     const outside: string[] = [];
-    // band-specific: day-band in the list below is replaced in T-30b
     for (const el of document.querySelectorAll<HTMLElement>(
-      "main, header, [data-testid=day-band], [data-testid=week-board], [data-testid=day-column], article",
+      "main, header, [data-testid=column-events], [data-testid=week-board], [data-testid=day-column], article",
     )) {
       if (
         el.scrollHeight > el.clientHeight + 1 ||
@@ -99,7 +98,7 @@ test.describe("night mode", () => {
       });
     }
 
-    await page.getByRole("button", { name: "Week view" }).click();
+    await page.getByRole("button", { name: "Week" }).click();
     await expect(page.getByTestId("day-column")).toHaveCount(7);
     expect(await theme(page)).toBe("night");
     await expectNoOverflow(page);

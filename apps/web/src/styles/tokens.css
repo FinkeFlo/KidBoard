@@ -72,8 +72,6 @@
   /* Child badge on a tile, navigation rail width. */
   --spacing-badge: 2.5rem;
   --spacing-nav: 6.5rem;
-  /* Legacy: natural height of a day-band tile (band layout). */
-  --spacing-band-tile: 6.5rem;
 
   /* Shape. */
   /* Small chips, the colour bar. */
@@ -133,7 +131,7 @@
   --color-band-morning-accent: #8a5300;
   /* Sun outline icon (midday). */
   --color-band-midday-accent: #9a5b00;
-  /* Moon icon (evening) and the countdown moons. */
+  /* Evening icon and the countdown moons. */
   --color-band-evening-accent: #5a3c99;
   /* Offline / stale banner background. */
   --color-notice: #f6e7c8;
@@ -171,10 +169,8 @@
   --color-child-6-tint: #e3e4ea;
   /* Ring around child badges, text on a child tone. */
   --color-on-child: #ffffff;
-  /* Legacy band surfaces (band layout only). */
-  --color-band-morning: #fff0c2;
-  --color-band-midday: #dcefff;
-  --color-band-evening: #eae0f7;
+  /* Weekend columns of the week view (T-18): warm, distinct from the page. */
+  --color-surface-weekend: #fff0c2;
 
   /* Elevation (day). */
   --shadow-card: 0 0.125rem 0.5rem rgb(43 33 24 / 0.1);
@@ -219,9 +215,7 @@
   --color-child-5-tint: #36270f;
   --color-child-6-tint: #262833;
   --color-on-child: #1a1008;
-  --color-band-morning: #2b2214;
-  --color-band-midday: #16222c;
-  --color-band-evening: #231c30;
+  --color-surface-weekend: #2b2214;
 
   --shadow-card: 0 0.125rem 0.5rem rgb(0 0 0 / 0.5);
   --shadow-raised: 0 0.5rem 1.5rem rgb(0 0 0 / 0.6);

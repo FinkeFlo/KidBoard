@@ -36,7 +36,7 @@ async function metrics(page: Page): Promise<Metrics> {
       .querySelector("h1")
       ?.getBoundingClientRect() as DOMRect;
     const toggle = document
-      .querySelector("[role=group]")
+      .querySelector("[data-testid=view-toggle]")
       ?.getBoundingClientRect() as DOMRect;
     let contentBottom = 0;
     for (const el of document.querySelectorAll(
@@ -110,7 +110,7 @@ test.describe("burn-in shift", () => {
       await context.setOffline(true);
       await expect(page.getByRole("status")).toContainText("No internet");
 
-      for (const view of ["Day view", "Week view"]) {
+      for (const view of ["Today", "Week"]) {
         await page.getByRole("button", { name: view }).click();
         expect(await moons(page)).toBe(14);
         await expectNoOverflow(page);
@@ -213,7 +213,7 @@ test.describe("burn-in shift", () => {
   });
 });
 
-test.describe("view toggle keeps its place when the banner appears", () => {
+test.describe("the rail's view toggle keeps its place when the banner appears", () => {
   test("same position online and offline, with countdown, in both views", async ({
     page,
     context,
@@ -225,14 +225,14 @@ test.describe("view toggle keeps its place when the banner appears", () => {
     await expect(page.getByRole("status")).toHaveCount(0);
 
     const positions: Record<string, Metrics["toggle"]> = {};
-    for (const view of ["Day view", "Week view"]) {
+    for (const view of ["Today", "Week"]) {
       await page.getByRole("button", { name: view }).click();
       positions[`online ${view}`] = (await metrics(page)).toggle;
     }
 
     await context.setOffline(true);
     await expect(page.getByRole("status")).toContainText("No internet");
-    for (const view of ["Day view", "Week view"]) {
+    for (const view of ["Today", "Week"]) {
       await page.getByRole("button", { name: view }).click();
       positions[`offline ${view}`] = (await metrics(page)).toggle;
       await expectNoOverflow(page);
@@ -243,11 +243,11 @@ test.describe("view toggle keeps its place when the banner appears", () => {
       }
     }
 
-    for (const view of ["Day view", "Week view"]) {
+    for (const view of ["Today", "Week"]) {
       expect(positions[`offline ${view}`]).toEqual(positions[`online ${view}`]);
     }
-    // Header row 1: the toggle sits in the top band, next to the heading's row.
-    const online = positions["online Day view"];
+    // The rail's buttons start at the top, next to the heading's row.
+    const online = positions["online Today"];
     const { viewport } = await metrics(page);
     expect(online?.top).toBeLessThan(viewport.height * 0.2);
   });

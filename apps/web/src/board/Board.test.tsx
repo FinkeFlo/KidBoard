@@ -79,7 +79,7 @@ describe("Board", () => {
     expect(fake.count("/api/agenda")).toBe(0);
   });
 
-  it("renders header, bands, all-day row and meals; highlights the current band", async () => {
+  it("renders header, four day columns with all-day banner, now line and meals", async () => {
     fake.setReplies("/api/agenda", {
       status: 200,
       body: agendaFixture({
@@ -110,6 +110,12 @@ describe("Board", () => {
             start: "2026-11-22T18:00:00+01:00",
             end: "2026-11-22T18:30:00+01:00",
           }),
+          eventFixture({
+            id: "zoo",
+            title: "Zoo",
+            start: "2026-11-25T10:00:00+01:00",
+            end: "2026-11-25T11:00:00+01:00",
+          }),
         ],
         meals: [
           mealFixture({ id: "m2", slot: "dinner", title: "Soup" }),
@@ -122,45 +128,74 @@ describe("Board", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Sunday" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("November 22, 2026")).toBeInTheDocument();
+    expect(screen.getByText("November 22")).toBeInTheDocument();
 
-    const bands = screen.getAllByTestId("day-band");
-    expect(bands.map((b) => b.dataset["band"])).toEqual([
-      "morning",
-      "midday",
-      "evening",
+    const columns = screen.getAllByTestId("day-column");
+    expect(columns.map((c) => c.dataset["date"])).toEqual([
+      "2026-11-22",
+      "2026-11-23",
+      "2026-11-24",
+      "2026-11-25",
     ]);
-    expect(bands.map((b) => b.dataset["status"])).toEqual([
+    const today = columns[0] as HTMLElement;
+    expect(today).toHaveAttribute("aria-current", "date");
+    expect(
+      within(today).getByRole("heading", { level: 2, name: en.day.today }),
+    ).toBeVisible();
+    expect(
+      within(columns[3] as HTMLElement).getByRole("heading", {
+        level: 2,
+        name: "Wednesday",
+      }),
+    ).toBeVisible();
+
+    // Events top to bottom; started ones above the now line, the next one emphasised.
+    const tiles = within(today)
+      .getAllByTestId("event-tile")
+      .filter((tile) => tile.dataset["allDay"] === "false");
+    expect(tiles.map((tile) => tile.dataset["status"])).toEqual([
       "past",
       "current",
       "upcoming",
     ]);
-    expect(bands[1]).toHaveAttribute("aria-current", "time");
-    expect(within(bands[0] as HTMLElement).getByText("Swimming")).toBeVisible();
+    expect(tiles.map((tile) => tile.dataset["next"])).toEqual([
+      "false",
+      "false",
+      "true",
+    ]);
+    const now = within(today).getByRole("separator", { name: "now, 12:00 PM" });
     expect(
-      within(bands[0] as HTMLElement).getByRole("article", {
-        name: "Swimming",
-      }),
-    ).toHaveAttribute("data-status", "past");
+      now.compareDocumentPosition(tiles[1] as HTMLElement) &
+        Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy();
     expect(
-      within(bands[1] as HTMLElement).getByRole("article", { name: "Piano" }),
-    ).toHaveAttribute("data-status", "current");
-    expect(
-      within(bands[2] as HTMLElement).getByText("Bath time"),
-    ).toBeVisible();
+      now.compareDocumentPosition(tiles[2] as HTMLElement) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Only today has a now line.
+    expect(screen.getAllByRole("separator")).toHaveLength(1);
 
-    // The all-day event is outside the bands and shows no clock time.
-    const trip = screen.getByRole("article", { name: "School trip" });
+    // The all-day event is a banner at the top, with its own icon and no clock time.
+    const banner = within(today).getByTestId("all-day");
+    const trip = within(banner).getByRole("article", {
+      name: "School trip, All day, For everyone",
+    });
     expect(trip).toHaveAttribute("data-all-day", "true");
-    expect(trip).toHaveTextContent(en.event.allDay);
-    expect(bands.some((b) => b.contains(trip))).toBe(false);
+    expect(within(trip).getByTestId("all-day-icon")).toBeInTheDocument();
+    expect(within(trip).queryByText("🌞")).toBeNull();
 
-    const meals = screen.getByRole("region", { name: en.day.meals });
+    // Meals as named plates: breakfast place empty, lunch, dinner.
+    const meals = within(today).getByRole("list", { name: en.day.meals });
     expect(
       within(meals)
-        .getAllByRole("article")
-        .map((m) => m.dataset["slot"]),
-    ).toEqual(["lunch", "dinner"]);
+        .getAllByRole("img")
+        .map((plate) => plate.getAttribute("aria-label")),
+    ).toEqual(["Lunch: Pasta", "Dinner: Soup"]);
+    expect(
+      within(columns[1] as HTMLElement).queryByRole("list", {
+        name: en.day.meals,
+      }),
+    ).toBeNull();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -173,20 +208,36 @@ describe("Board", () => {
     expect(
       await screen.findByRole("heading", { name: en.day.empty.title }),
     ).toBeVisible();
-    expect(screen.queryByTestId("day-band")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("day-column")).toHaveLength(4);
+    // The empty note sits inside today's column.
+    expect(screen.getAllByTestId("day-column")[0]).toContainElement(
+      screen.getByTestId("day-empty"),
+    );
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Sunday",
     );
   });
 
-  it("keeps the bands when only meals exist", async () => {
+  it("keeps the meals below the empty note when only meals exist", async () => {
     fake.setReplies("/api/agenda", {
       status: 200,
       body: agendaFixture({ events: [], meals: [mealFixture()] }),
     });
     renderDay();
-    expect(await screen.findAllByTestId("day-band")).toHaveLength(3);
-    expect(screen.queryByTestId("day-empty")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("img", { name: "Lunch: Pasta" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("day-empty")).toBeInTheDocument();
+    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+  });
+
+  it("shows the 'Stand' time of the agenda in the rail, not as a live region", async () => {
+    fake.setReplies("/api/agenda", { status: 200, body: agendaFixture() });
+    renderDay();
+    const updated = await screen.findByTestId("updated-at");
+    expect(updated).toHaveTextContent("Updated 12:00 PM");
+    expect(updated.closest("[aria-live], [role=status]")).toBeNull();
+    expect(screen.getByTestId("nav-rail")).toContainElement(updated);
   });
 
   it("follows the config locale and zone", async () => {
@@ -202,7 +253,10 @@ describe("Board", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Sonntag" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("22. November 2026")).toBeInTheDocument();
+    expect(screen.getByText("22. November")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Heute" }),
+    ).toBeInTheDocument();
     expect(screen.getByText(de.day.empty.title)).toBeVisible();
   });
 
@@ -225,7 +279,7 @@ describe("Board", () => {
     expect(status).toHaveTextContent(en.day.error.title);
     expect(status).toHaveTextContent(en.day.error.offline);
     expect(status).not.toHaveTextContent(en.status.offline);
-    expect(screen.queryByTestId("day-band")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("day-column")).not.toBeInTheDocument();
   });
 
   it("shows the error state when the agenda fails and nothing is cached", async () => {
@@ -237,7 +291,7 @@ describe("Board", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveAttribute("data-error", "failed");
     expect(alert).toHaveTextContent(en.status.error);
-    expect(screen.queryByTestId("day-band")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("day-column")).not.toBeInTheDocument();
   });
 
   it("keeps showing the board for worker-stale data", async () => {
@@ -247,7 +301,7 @@ describe("Board", () => {
     });
     renderDay();
     await waitFor(() => {
-      expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+      expect(screen.getAllByTestId("day-column")).toHaveLength(4);
     });
     // Stale data is shown; the banner is debounced (see DiscreetStatusBanner.test).
     expect(screen.queryByTestId("day-empty")).not.toBeInTheDocument();
@@ -264,7 +318,7 @@ describe("Board", () => {
     renderDay();
     // `vi.waitFor` advances the fake timers while polling (the fetch resolves via I/O).
     await vi.waitFor(() => {
-      expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+      expect(screen.getAllByTestId("day-column")).toHaveLength(4);
     });
     expect(screen.queryByText(en.status.stale)).not.toBeInTheDocument();
     await act(async () => {
@@ -294,7 +348,7 @@ describe("Board", () => {
       expect(shift).toContainElement(screen.getByRole("banner"));
     });
 
-    it("shows the status banner outside the header, so the toggle keeps its row", async () => {
+    it("shows the status banner outside the header and the rail, so the toggle keeps its place", async () => {
       fake.setReplies("/api/agenda", {
         status: 200,
         body: agendaFixture({ stale: true }),
@@ -303,7 +357,7 @@ describe("Board", () => {
       vi.setSystemTime(Date.parse("2026-11-22T12:00:00+01:00"));
       renderDay();
       await vi.waitFor(() => {
-        expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+        expect(screen.getAllByTestId("day-column")).toHaveLength(4);
       });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(STALE_BANNER_DELAY_MS);
@@ -311,6 +365,8 @@ describe("Board", () => {
       const banner = screen.getByRole("status");
       expect(banner).toHaveTextContent(en.status.stale);
       expect(screen.getByRole("banner")).not.toContainElement(banner);
+      expect(screen.getByTestId("nav-rail")).not.toContainElement(banner);
+      expect(screen.getByTestId("burn-in-shift")).not.toContainElement(banner);
       expect(screen.getByRole("main")).toContainElement(banner);
     });
   });
@@ -340,18 +396,20 @@ describe("Board", () => {
     it("starts on the day view and switches to the week with the shared header", async () => {
       agenda();
       renderDay();
-      expect(await screen.findAllByTestId("day-band")).toHaveLength(3);
+      expect(await screen.findAllByTestId("day-column")).toHaveLength(4);
       expect(screen.queryByTestId("week-board")).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: en.board.week }));
       expect(screen.getByTestId("week-board")).toBeInTheDocument();
-      expect(screen.queryByTestId("day-band")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("overview")).not.toBeInTheDocument();
       expect(screen.getAllByTestId("day-column")).toHaveLength(7);
       // Header (date and legend) and toggle stay.
       expect(
         screen.getByRole("heading", { level: 1, name: "Sunday" }),
       ).toBeInTheDocument();
-      expect(screen.getByText("November 22, 2026")).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("banner")).getByText("November 22"),
+      ).toBeInTheDocument();
       expect(screen.getByRole("list", { name: en.legend.label })).toBeVisible();
       expect(
         screen.getByRole("button", { name: en.board.week }),
@@ -360,7 +418,7 @@ describe("Board", () => {
       expect(screen.getByText("Lunch: Soup")).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: en.board.day }));
-      expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+      expect(screen.getAllByTestId("day-column")).toHaveLength(4);
     });
 
     it("returns to the day view after autoReturnSeconds of inactivity, not before", async () => {
@@ -373,7 +431,7 @@ describe("Board", () => {
       agenda();
       renderDay();
       await vi.waitFor(() => {
-        expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+        expect(screen.getAllByTestId("day-column")).toHaveLength(4);
       });
       fireEvent.click(screen.getByRole("button", { name: en.board.week }));
       expect(screen.getByTestId("week-board")).toBeInTheDocument();
@@ -391,7 +449,7 @@ describe("Board", () => {
         await vi.advanceTimersByTimeAsync(1_000);
       });
       expect(screen.queryByTestId("week-board")).not.toBeInTheDocument();
-      expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+      expect(screen.getAllByTestId("day-column")).toHaveLength(4);
     });
   });
 
@@ -455,7 +513,7 @@ describe("Board", () => {
         }),
       });
       renderDay();
-      expect(await screen.findAllByTestId("day-band")).toHaveLength(3);
+      expect(await screen.findAllByTestId("day-column")).toHaveLength(4);
       expect(
         screen.queryByRole("region", { name: en.countdown.label }),
       ).not.toBeInTheDocument();

@@ -58,7 +58,7 @@ describe("WeekBoard", () => {
       "true",
     ]);
     // Weekend columns carry a different surface than weekdays.
-    expect(columns[0]?.className).toContain("bg-band-morning");
+    expect(columns[0]?.className).toContain("bg-surface-weekend");
     expect(columns[1]?.className).toContain("bg-surface-raised");
   });
 

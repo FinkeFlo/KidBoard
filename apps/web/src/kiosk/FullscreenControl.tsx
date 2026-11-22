@@ -7,8 +7,10 @@ import { useFullscreen } from "./useFullscreen";
 export const FULLSCREEN_HOLD_MS = 700;
 
 /**
- * Parent control for fullscreen, a quiet corner overlay (outside the header, so it never
- * changes the header layout). Children must not toggle fullscreen by accident, so a
+ * Parent control for fullscreen, a quiet overlay in the bottom slot of the navigation rail
+ * (merge rule 6): fixed in the reserved bottom strip, centred under the rail, so the rail
+ * and the board never cover it and it never changes their layout. It stays in place on
+ * the loading and error screens too (they have no rail). Children must not toggle fullscreen by accident, so a
  * pointer needs a long press (`FULLSCREEN_HOLD_MS`). It is quiet and shows only a small
  * glyph in `--color-control-quiet` (no opacity, so it keeps >= 3:1 non-text contrast,
  * WCAG 1.4.11), but the hit area is a full 64 px touch target. Keyboard and assistive-tech
@@ -63,7 +65,7 @@ export function FullscreenControl(): React.JSX.Element | null {
         // Pointer clicks have detail >= 1 and are handled above; keyboard/AT have 0.
         if (event.detail === 0) void toggle();
       }}
-      className="text-control-quiet min-h-touch min-w-touch focus-visible:outline-accent fixed right-0 bottom-0 z-10 flex touch-none items-center justify-center select-none focus-visible:outline-4 focus-visible:-outline-offset-4"
+      className="text-control-quiet min-h-touch min-w-touch focus-visible:outline-accent fixed right-[calc(var(--spacing-gutter)+(var(--spacing-nav)-var(--spacing-touch))/2)] bottom-0 z-10 flex touch-none items-center justify-center select-none focus-visible:outline-4 focus-visible:-outline-offset-4"
     >
       <svg
         aria-hidden="true"

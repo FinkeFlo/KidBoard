@@ -69,7 +69,7 @@ test.describe("with the service worker", () => {
     ).toBeVisible();
     await expect(event(page, "Swimming")).toBeVisible();
     await expect(
-      page.getByRole("article", { name: "Vegetable soup" }),
+      page.getByRole("img", { name: "Dinner: Vegetable soup" }),
     ).toBeVisible();
     await expect(banner(page)).toHaveAttribute("data-status", "offline");
     await expect(banner(page)).toHaveText(

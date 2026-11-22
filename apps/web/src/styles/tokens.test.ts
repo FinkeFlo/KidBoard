@@ -90,38 +90,38 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ["--color-on-danger", "--color-danger", TEXT_AA],
   ["--color-on-notice", "--color-notice", TEXT_AA],
   ["--color-border", "--color-surface", 1.2],
-  ...BANDS.flatMap((band) => [
-    [`--color-text`, `--color-band-${band}`, TEXT_AA] as const,
-    [`--color-text-muted`, `--color-band-${band}`, TEXT_AA] as const,
-    [`--color-band-${band}-accent`, `--color-band-${band}`, TEXT_AA] as const,
-  ]),
+  // Weekend week columns (`bg-surface-weekend`, label `text-band-morning-accent`).
+  ["--color-text", "--color-surface-weekend", TEXT_AA] as const,
+  ["--color-text-muted", "--color-surface-weekend", TEXT_AA] as const,
+  ["--color-band-morning-accent", "--color-surface-weekend", TEXT_AA] as const,
+  ["--color-accent", "--color-surface-weekend", UI_AA] as const,
   ["--color-text-muted", "--color-surface-sunken", TEXT_AA] as const,
-  // Weekend week columns (`bg-band-morning`, label `text-band-morning-accent`) and the
-  // countdown surface (`bg-band-evening`) also carry the muted text and the accent.
-  ["--color-accent", "--color-band-morning", UI_AA] as const,
-  ["--color-accent", "--color-band-evening", UI_AA] as const,
   ["--color-accent", "--color-surface-sunken", UI_AA] as const,
-  // `ring-accent` (current tile, today's column) against what surrounds it.
+  // `ring-accent` (current tile) against today's column around it.
   ["--color-accent", "--color-surface-raised", UI_AA] as const,
-  ["--color-accent", "--color-band-midday", UI_AA] as const,
-  // Band rings (`ring-band-*-accent`) against the page.
+  // Time-of-day accents (weekend label) against the page.
   ...BANDS.map(
     (band) =>
       [`--color-band-${band}-accent`, "--color-surface", UI_AA] as const,
   ),
-  // The band surfaces must stand out from the page (edge between columns).
-  ...BANDS.map(
-    (band) => [`--color-band-${band}`, "--color-surface", 1.05] as const,
-  ),
+  // The weekend surface must stand out from the page (edge between columns).
+  ["--color-surface-weekend", "--color-surface", 1.05] as const,
   ["--color-on-notice", "--color-surface", TEXT_AA] as const,
-  // Fullscreen glyph (`text-control-quiet`, no opacity) in the bottom-right corner: on
-  // the page, a meal card or the weekend (Sunday) week column, WCAG 1.4.11.
+  // Fullscreen glyph (`text-control-quiet`, no opacity) in the rail's bottom slot: on the
+  // page and every column surface it may sit next to, WCAG 1.4.11.
   ...[
     "--color-surface",
     "--color-surface-raised",
     "--color-surface-sunken",
-    ...BANDS.map((band) => `--color-band-${band}`),
+    "--color-surface-weekend",
   ].map((bg) => ["--color-control-quiet", bg, UI_AA] as const),
+  // Overview (T-30b): the now line and its "now" label in today's column, the "next"
+  // tile's ring on every child tint, the child edge on its own tint.
+  ["--color-now", "--color-surface-raised", TEXT_AA] as const,
+  ...CHILD_TINTS.map((tint) => ["--color-now", tint, UI_AA] as const),
+  ...CHILD_TINTS.map(
+    (tint) => [tint.replace(/-tint$/, ""), tint, UI_AA] as const,
+  ),
   ["--color-danger", "--color-surface", TEXT_AA] as const,
   ...CHILD_TOKENS.flatMap((child) => [
     ["--color-on-child", child, TEXT_AA] as const,
@@ -180,9 +180,8 @@ describe("token structure", () => {
     }
   });
 
-  it("covers the contrast of every band, bands, radii, shadows, sizes and durations", () => {
+  it("defines the time-of-day accents, radii, shadows, sizes and durations", () => {
     for (const band of BANDS) {
-      expect(light.has(`--color-band-${band}`)).toBe(true);
       expect(light.has(`--color-band-${band}-accent`)).toBe(true);
     }
     for (const prefix of ["--radius-", "--shadow-", "--text-", "--duration-"]) {
@@ -236,9 +235,19 @@ describe("token structure", () => {
     }
   });
 
-  it("keeps a weekend column surface (morning band) with AA text, muted text and label in both themes", () => {
+  it("removed the legacy band surfaces and the band tile size (T-30b)", () => {
+    for (const name of [
+      ...BANDS.map((band) => `--color-band-${band}`),
+      "--spacing-band-tile",
+    ]) {
+      expect(light.has(name), name).toBe(false);
+      expect(nightOverrides.has(name), name).toBe(false);
+    }
+  });
+
+  it("keeps a weekend column surface with AA text, muted text and label in both themes", () => {
     for (const theme of [light, night]) {
-      const bg = color(theme, "--color-band-morning");
+      const bg = color(theme, "--color-surface-weekend");
       expect(
         contrast(bg, color(theme, "--color-surface")),
         "distinct from page",

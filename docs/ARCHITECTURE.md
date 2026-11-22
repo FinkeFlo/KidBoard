@@ -383,14 +383,31 @@ the cache until its fetch lands) and that must not flash on a wall display. `off
 reload through the service worker, `stale: true`, 502 with and without data, reconnect,
 offline across midnight and the 401 wipe, with the device in `America/Los_Angeles`.
 
-### Board: day & week view (T-18)
+### Board: four-day overview & week view (T-18, T-30b)
 
 `apps/web/src/board/`: `Board` loads config and agenda, then renders `BoardFrame`
-(`<main>`, header with today's date, the countdown (T-19), `DiscreetStatusBanner`, `ChildLegend` and the
-pictorial `ViewToggle` ☀️/🗓️) around `DayBoard` or `WeekBoard`. View state is local to
-`Board` (day on start). `useAutoReturn` switches back to the day view after
+(`<main>`, header with weekday + date, the countdown (T-19, target in the child's tint) and
+`ChildLegend`; the navigation rail `NavRail` on the right with the `ViewToggle` buttons
+"Today" (☀️, also at night) / "Week" (seven bars) and the "Stand HH:MM" line from the agenda
+query's `dataUpdatedAt`, plain text, not a live region) around `OverviewBoard` or
+`WeekBoard`. The reserved bottom strip holds `DiscreetStatusBanner` and, centred under the
+rail (its bottom slot), the long-press `FullscreenControl`. View state is local to `Board`
+(overview on start). `useAutoReturn` switches back to the overview after
 `config.autoReturnSeconds` (default 120) without `pointerdown`/`pointermove`/`touchstart`/
 `keydown`; every activity restarts the countdown.
+
+`apps/web/src/day/`: `buildOverviewModel` (today + 3 days via `buildDayModel`) feeds four
+`DayColumn`s (today `2fr`, the others `1fr`). A column shows its all-day banner
+(`AllDayBanner`, own arc icon, at most two entries then a named "+N"), its timed events top
+to bottom (`EventTile`: child tint/edge/badges via `resolveTileTint`, time-of-day emoji
+🌅 / 🌞 / 🌆, past events on the sunken surface with muted text, never opacity), today's
+`NowLine` (a named separator between started and upcoming events; the current tile keeps
+its accent ring, the next upcoming one a ring in `--color-now`) and `MealPlates` at the
+bottom. How many tiles fit is measured: `useContentHeight` (a `ResizeObserver` on the
+`flex-1 min-h-0` list) gives the height in rem, `fitColumn` picks the tile size and the
+largest `columnLayout` capacity whose real height fits (past events fold into the
+"vorbei" strip first, then the latest are summed up in "+N"; strip and "+N" name their
+titles for assistive tech, nothing is hidden silently, nothing scrolls).
 
 `apps/web/src/week/buildWeekModel.ts` (pure): 7 columns from today in the config zone
 (`addCalendarDays`), each built with `buildDayModel(agenda, config, date, now)`, so day
@@ -402,8 +419,8 @@ events, 2. all-day events, 3. timed events by start (a multi-day event continuin
 an earlier day counts as the earliest), ties by title. An icon of a child's event sits
 in a ring in the (first) child's colour with a small avatar per child (colour is never
 the only cue); events without a child have no ring.
-**One meaning per symbol:** 🌙 only counts sleeps (countdown), ☀️ is the day-view toggle;
-the day bands use 🌅 / 🌞 / 🌆.
+**One meaning per symbol:** 🌙 only counts sleeps (countdown), ☀️ is the "Today" button;
+tiles and meal plates use 🌅 / 🌞 / 🌆 for the time of day, all-day events an arc icon.
 Weekend = Saturday/Sunday of the date key (zone-independent calendar math).
 The week uses the board's one agenda query (`AGENDA_DAYS` = 31 since T-19).
 

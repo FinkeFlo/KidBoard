@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { Emoji } from "../components/Emoji";
 
-/** Placeholder with the day view's layout while nothing is known yet. */
+/** Placeholder with the overview's four columns while nothing is known yet. */
 export function DayLoading(): React.JSX.Element {
   const { t } = useTranslation();
   const block = "bg-surface-sunken rounded-card motion-safe:animate-pulse";
@@ -20,8 +20,9 @@ export function DayLoading(): React.JSX.Element {
       </div>
       <div
         aria-hidden="true"
-        className="gap-gutter grid min-h-0 flex-1 grid-cols-3"
+        className="gap-gutter grid min-h-0 flex-1 grid-cols-[2fr_1fr_1fr_1fr]"
       >
+        <div className={block} />
         <div className={block} />
         <div className={block} />
         <div className={block} />
@@ -30,17 +31,17 @@ export function DayLoading(): React.JSX.Element {
   );
 }
 
-/** Friendly illustration for a day without events and meals. */
+/** Friendly note inside today's column when nothing is planned (meals stay below). */
 export function DayEmpty(): React.JSX.Element {
   const { t } = useTranslation();
   return (
     <div
       data-testid="day-empty"
-      className="gap-gutter flex min-h-0 flex-1 flex-col items-center justify-center text-center"
+      className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center"
     >
-      <Emoji emoji="🏖️" className="text-display" />
-      <h2 className="text-heading font-bold">{t("day.empty.title")}</h2>
-      <p className="text-title text-text-muted">{t("day.empty.hint")}</p>
+      <Emoji emoji="🏖️" className="text-[3.5rem]" />
+      <h3 className="text-title">{t("day.empty.title")}</h3>
+      <p className="text-body text-text-muted">{t("day.empty.hint")}</p>
     </div>
   );
 }
