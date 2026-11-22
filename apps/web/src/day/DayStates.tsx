@@ -57,7 +57,7 @@ export function DayError({ kind }: { kind: DayErrorKind }): React.JSX.Element {
     kind === "unauthorized"
       ? t("status.unauthorized")
       : kind === "offline"
-        ? t("status.offline")
+        ? t("day.error.offline")
         : t("status.error");
   return (
     <main className="bg-surface text-text p-page flex h-full flex-col items-center justify-center">

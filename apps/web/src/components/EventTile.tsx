@@ -56,6 +56,9 @@ export function EventTile({
         <p className="text-caption text-text-muted">
           {event.allDay ? t("event.allDay") : formatTime(event.start, format)}
         </p>
+        {event.childIds.length === 0 && (
+          <p className="sr-only">{t("event.forEveryone")}</p>
+        )}
         {status !== "upcoming" && (
           <p className="sr-only">{t(`event.status.${status}`)}</p>
         )}

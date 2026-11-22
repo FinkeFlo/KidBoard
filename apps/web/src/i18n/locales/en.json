@@ -43,7 +43,8 @@
     },
     "error": {
       "title": "The plan isn't here right now",
-      "hint": "KidBoard keeps trying on its own. A grown-up can check the details below."
+      "hint": "KidBoard keeps trying on its own. A grown-up can check the details below.",
+      "offline": "No internet and no saved plan yet."
     }
   }
 }

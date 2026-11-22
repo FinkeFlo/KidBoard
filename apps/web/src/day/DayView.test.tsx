@@ -1,5 +1,5 @@
-import type { QueryClient } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { onlineManager, type QueryClient } from "@tanstack/react-query";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -22,6 +22,7 @@ import { applyLocale } from "../i18n";
 import de from "../i18n/locales/de.json";
 import en from "../i18n/locales/en.json";
 import { DayView } from "./DayView";
+import { STALE_BANNER_DELAY_MS } from "./DiscreetStatusBanner";
 
 let fake: FakeFetch;
 let clients: QueryClient[] = [];
@@ -57,6 +58,7 @@ afterEach(() => {
   });
   clients = [];
   applyLocale("en");
+  onlineManager.setOnline(true);
   vi.useRealTimers();
 });
 
@@ -206,6 +208,19 @@ describe("DayView", () => {
     expect(alert).toHaveTextContent(en.status.unauthorized);
   });
 
+  it("explains offline without any saved plan (no 'last known plan' claim)", async () => {
+    onlineManager.setOnline(false);
+    renderDay();
+    const status = (await screen.findByText(en.day.error.offline)).closest(
+      "[data-error]",
+    );
+    expect(status).toHaveAttribute("data-error", "offline");
+    expect(status).toHaveTextContent(en.day.error.title);
+    expect(status).toHaveTextContent(en.day.error.offline);
+    expect(status).not.toHaveTextContent(en.status.offline);
+    expect(screen.queryByTestId("day-band")).not.toBeInTheDocument();
+  });
+
   it("shows the error state when the agenda fails and nothing is cached", async () => {
     fake.setReplies("/api/agenda", {
       status: 502,
@@ -229,5 +244,25 @@ describe("DayView", () => {
     });
     // Stale data is shown; the banner is debounced (see DiscreetStatusBanner.test).
     expect(screen.queryByTestId("day-empty")).not.toBeInTheDocument();
+  });
+
+  it("shows the stale banner once stale data has persisted for the delay", async () => {
+    // Timers must be faked before render so the debounce timer is the fake one.
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(Date.parse("2026-11-22T12:00:00+01:00"));
+    fake.setReplies("/api/agenda", {
+      status: 200,
+      body: agendaFixture({ stale: true }),
+    });
+    renderDay();
+    // `vi.waitFor` advances the fake timers while polling (the fetch resolves via I/O).
+    await vi.waitFor(() => {
+      expect(screen.getAllByTestId("day-band")).toHaveLength(3);
+    });
+    expect(screen.queryByText(en.status.stale)).not.toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STALE_BANNER_DELAY_MS);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(en.status.stale);
   });
 });

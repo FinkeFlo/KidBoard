@@ -78,6 +78,21 @@ describe("EventTile", () => {
     ).toBe("var(--color-border)");
   });
 
+  it("announces events without a child as for everyone (screen reader only)", () => {
+    const { rerender } = render(
+      <EventTile event={eventFixture()} childList={[MIA]} format={format} />,
+    );
+    expect(screen.getByText(en.event.forEveryone)).toHaveClass("sr-only");
+    rerender(
+      <EventTile
+        event={eventFixture({ childIds: ["mia"] })}
+        childList={[MIA]}
+        format={format}
+      />,
+    );
+    expect(screen.queryByText(en.event.forEveryone)).not.toBeInTheDocument();
+  });
+
   it("marks past and current tiles for assistive tech and styling", () => {
     const { rerender } = render(
       <EventTile
