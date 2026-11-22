@@ -43,7 +43,8 @@
     },
     "error": {
       "title": "Der Plan ist gerade nicht da",
-      "hint": "KidBoard versucht es von selbst weiter. Ein Erwachsener kann unten die Einzelheiten lesen."
+      "hint": "KidBoard versucht es von selbst weiter. Ein Erwachsener kann unten die Einzelheiten lesen.",
+      "offline": "Kein Internet und noch kein gespeicherter Plan."
     }
   }
 }
