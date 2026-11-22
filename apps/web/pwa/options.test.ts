@@ -4,7 +4,7 @@ import type { RuntimeCaching } from "workbox-build";
 
 import { createManifest, createPwaOptions } from "./options";
 
-const colors = { background: "#fff8f0", theme: "#a63a08" };
+const colors = { background: "#fbf6ee", theme: "#a63a08" };
 const ORIGIN = "https://kidboard.example";
 
 type Matcher = (context: { url: URL; sameOrigin: boolean }) => boolean;
@@ -37,7 +37,7 @@ describe("createManifest", () => {
       display: "fullscreen",
       orientation: "landscape",
       theme_color: "#a63a08",
-      background_color: "#fff8f0",
+      background_color: "#fbf6ee",
     });
   });
 

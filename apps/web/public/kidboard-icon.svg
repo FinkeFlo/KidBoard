@@ -2,8 +2,8 @@
   <!-- KidBoard app icon (original artwork): a smiling sun on a calendar page. -->
   <!-- Colours are light design tokens from src/styles/tokens.css (checked by pwa/icon.test.ts). -->
   <rect width="512" height="512" rx="112" fill="#a63a08"/>
-  <rect x="88" y="120" width="336" height="304" rx="44" fill="#fff8f0"/>
-  <rect x="88" y="120" width="336" height="64" rx="32" fill="#f3e9db"/>
+  <rect x="88" y="120" width="336" height="304" rx="44" fill="#fbf6ee"/>
+  <rect x="88" y="120" width="336" height="64" rx="32" fill="#f3ece1"/>
   <rect x="160" y="84" width="36" height="76" rx="18" fill="#2b2118"/>
   <rect x="316" y="84" width="36" height="76" rx="18" fill="#2b2118"/>
   <g stroke="#c2410c" stroke-width="18" stroke-linecap="round">

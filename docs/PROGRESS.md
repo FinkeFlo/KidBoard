@@ -31,6 +31,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-24 Visual screenshots | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; pre-existing 4-event band overflow found, moved to follow-up |
 | 2026-11-22 | M5 review fixes | Opus (builder-opus) | Opus (reviewer-opus) | 2 | Wake lock outside error boundary, fullscreen glyph token (≥3:1), dense day bands (+N, past hidden first), single error announcement, demo weekdays; orchestrator pinned pwa.spec clock (failed after 19:30 Berlin) |
 | 2026-11-22 | T-25 Cloudflare deploy | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; wrangler config moved to repo root (deploy button needs it); CSP via generated _headers with boot-script hash; REPLACE_ME token fails closed; Cache-Control + ?key= logging verified; reviewer Context7 unreachable (Cloudflare docs repo + installed sources) |
+| 2026-11-22 | T-29 Final design tokens | Sonnet (builder) | Sonnet (reviewer) | 2 | PASS round 2; night nav-active flipped to light fill (>=3:1, synced into docs/design); opacity-past marked not-for-text; week header uses text-tile (no mid-word wrap) |
 
 ## Escalations
 

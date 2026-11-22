@@ -390,7 +390,7 @@ not address. These rules apply to every M5b task:
 6. *Kiosk corner:* no parent lock until M8; the rail's bottom slot hosts the long-press
    fullscreen control; burn-in and kiosk e2e re-run against the rail and the today ring.
 
-- [ ] **T-29 Final design tokens** (risk: medium, deps: M5)
+- [x] **T-29 Final design tokens** (risk: medium, deps: M5)
   Acceptance: `apps/web/src/styles/tokens.css` replaced by `docs/design/tokens.css` (legacy band
   tokens stay until T-30b); a weekend surface token kept; `tokens.test.ts` extended with the
   pairs listed in `docs/design/README.md` (text on child tints, time-of-day accents on tints,

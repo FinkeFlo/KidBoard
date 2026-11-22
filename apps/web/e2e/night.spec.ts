@@ -13,8 +13,8 @@ const SHOT_DIR = process.env["E2E_SCREENSHOT_DIR"];
 
 /** Sunday evening in Berlin, inside the default night window 19:30-06:30. */
 const NIGHT_NOW = at("21:00");
-const LIGHT_BG = "rgb(255, 248, 240)"; // --color-surface (light)
-const NIGHT_BG = "rgb(23, 18, 13)"; // --color-surface (night)
+const LIGHT_BG = "rgb(251, 246, 238)"; // --color-surface (light)
+const NIGHT_BG = "rgb(20, 16, 12)"; // --color-surface (night)
 
 const EVENTS: MockEvent[] = Array.from({ length: 7 }, (_, day) => [
   { title: `Swimming ${String(day)}`, icon: "🏊", time: "07:30", day },
@@ -160,7 +160,7 @@ test.describe("night mode", () => {
     await mockBoard(page, { agenda: agenda(EVENTS, MEALS), now: NIGHT_NOW });
     await page.goto("/");
     await expect(page.getByTestId("day-band")).toHaveCount(3);
-    await expect(meta).toHaveAttribute("content", "#17120d");
+    await expect(meta).toHaveAttribute("content", "#14100c");
   });
 
   test("switches by itself at 19:30 and fades the colours", async ({

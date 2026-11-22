@@ -59,7 +59,7 @@ export function BoardFrame({
             <h1 className="text-display font-extrabold">
               {formatWeekday(today, format)}
             </h1>
-            <p className="text-title text-text-muted font-bold">
+            <p className="text-title text-text-muted leading-snug font-bold">
               {formatLongDate(today, format)}
             </p>
           </div>

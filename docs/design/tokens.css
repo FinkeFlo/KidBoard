@@ -94,7 +94,9 @@
   --duration-normal: 250ms;
   --duration-slow: 600ms;
 
-  /* Opacity of past events. */
+  /* Opacity of past events. NOT FOR TEXT: the blended text contrast is below AA
+     (merge rule 4); tokens.test.ts forbids their use on text. Past events recede via
+     surface/text tokens instead. */
   --opacity-past: 0.5;
   --opacity-past-night: 0.4;
 
@@ -117,7 +119,7 @@
   --color-accent: #a63a08;
   /* Text on color-accent. */
   --color-on-accent: #ffffff;
-  /* Fill of the active view button. */
+  /* Fill of the active view button (night: light fill, >= 3:1 against the inactive button and the page). */
   --color-nav-active: #2b2118;
   /* Label on color-nav-active. */
   --color-on-nav-active: #fff8ec;
@@ -191,8 +193,8 @@
   --color-control-quiet: #7d6e5d;
   --color-accent: #f0a35e;
   --color-on-accent: #1a1008;
-  --color-nav-active: #3a3026;
-  --color-on-nav-active: #e8dbc6;
+  --color-nav-active: #a8946f;
+  --color-on-nav-active: #14100c;
   --color-today-ring: #8f7436;
   --color-now: #e8dbc6;
   --color-sun: #c9a85a;
