@@ -170,7 +170,7 @@ operation, works offline with the last known state.
 
 - [x] **T-10 Worker API** (risk: **high** → Opus, deps: T-09)
   Acceptance:
-  1. `GET /api/agenda?from=YYYY-MM-DD&days=N` (1 ≤ N ≤ 14, default 8, `from` default today
+  1. `GET /api/agenda?from=YYYY-MM-DD&days=N` (1 ≤ N ≤ 14, default 8 – raised to 31 in T-19, `from` default today
      in config zone) returns `AgendaResponse`; input validated → 400 on bad input.
   2. `GET /api/config` returns the public config; `GET /api/health` returns status without
      secrets.
@@ -298,6 +298,10 @@ operation, works offline with the last known state.
      accessible names via i18n.
   4. Auto-return to day view after `config.autoReturnSeconds` (default 120 s) of
      inactivity.
+  5. (M3 follow-ups) Header (date, status banner, child legend) moves out of `DayBoard` into a
+     shared board frame for day + week; `buildDayModel` reused per column (rename `today` →
+     `date`). Continuing multi-day timed events get a "continues" hint instead of the
+     original start time.
 
 - [ ] **T-19 "How many sleeps?" countdown** (risk: medium, deps: T-18, T-16)
   Acceptance:
@@ -307,6 +311,10 @@ operation, works offline with the last known state.
   3. Rendered as countable 🌙 symbols (≤ 14 shown individually, beyond that grouped with a
      number) plus an accessible localized label with plural rules (DE/EN).
   4. Shown on week view and as a compact badge on the day view. DST-crossing tests.
+  5. (M3 review, structural) Data: `/api/agenda` `days` limit raised from 14 to 31 (still inside
+     the worker window `[today−1, today+32)`) and the client `AGENDA_DAYS` raised from 8 to 31, so
+     day, week and countdown share one query, status and offline seed. Worker tests, ARCHITECTURE
+     "Worker API details" and T-10 wording updated accordingly.
 
 **M4 exit:** milestone review, CI green.
 
@@ -315,12 +323,13 @@ operation, works offline with the last known state.
 - [ ] **T-20 Wake lock & fullscreen** (risk: medium, deps: M4)
   Acceptance: Screen Wake Lock requested when visible and re-acquired on
   `visibilitychange`; graceful no-op where unsupported; small, unobtrusive parent control
-  for fullscreen (Fullscreen API); unit tests with mocked APIs.
+  for fullscreen (Fullscreen API); unit tests with mocked APIs. (M3 follow-up) `AppErrorBoundary` auto-resets after a delay with backoff so an unattended
+  kiosk recovers without a tap.
 
 - [ ] **T-21 Night mode** (risk: medium, deps: T-11, T-16)
   Acceptance: automatic switch by `config.nightMode` times (spanning midnight works),
   dimmed warm token set, smooth transition (none under reduced motion), optional manual
-  toggle via URL param `?night=1|0` for testing; contrast of night tokens meets AA. (M2 follow-up) `<meta name="theme-color">` follows night mode, or the reason it doesn't is
+  toggle via URL param `?night=1|0` for testing; contrast of night tokens meets AA. (M3 follow-up) Use `useCurrentBand` or remove it and fix its ARCHITECTURE mention. (M2 follow-up) `<meta name="theme-color">` follows night mode, or the reason it doesn't is
   documented.
 
 - [ ] **T-22 Burn-in protection** (risk: low, deps: T-11)
@@ -333,7 +342,11 @@ operation, works offline with the last known state.
   offline hint; API returns `stale: true` → stale hint; API 502 with persisted data →
   data + hint; API 502 without data → error state; back online → hint disappears after
   refetch. (M2 follow-ups) offline across midnight keeps showing data; 401 with persisted
-  data wipes storage and `kidboard.accessToken`.
+  data wipes storage and `kidboard.accessToken`. (M3 follow-ups) the e2e clock Proxy gets a test-only offset setter (offline across midnight)
+  and an `apply` trap; Playwright projects set `timezoneId` (e.g. America/Los_Angeles) so the
+  config zone is proven against a non-UTC device zone; `pwa.spec.ts` offline test asserts day
+  content or the offline banner again; ARCHITECTURE gets a day-view section (placement rules,
+  5 s stale-banner delay) and ADR-0006/ADR-0009 mention the delay and the decorative emoji mode.
 
 - [ ] **T-24 Visual screenshots** (risk: medium, deps: T-21, T-23)
   Acceptance: a dev/screenshot fixture with dates relative to "today" (or recurring) exists so manual dev
@@ -369,7 +382,8 @@ operation, works offline with the last known state.
   Acceptance: full review by `reviewer-opus`; gitleaks over full history clean;
   `pnpm audit --prod` without high/critical; release-please release `v1.0.0` published;
   branch-protection settings documented/applied; `CLAUDE.md` switched to PR workflow;
-  M7+ plan refined.
+  M7+ plan refined. (M3 follow-up) release-please `initial-version` set (e.g. `0.1.0`) so it never proposes
+  1.0.0 early; maintainer enables "Allow GitHub Actions to create and approve pull requests".
 
 ## M7+ – Later (not in MVP)
 
@@ -386,6 +400,7 @@ operation, works offline with the last known state.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | M3 review: agenda `days` limit 14 → 31 and client range 8 → 31 (T-19, shared query for day/week/countdown); follow-ups to T-18 (shared frame, continuing events), T-20 (boundary auto-reset), T-21 (`useCurrentBand`), T-23 (e2e clock, `timezoneId`, docs), T-28 (release-please initial version) | M3 milestone review by reviewer-opus; countdown needs 30 days but `/api/agenda` capped at 14 |
 | 2026-11-22 | M2 review follow-ups: unauthorized state + boundary placement (T-15), shared today helper, offline midnight placeholder, pre-config behaviour (T-16), `formatTime` for timed events only (T-17), theme-color in night mode (T-21), offline-midnight + 401 e2e (T-23), static-asset Cache-Control + `?key=` logging check (T-25), token flow docs (T-27) | M2 milestone review by reviewer-opus |
 | 2026-11-22 | M1 review follow-ups: fresh-clone `pnpm dev` (T-11), locale fallback docs (T-12), client timeout (T-13), relative dev fixture (T-24) | M1 milestone review by reviewer-opus |
 | 2026-11-22 | T-10: worker cache uses an auto-provisioned KV binding (`KIDBOARD_CACHE`) with Cache API/memory fallback; cached window `[today−1, today+32)` | Cache API is a no-op on `*.workers.dev`; T-19 needs a 30-day countdown lookahead (T-10 review, structural) |
