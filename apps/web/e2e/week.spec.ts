@@ -156,6 +156,38 @@ test.describe("week view", () => {
     await expect(page.getByTestId("week-board")).toHaveCount(0);
   });
 
+  for (const locale of ["en", "de"] as const) {
+    test(`weekday headers stay on one line (${locale})`, async ({ page }) => {
+      await mockBoard(page, {
+        config: {
+          locale,
+          timeZone: "Europe/Berlin",
+          calendars: [{ id: "family", kind: "events" }],
+        },
+        agenda: agenda(EVENTS, MEALS),
+      });
+      await page.goto("/");
+      await page
+        .getByRole("button", {
+          name: locale === "en" ? "Week view" : "Wochenansicht",
+        })
+        .click();
+      await expect(page.getByTestId("week-day")).toHaveCount(7);
+      const wrapped = await page.evaluate(() =>
+        [...document.querySelectorAll("[data-testid=week-day] h2")]
+          .filter((h) => {
+            const size = parseFloat(getComputedStyle(h).fontSize);
+            return (
+              h.getBoundingClientRect().height > size * 1.6 ||
+              h.scrollWidth > h.clientWidth
+            );
+          })
+          .map((h) => h.textContent),
+      );
+      expect(wrapped).toEqual([]);
+    });
+  }
+
   test("shows an empty week without errors", async ({ page }) => {
     await mockBoard(page, {
       agenda: agenda([{ title: "Swimming", icon: "🏊", time: "10:00" }], []),

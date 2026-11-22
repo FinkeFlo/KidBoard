@@ -100,7 +100,7 @@ function WeekColumn({
       <div className="shrink-0">
         <h2
           id={headingId}
-          className={`${label} text-title font-extrabold break-words hyphens-auto`}
+          className={`${label} text-tile font-extrabold break-words hyphens-auto`}
         >
           {formatWeekday(day.date, format)}
         </h2>

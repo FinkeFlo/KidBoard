@@ -57,7 +57,7 @@ test("applies the self-hosted Nunito font and token colors", async ({
   });
   expect(style.family).toContain("Nunito Variable");
   expect(style.nunitoLoaded).toBe(true);
-  expect(style.background).toBe("rgb(255, 248, 240)");
+  expect(style.background).toBe("rgb(251, 246, 238)");
 });
 
 test.describe("language", () => {

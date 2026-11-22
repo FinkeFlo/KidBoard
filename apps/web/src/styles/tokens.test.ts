@@ -73,6 +73,9 @@ const UI_AA = 3;
 const CHILD_TOKENS = [1, 2, 3, 4, 5, 6].map(
   (n) => `--color-child-${String(n)}`,
 );
+const CHILD_TINTS = [1, 2, 3, 4, 5, 6].map(
+  (n) => `--color-child-${String(n)}-tint`,
+);
 const BANDS = ["morning", "midday", "evening"] as const;
 
 /** [foreground, background, minimum ratio] pairs the components actually use. */
@@ -125,6 +128,22 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
     [child, "--color-surface", UI_AA] as const,
     [child, "--color-surface-raised", UI_AA] as const,
   ]),
+  // Design hand-off pairs (docs/design/README.md): child tints, time-of-day accents,
+  // today ring, nav, soft error.
+  ...CHILD_TINTS.flatMap((tint) => [
+    ["--color-text", tint, TEXT_AA] as const,
+    ["--color-text-muted", tint, TEXT_AA] as const,
+    ...BANDS.map(
+      (band) => [`--color-band-${band}-accent`, tint, UI_AA] as const,
+    ),
+  ]),
+  ["--color-today-ring", "--color-surface", UI_AA] as const,
+  ["--color-on-nav-active", "--color-nav-active", TEXT_AA] as const,
+  ["--color-text", "--color-soft-error", TEXT_AA] as const,
+  // The active view button must stand out from the inactive one and from the page.
+  ["--color-nav-active", "--color-surface-raised", UI_AA] as const,
+  ["--color-nav-active", "--color-surface-sunken", UI_AA] as const,
+  ["--color-nav-active", "--color-surface", UI_AA] as const,
 ];
 
 describe.each([
@@ -199,6 +218,88 @@ describe("token structure", () => {
     expect(globalCss).toMatch(/prefers-reduced-motion:\s*reduce/);
     expect(globalCss).toMatch(/transition-duration:\s*0\.01ms\s*!important/);
     expect(globalCss).toMatch(/animation-duration:\s*0\.01ms\s*!important/);
+  });
+
+  it("defines a matching child colour for every child tint, in both themes", () => {
+    for (const theme of [light, night]) {
+      const tints = [...theme.keys()].filter((k) =>
+        /^--color-child-\d+-tint$/.test(k),
+      );
+      expect(tints).toHaveLength(CHILD_TOKENS.length);
+      for (const tint of tints) {
+        const base = tint.replace(/-tint$/, "");
+        expect(theme.has(base), `${tint} has no ${base}`).toBe(true);
+        expect(color(theme, base).toLowerCase()).not.toBe(
+          color(theme, tint).toLowerCase(),
+        );
+      }
+    }
+  });
+
+  it("keeps a weekend column surface (morning band) with AA text, muted text and label in both themes", () => {
+    for (const theme of [light, night]) {
+      const bg = color(theme, "--color-band-morning");
+      expect(
+        contrast(bg, color(theme, "--color-surface")),
+        "distinct from page",
+      ).toBeGreaterThan(1.05);
+      for (const fg of [
+        "--color-text",
+        "--color-text-muted",
+        "--color-band-morning-accent",
+      ]) {
+        expect(contrast(color(theme, fg), bg), fg).toBeGreaterThanOrEqual(
+          TEXT_AA,
+        );
+      }
+    }
+  });
+
+  it("keeps the night active nav button clearly above the inactive one and the page (>= 3:1)", () => {
+    const active = color(night, "--color-nav-active");
+    for (const bg of [
+      "--color-surface-raised",
+      "--color-surface-sunken",
+      "--color-surface",
+    ]) {
+      expect(contrast(active, color(night, bg)), bg).toBeGreaterThanOrEqual(
+        UI_AA,
+      );
+    }
+  });
+
+  it("marks --opacity-past* as not for text: blended text fails AA and no component uses them", () => {
+    // Blended contrast of text at the past opacity over the sunken column: documents why.
+    const blend = (fg: string, bg: string, alpha: number): string => {
+      const mix = (o: number): string =>
+        Math.round(
+          parseInt(fg.slice(o, o + 2), 16) * alpha +
+            parseInt(bg.slice(o, o + 2), 16) * (1 - alpha),
+        )
+          .toString(16)
+          .padStart(2, "0");
+      return `#${mix(1)}${mix(3)}${mix(5)}`;
+    };
+    for (const [theme, token] of [
+      [light, "--opacity-past"],
+      [night, "--opacity-past-night"],
+    ] as const) {
+      const alpha = parseFloat(theme.get(token) ?? "");
+      expect(alpha).toBeGreaterThan(0);
+      expect(alpha).toBeLessThan(1);
+      const text = color(theme, "--color-text");
+      const bg = color(theme, "--color-surface-sunken");
+      expect(contrast(blend(text, bg, alpha), bg), token).toBeLessThan(TEXT_AA);
+    }
+    const sources = import.meta.glob<string>("../**/*.{ts,tsx}", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    });
+    for (const [file, source] of Object.entries(sources)) {
+      if (file.endsWith(".test.ts") || file.endsWith(".test.tsx")) continue;
+      expect(source, file).not.toMatch(/opacity-past/);
+    }
   });
 
   it("keeps components free of raw hex colours", () => {

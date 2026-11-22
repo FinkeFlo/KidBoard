@@ -29,13 +29,13 @@ describe("pwa token colours", () => {
       @theme static {
         --color-*: initial;
         /* --color-surface: #000000; */
-        --color-surface: #FFF8F0;
+        --color-surface: #FBF6EE;
         --color-accent: #a63a08;
       }
-      [data-theme="night"] { --color-surface: #17120d; --color-accent: #f0a35e; }
+      [data-theme="night"] { --color-surface: #14100c; --color-accent: #f0a35e; }
     `;
     expect(pwaColorsFromTokens(css)).toEqual({
-      background: "#fff8f0",
+      background: "#fbf6ee",
       theme: "#a63a08",
     });
   });
