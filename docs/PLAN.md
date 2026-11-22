@@ -453,12 +453,12 @@ not address. These rules apply to every M5b task:
 
 - ~~**T-26 Vercel alternative**~~ – moved out of v1.0.0 to issue #3 (Vercel as a second hosting provider).
 
-- [ ] **T-27 Documentation** (risk: low, deps: T-25)
+- [x] **T-27 Documentation** (risk: low, deps: T-25)
   Acceptance: README EN + DE complete: features, screenshots, Google Calendar setup (where
   to find the secret iCal address, creating separate calendars, sharing caveats), title
   conventions with examples, configuration reference, deploy (Cloudflare), kiosk
   tips (Fully Kiosk settings, PWA install, screen dimming), troubleshooting, privacy note. (M2 follow-up) CONFIG.md EN + DE documents the tablet token flow: open `/?key=` once,
-  token stored + stripped from URL, forgotten after a 401. (M5b follow-up) Describe the four-day overview, rail ("Stand/Updated"), vorbei strip, now line and "+N"; overview and state screenshots with updated captions; `KB-*` error codes in troubleshooting; `children[].emoji`/colour as tile tint and badge; CONFIG.md: `bands` set the time-of-day icon and meal slot. (M5 follow-up) Kiosk tips explain the hidden
+  token stored + stripped from URL, forgotten after a 401. (M5b follow-up) Describe the four-day overview, rail ("Stand/Updated"), vorbei strip, now line and "+N"; overview and state screenshots with updated captions; `KB-*` error codes in troubleshooting; `children[].avatar`/colour as tile tint and badge; CONFIG.md: `bands` set the time-of-day icon and meal slot. (M5 follow-up) Kiosk tips explain the hidden
   bottom-right fullscreen control (press and hold), wake-lock behaviour and its limits (battery
   saver), Fully Kiosk "keep screen on" as backup; `?night=` / `?burnin=` in a short developer note.
 
