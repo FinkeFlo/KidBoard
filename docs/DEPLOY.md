@@ -1,0 +1,195 @@
+# Deploy KidBoard to Cloudflare
+
+[Deutsch](DEPLOY.de.md)
+
+KidBoard runs as **one Cloudflare Worker**: it serves the board (static assets from
+`apps/web/dist`) and the JSON API under `/api/*`, and reads your calendars' secret iCal
+addresses on the server. The Workers Free plan is enough for a family. You get a URL like
+`https://kidboard.<your-subdomain>.workers.dev`.
+
+Everything Wrangler needs is in the root [`wrangler.jsonc`](../wrangler.jsonc). Secrets
+never go into the repository: they are Worker secrets in your Cloudflare account.
+
+## 1. Before you start
+
+You need:
+
+1. A free **Cloudflare account** (and for option A a GitHub or GitLab account).
+2. The **secret iCal address** of every calendar you want to show. Google Calendar (web):
+   Settings > your calendar > "Integrate calendar" > **Secret address in iCal format**.
+   Treat it like a password: anyone with it can read the calendar.
+3. An **access token**: a long random string, for example the output of
+   `openssl rand -hex 32`. Without it anyone who finds your `workers.dev` URL can read the
+   calendar data through the API, so set one.
+4. Your **settings** (`KIDBOARD_CONFIG`) as **one line of JSON**: children, calendars, time
+   zone, ... Start from [`config.example.json`](../config.example.json), all options are in
+   [CONFIG.md](CONFIG.md). Each calendar `id` needs a matching secret `CAL_<ID>_URL` (id in
+   upper case: `kinder` -> `CAL_KINDER_URL`). To turn the file into one line:
+
+   ```sh
+   node -e "process.stdout.write(JSON.stringify(require('./config.example.json')))"
+   ```
+
+## 2. Secrets and variables
+
+The worker reads exactly these names (`apps/worker/src/env.ts`):
+
+| Name                       | Kind                | Required | Notes                                                                                            |
+| -------------------------- | ------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `CAL_<ID>_URL`             | secret              | per calendar | e.g. `CAL_KINDER_URL`, `CAL_ESSEN_URL`, `CAL_MIA_URL`. A missing one only marks that calendar as `error`. |
+| `KIDBOARD_ACCESS_TOKEN`    | secret              | strongly recommended | Empty or unset = no check. A value still containing `REPLACE_ME` is refused (API answers `500`). |
+| `KIDBOARD_CONFIG`          | secret or variable  | yes      | Single-line JSON. Missing/invalid: `/api/config` and `/api/agenda` answer `500`.                 |
+| `KIDBOARD_ALLOWED_ORIGINS` | variable            | no       | Only for cross-origin API use; the board itself is same-origin.                                  |
+| `KIDBOARD_CACHE_TTL`       | variable            | no       | Seconds a feed counts as fresh, default 3600.                                                    |
+| `KIDBOARD_CACHE`           | KV namespace binding | automatic | Declared without an id in `wrangler.jsonc`; Wrangler creates it on the first deploy.            |
+
+Plain-text variables set in the dashboard survive later deploys (`keep_vars: true`);
+secrets always do. The template for all of them is [`.dev.vars.example`](../.dev.vars.example).
+
+## 3. Option A: "Deploy to Cloudflare" button
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/FinkeFlo/kidboard)
+
+1. Click the button and log in to Cloudflare.
+2. Connect GitHub or GitLab and choose a name for the new repository. Cloudflare copies
+   KidBoard into your account; later pushes to it redeploy automatically.
+3. Keep or change the **Worker name** (default `kidboard`, it becomes part of the URL) and
+   keep the suggested **KV namespace** for `KIDBOARD_CACHE`.
+4. Fill in the secrets the page asks for (taken from `.dev.vars.example`):
+   `CAL_KINDER_URL`, `CAL_ESSEN_URL`, `KIDBOARD_ACCESS_TOKEN`, `KIDBOARD_CONFIG`. **Replace
+   every `REPLACE_ME`.** If your calendars have other ids, enter the ones you have here and
+   add the remaining `CAL_<ID>_URL` secrets afterwards (step 7).
+5. Check the build settings. The repository is a pnpm monorepo, so the build must run in
+   the repository root:
+   - Root directory: empty (repository root)
+   - Build command: `pnpm run build` (pre-filled from `package.json`; builds the web app,
+     then dry-runs the worker)
+   - Deploy command: `npx wrangler deploy` (the default; uses the `wrangler` version pinned
+     in the root `package.json` and the root `wrangler.jsonc`)
+
+   Node.js 22 comes from `.nvmrc`, pnpm from the `packageManager` field.
+6. Create and deploy. The first build takes a few minutes.
+7. Missing calendars or a changed setting: Workers & Pages > your Worker > Settings >
+   Variables and Secrets > Add (type "Secret"). Saving deploys a new version.
+
+## 4. Option B: from a local clone (Wrangler CLI)
+
+Requires Node 22 and pnpm 10 (`corepack enable`).
+
+```sh
+git clone https://github.com/FinkeFlo/kidboard.git && cd kidboard
+pnpm install
+pnpm exec wrangler login          # opens the browser once
+pnpm deploy:cloudflare            # builds apps/web, then `wrangler deploy`
+```
+
+The first deploy creates the Worker and its KV namespace. Then set the secrets (each command
+prompts for the value; every change is deployed at once):
+
+```sh
+pnpm exec wrangler secret put CAL_KINDER_URL
+pnpm exec wrangler secret put CAL_ESSEN_URL        # one per calendar: CAL_<ID>_URL
+pnpm exec wrangler secret put KIDBOARD_ACCESS_TOKEN
+node -e "process.stdout.write(JSON.stringify(require('./my-config.json')))" \
+  | pnpm exec wrangler secret put KIDBOARD_CONFIG
+```
+
+Or all at once from a filled-in copy of the template, which is git-ignored because of its
+name: copy `.dev.vars.example` to `.dev.vars.production`, fill it in, run
+`pnpm exec wrangler secret bulk .dev.vars.production` and delete the file afterwards.
+
+Updating later: `git pull && pnpm install && pnpm deploy:cloudflare`. Secrets stay.
+
+## 5. Check the deployment
+
+Replace `<url>` and `<token>`:
+
+```sh
+curl -s https://<url>/api/health                                         # {"ok":true}
+curl -s -H "Authorization: Bearer <token>" https://<url>/api/config      # your public settings
+curl -s -H "Authorization: Bearer <token>" "https://<url>/api/agenda?days=3"
+```
+
+In the agenda answer every entry of `sources` should have `"status":"ok"`. `"error"` means
+that calendar's secret is missing, misspelled or the address is wrong.
+
+Then open **`https://<url>/?key=<token>` once on the tablet**. The board stores the token,
+removes it from the address bar and from then on sends it as a header. Install it as an app
+(browser menu > "Add to home screen") or point your kiosk browser at `https://<url>/`.
+
+Changing the token: set a new `KIDBOARD_ACCESS_TOKEN`; the tablet then says "The access
+link has expired", wipes its stored calendar data and forgets the old token until you open
+a new `?key=` link.
+
+## 6. Optional: custom domain
+
+Worker > Settings > Domains & Routes > Add > Custom domain (the domain must be on
+Cloudflare). The board works the same; the Cache API is then available as an extra fallback
+(on `workers.dev` the worker relies on the KV namespace, ADR-0006).
+
+## 7. HTTP caching and security headers
+
+Checked against the Cloudflare docs (Workers Static Assets, "Headers") and with
+`wrangler dev`: every static asset is served with **`Cache-Control: public, max-age=0,
+must-revalidate`** plus an `ETag`. That holds for `sw.js`, `index.html` (also as the
+single-page-application fallback) and `manifest.webmanifest`, so browsers revalidate them
+on every use and a new deploy is picked up at once; nothing is cached too long, and
+KidBoard does not override it. Hashed files under `/assets/` are also revalidated (cheap
+`304`) and the service worker keeps its own copy anyway.
+
+`vite build` generates `apps/web/dist/_headers` (`apps/web/headers/staticHeaders.ts`),
+which Workers Static Assets applies to all static responses:
+
+- `Content-Security-Policy`: only same-origin resources, no `eval`, no inline code except
+  the theme boot script in `index.html`, allowed by its SHA-256 hash. The hash is computed
+  from the built file on every build, so it cannot go stale.
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` (the first visit's
+  `?key=` is never sent as a referrer), `Permissions-Policy` without camera, microphone,
+  geolocation, payment and USB (wake lock and fullscreen stay allowed).
+- Framing is not restricted, so dashboards (e.g. Home Assistant) can embed the board. To
+  forbid it, add `frame-ancestors 'none'` to the policy in `staticHeaders.ts`.
+
+`_headers` does not apply to `/api/*`: the worker answers those itself with
+`Cache-Control: no-store`, `nosniff` and `Referrer-Policy: no-referrer`.
+
+## 8. Logs and the `?key=` link
+
+- **Workers Logs** (enabled in `wrangler.jsonc`, the default for new Workers) record one
+  invocation log per **Worker invocation**, with method and URL. The `/?key=…` page load
+  never invokes the Worker: `/` is a static asset, only `/api/*` runs the Worker first
+  (`run_worker_first`), and since compatibility date 2025-04-01 navigations prefer asset
+  serving. So the link with the token is **not** in Workers Logs, and therefore not in
+  Workers Logpush (`workers_trace_events`) or Tail Workers either. Local check with
+  `wrangler dev`: the captured traces contained only the `/api/*` requests.
+- API requests carry the token in the `Authorization` header; Cloudflare's trace events
+  redact header values whose name contains "auth", "key" or "token" by default. The API also accepts `?key=` (e.g. for `curl`);
+  `observability.redact_query_string: true` removes query strings from logged URLs.
+- **Not covered:** zone-level HTTP request logs. With a custom domain, Cloudflare's HTTP
+  request logs (Logpush dataset `http_requests`, Enterprise plans) and analytics can
+  contain the full request URL including `?key=`. The token also stays in the browser
+  history of the device on which you opened the link, and in the place you sent the link
+  through. Open it directly on the tablet, and rotate the token if the link leaks.
+- KidBoard itself never logs feed URLs, tokens or calendar content (only ids, secret
+  _names_ and reason codes).
+
+## 9. Troubleshooting
+
+| Symptom | Cause and fix |
+| --- | --- |
+| Board says "The access link has expired" | Wrong or changed token: open `https://<url>/?key=<token>` again. |
+| `/api/config` answers `500 server_misconfigured` | `KIDBOARD_CONFIG` missing or invalid (Workers Logs list the validation errors), or `KIDBOARD_ACCESS_TOKEN` still contains `REPLACE_ME`. |
+| A calendar is missing, `sources[].status` is `error` | Secret name does not match the calendar id (`CAL_<ID>_URL`, upper case) or the iCal address is wrong. |
+| Build fails with a pnpm error | Add the build variable `PNPM_VERSION=10.28.0` (Worker > Settings > Build). |
+| `The directory specified by the "assets.directory" field ... does not exist` | The web app was not built: use `pnpm deploy:cloudflare` or the build command `pnpm run build`. |
+| Old version still shown | The tablet checks for a new version hourly and reloads itself; or reload once. |
+
+## How this guide was verified
+
+Without a Cloudflare account (no real deploy): `pnpm exec wrangler deploy --dry-run`
+(also in CI) and `pnpm deploy:cloudflare --dry-run` with the root config; `wrangler dev`
+with fake secrets (`TESTONLY-not-a-secret` token, calendars from `fixtures/ics` on a local
+HTTP server), `curl` against `/api/health`, `/api/config`, `/api/agenda` (with and without
+token) and the static paths (`Cache-Control`, `_headers`), and a headless Chromium opening
+`/?key=…` (token stored and stripped, service worker active, zero CSP violations). The
+button flow, Workers Builds and the production log behaviour follow the Cloudflare docs and
+need a real account to confirm.

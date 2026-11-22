@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 
 import type { AppEnv } from "../env";
+import { logError } from "../log";
 
 const encoder = new TextEncoder();
 
@@ -25,14 +26,22 @@ function bearerToken(header: string | undefined): string | undefined {
   return match?.[1];
 }
 
+/**
+ * Marker of the template value in `.dev.vars.example`. "Deploy to Cloudflare" offers that
+ * file's values as defaults, so a token still containing it is publicly known: the API
+ * refuses to run with it instead of accepting it.
+ */
+export const PLACEHOLDER_TOKEN_MARKER = "REPLACE_ME";
+
 /** Paths that stay public even with an access token (they expose only `{ ok: true }`). */
 const PUBLIC_PATHS = new Set(["/api/health"]);
 
 /**
  * Optional access token (`KIDBOARD_ACCESS_TOKEN`). When set and non-empty, every API
  * path except {@link PUBLIC_PATHS} needs `Authorization: Bearer <token>` or
- * `?key=<token>`; otherwise 401. CORS preflights are answered by the CORS middleware
- * before this runs.
+ * `?key=<token>`; otherwise 401. A token that still contains
+ * {@link PLACEHOLDER_TOKEN_MARKER} fails closed with 500 `server_misconfigured`. CORS
+ * preflights are answered by the CORS middleware before this runs.
  */
 export function accessToken(): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
@@ -40,6 +49,18 @@ export function accessToken(): MiddlewareHandler<AppEnv> {
     if (expected === "" || PUBLIC_PATHS.has(c.req.path)) {
       await next();
       return;
+    }
+    if (expected.toUpperCase().includes(PLACEHOLDER_TOKEN_MARKER)) {
+      logError(
+        "KIDBOARD_ACCESS_TOKEN is still the template placeholder; set a random token",
+      );
+      return c.json(
+        {
+          error: "server_misconfigured",
+          message: "Server configuration is invalid",
+        },
+        500,
+      );
     }
     const candidates = [
       bearerToken(c.req.header("Authorization")),

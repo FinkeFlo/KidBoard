@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "node scripts/ensure-web-dist.mjs && pnpm --parallel --filter @kidboard/web --filter @kidboard/worker dev",
     "build": "pnpm --filter @kidboard/web build && pnpm --filter @kidboard/worker build",
+    "deploy:cloudflare": "pnpm --filter @kidboard/web build && wrangler deploy",
     "lint": "eslint --max-warnings=0 .",
     "typecheck": "tsc -p tsconfig.json && pnpm -r --workspace-concurrency=1 typecheck",
     "test": "vitest run",
@@ -20,6 +21,25 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "node -e \"process.exit(require('fs').existsSync('.git')?0:1)\" && lefthook install || echo \"skipping lefthook install\""
+  },
+  "cloudflare": {
+    "bindings": {
+      "CAL_KINDER_URL": {
+        "description": "Secret iCal address of the calendar with id `kinder` (Google Calendar: Settings > calendar > **Secret address in iCal format**). One `CAL_<ID>_URL` per calendar in `KIDBOARD_CONFIG`; see [docs/DEPLOY.md](https://github.com/FinkeFlo/kidboard/blob/main/docs/DEPLOY.md)."
+      },
+      "CAL_ESSEN_URL": {
+        "description": "Secret iCal address of the meal plan calendar with id `essen`. Never share it."
+      },
+      "KIDBOARD_ACCESS_TOKEN": {
+        "description": "API access token: a long random string, e.g. `openssl rand -hex 32`. Open the board once as `https://<worker>/?key=<token>`. Must not contain `REPLACE_ME` (the API refuses it)."
+      },
+      "KIDBOARD_CONFIG": {
+        "description": "Settings as single-line JSON (children, calendars, time zone, ...). Template: `config.example.json`, options: `docs/CONFIG.md`. Its calendar ids must match the `CAL_<ID>_URL` secrets."
+      },
+      "KIDBOARD_CACHE": {
+        "description": "KV namespace for the calendar cache. Created automatically; keep the default."
+      }
+    }
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
@@ -39,6 +59,7 @@
     "prettier-plugin-tailwindcss": "^0.8.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.73.0",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.1",
+    "wrangler": "^4.166.0"
   }
 }

@@ -367,7 +367,7 @@ operation, works offline with the last known state.
 
 ## M6 – Deploy, docs, v1.0.0
 
-- [ ] **T-25 Cloudflare deploy** (risk: **high** → Opus, deps: M5)
+- [x] **T-25 Cloudflare deploy** (risk: **high** → Opus, deps: M5)
   Acceptance: root `pnpm deploy:cloudflare` builds web + deploys worker; "Deploy to
   Cloudflare" button in README; documented secrets (`wrangler secret put CAL_KINDER_URL`)
   and vars; `wrangler deploy --dry-run` in CI; step-by-step guide verified as far as

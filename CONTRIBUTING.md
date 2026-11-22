@@ -24,8 +24,9 @@ server URL for live reload.
 (Mia and Ben, a week of events and meals, a countdown) - no worker, secrets or calendar
 needed.
 
-For local worker secrets copy `apps/worker/.dev.vars.example` to `apps/worker/.dev.vars`
-(see [docs/CONFIG.md](docs/CONFIG.md)).
+For local worker secrets copy `.dev.vars.example` to `.dev.vars` in the repository root,
+next to the only `wrangler.jsonc` (see [docs/CONFIG.md](docs/CONFIG.md)). Deploying:
+[docs/DEPLOY.md](docs/DEPLOY.md).
 
 ### Commands and quality gate
 
@@ -70,8 +71,9 @@ Danke für deine Hilfe! Bitte lies zuerst den [Verhaltenskodex](CODE_OF_CONDUCT.
 Benötigt Node 22 und pnpm 10 (über corepack): `pnpm install`, dann `pnpm dev`. Der Worker
 liefert `apps/web/dist` aus; `pnpm dev` baut die Web-App daher einmalig, falls das Verzeichnis
 fehlt (frischer Klon, `scripts/ensure-web-dist.mjs`). Lokale
-Worker-Secrets: `apps/worker/.dev.vars.example` nach `apps/worker/.dev.vars` kopieren
-(siehe [docs/CONFIG.md](docs/CONFIG.md)).
+Worker-Secrets: `.dev.vars.example` im Repository-Root nach `.dev.vars` kopieren (neben der
+einzigen `wrangler.jsonc`, siehe [docs/CONFIG.md](docs/CONFIG.md)). Deployment:
+[docs/DEPLOY.de.md](docs/DEPLOY.de.md).
 
 ### Befehle und Qualitätsprüfung
 

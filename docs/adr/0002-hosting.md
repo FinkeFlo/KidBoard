@@ -30,3 +30,8 @@ Option 1 as the default. Option 3 is documented and supported through a thin ada
   source cache therefore uses an auto-provisioned KV namespace (`KIDBOARD_CACHE`,
   declared without an id in `wrangler.jsonc`) and falls back to the Cache API when the
   binding is missing (ADR-0006).
+* "Deploy to Cloudflare" only supports monorepos whose app is fully isolated in the
+  linked subdirectory; the worker needs `packages/shared` and `apps/web`. The button
+  therefore links the repository root, and the single `wrangler.jsonc` lives there
+  (T-25, docs/DEPLOY.md). Workers Builds runs the root `build` script (web before
+  worker) and `npx wrangler deploy` with the root's pinned `wrangler`.

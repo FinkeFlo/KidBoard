@@ -55,8 +55,15 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      # Also runs `wrangler deploy --dry-run --outdir dist` for the worker.
       - name: Build
         run: pnpm build
+
+      # The deploy itself, minus the upload: same root wrangler.jsonc and command as
+      # `pnpm deploy:cloudflare` and the Git/"Deploy to Cloudflare" builds (docs/DEPLOY.md).
+      # Validates the config, bundles the worker and reads dist/_headers; needs no account.
+      - name: Cloudflare deploy dry run
+        run: pnpm exec wrangler deploy --dry-run
 
       # Headless runs only need the Chromium headless shell (smaller download).
       - name: Install Playwright Chromium

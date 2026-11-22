@@ -6,6 +6,7 @@ import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 import { demoApiPlugin } from "./demo/demoPlugin.ts";
+import { staticHeadersPlugin } from "./headers/staticHeaders.ts";
 import { createPwaOptions } from "./pwa/options.ts";
 import { readPwaColors } from "./pwa/tokenColors.ts";
 
@@ -24,6 +25,8 @@ export default defineConfig(({ mode }) => ({
     react(),
     tailwindcss(),
     VitePWA(createPwaOptions(readPwaColors())),
+    // dist/_headers (CSP with the theme boot script hash, security headers), T-25.
+    staticHeadersPlugin(),
     ...(mode === "demo" ? [demoApiPlugin()] : []),
   ],
   define: appDefine,

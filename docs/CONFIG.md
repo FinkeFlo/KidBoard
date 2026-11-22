@@ -2,7 +2,7 @@
 
 KidBoard has two kinds of settings:
 
-1. **Secrets** (iCal URLs, optional access token) - Worker secrets / `apps/worker/.dev.vars`.
+1. **Secrets** (iCal URLs, optional access token) - Worker secrets / `.dev.vars` (repository root).
 2. **Non-secret settings** - one JSON document in the `KIDBOARD_CONFIG` variable. The
    shape is shown in [`config.example.json`](../config.example.json); the worker validates
    it with the schema from `packages/shared` and exposes the public part at `/api/config`.
@@ -13,13 +13,17 @@ Deutsche Kurzfassung am Ende dieses Dokuments.
 
 ## Secrets and environment variables
 
-Set locally in `apps/worker/.dev.vars` (copy from `.dev.vars.example`, dotenv format,
-git-ignored). In production use `wrangler secret put NAME` or the hosting dashboard.
+Set locally in `.dev.vars` in the repository root, next to `wrangler.jsonc` (copy from
+[`.dev.vars.example`](../.dev.vars.example), dotenv format, git-ignored). In production use
+`pnpm exec wrangler secret put NAME` or the hosting dashboard; step by step:
+[DEPLOY.md](DEPLOY.md). All five may be secrets; `KIDBOARD_CONFIG`,
+`KIDBOARD_ALLOWED_ORIGINS` and `KIDBOARD_CACHE_TTL` may also be plain-text variables
+(`keep_vars: true` keeps dashboard variables across deploys).
 
 | Name                      | Required | Default            | Description                                                                                                                                      |
 | ------------------------- | -------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `CAL_<ID>_URL`            | yes, one per calendar | -     | Secret iCal address of the calendar with id `<ID>` (upper case), e.g. `CAL_KINDER_URL`. Google Calendar: Settings > calendar > "Secret address in iCal format". `https://`, `http://` or `webcal://` (fetched as `https://`). Never commit it. A missing or invalid value marks only that calendar as `error`. |
-| `KIDBOARD_ACCESS_TOKEN`   | no       | unset (no check)   | If set (non-empty), API requests must present this token as `Authorization: Bearer <token>` or `?key=<token>`, else `401`. Prefer the header: `?key=` ends up in request logs and browser history. `/api/health` stays public (it only returns `{ "ok": true }`). |
+| `KIDBOARD_ACCESS_TOKEN`   | no       | unset (no check)   | If set (non-empty), API requests must present this token as `Authorization: Bearer <token>` or `?key=<token>`, else `401`. Prefer the header: `?key=` ends up in browser history (Workers Logs drop query strings, `redact_query_string`). A value that still contains `REPLACE_ME` (the template) is refused: every protected path answers `500 server_misconfigured`. `/api/health` stays public (it only returns `{ "ok": true }`). |
 | `KIDBOARD_ALLOWED_ORIGINS`| no       | same origin only   | Comma-separated list of allowed CORS origins, e.g. `http://localhost:5173`.                                                                      |
 | `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh (integer 60-86400; other values fall back to 3600 with a log warning). With the KV cache at least `ceil(calendars × 86400 / 500)` (KV Free plan write quota; 2 calendars → 346).                                    |
 | `KIDBOARD_CONFIG`         | yes      | -                  | The JSON document described below (single line). Missing or invalid: the API answers `500` and the log lists the validation errors.             |
@@ -76,7 +80,7 @@ for the window is stored once per refresh: it is fresh for `KIDBOARD_CACHE_TTL` 
 7 days as last-good, served with `status: "stale"` when the feed fails (an old entry may
 cover only part of the requested range). The store is the Workers KV namespace
 `KIDBOARD_CACHE`, which Wrangler creates automatically on the first deploy (declared
-without an id in `apps/worker/wrangler.jsonc`); without that binding the Cache API is
+without an id in the root `wrangler.jsonc`); without that binding the Cache API is
 used, which only works on a custom domain (not on `*.workers.dev`). All API responses
 carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and
 `Referrer-Policy: no-referrer`.
@@ -84,11 +88,12 @@ carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and
 ## Deutsche Kurzfassung
 
 **Geheimnisse** (iCal-URLs, optionales Zugriffstoken) liegen als Worker-Secrets bzw. lokal in
-`apps/worker/.dev.vars` (Vorlage: `.dev.vars.example`, nie einchecken). Pro Kalender gibt es
+`.dev.vars` im Repository-Root (Vorlage: `.dev.vars.example`, nie einchecken; Deployment:
+[DEPLOY.de.md](DEPLOY.de.md)). Pro Kalender gibt es
 `CAL_<ID>_URL` (ID in Großbuchstaben; fehlt sie, zeigt nur dieser Kalender einen Fehler).
 Optional: `KIDBOARD_ACCESS_TOKEN` (dann brauchen alle API-Aufrufe außer `/api/health` den
 Token als `Authorization: Bearer <token>` oder `?key=<token>`; besser den Header, denn `?key=`
-landet in Request-Logs; `/api/health` bleibt öffentlich und liefert nur `{ "ok": true }`),
+landet im Browserverlauf; ein Wert, der noch `REPLACE_ME` enthält, wird abgelehnt (`500`); `/api/health` bleibt öffentlich und liefert nur `{ "ok": true }`),
 `KIDBOARD_ALLOWED_ORIGINS`, `KIDBOARD_CACHE_TTL` (Sekunden, 60-86400, Standard 3600; mit
 KV-Cache mindestens `Kalender × 86400 / 500`).
 
