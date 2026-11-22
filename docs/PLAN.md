@@ -367,32 +367,76 @@ operation, works offline with the last known state.
 
 ## M5b – Design hand-off
 
-Adopts the final design from `docs/design/` (Claude Design, 2026-11-22). Runs before M6 so
-v1.0.0 ships with the final look.
+Adopts the final design from `docs/design/` (Claude Design, 2026-11-22). Runs before T-26/T-27
+so v1.0.0 ships with the final look (T-25 was already built before M5b landed).
+
+**Merge rules (design × built app, three-perspective review 2026-11-22: child UX, tech, a11y/kiosk).**
+The hand-off is adopted, except where the built app already solved a problem the hand-off does
+not address. These rules apply to every M5b task:
+
+1. *One symbol, one meaning:* 🌙 only counts sleeps; evening on tiles uses 🌆 (not the moon);
+   all-day events get their own treatment (a banner at the top of the column, not the midday
+   sun); the "Heute" button does not turn into a moon at night. Keep the e2e check.
+2. *Never hide silently:* the "vorbei" strip has an accessible name listing the titles; past
+   events give way first, then "+N" (with sr-only label), decided by available space, not a
+   fixed count. Keep the no-loss assertion (`shown + hidden === n`).
+3. *Now and next without reading:* keep the now line, keep the `current` tile state with a ring,
+   and emphasise the next upcoming tile.
+4. *Past events recede through tested tokens, not opacity alone* (opacity 0.4/0.5 fails AA);
+   `--opacity-past*` only where the blended contrast is tested.
+5. *Behaviour stays, visuals change:* `AppErrorBoundary` (backoff, single announcement, auto
+   reset), `StatusBanner` (5 s stale delay), 401 wipe, wake lock outside the boundary,
+   burn-in shift, theme-color meta and CSP hash all keep working; no hard-coded retry seconds.
+6. *Kiosk corner:* no parent lock until M8; the rail's bottom slot hosts the long-press
+   fullscreen control; burn-in and kiosk e2e re-run against the rail and the today ring.
 
 - [ ] **T-29 Final design tokens** (risk: medium, deps: M5)
-  Acceptance: `apps/web/src/styles/tokens.css` replaced by `docs/design/tokens.css`;
-  `tokens.test.ts` extended with the pairs listed in `docs/design/README.md` (text on child
-  tints, time-of-day accents on tints, today ring, nav, soft error) in both themes; no raw
-  hex in components; screenshots regenerated.
+  Acceptance: `apps/web/src/styles/tokens.css` replaced by `docs/design/tokens.css` (legacy band
+  tokens stay until T-30b); a weekend surface token kept; `tokens.test.ts` extended with the
+  pairs listed in `docs/design/README.md` (text on child tints, time-of-day accents on tints,
+  today ring, nav, soft error) plus: night `nav-active` vs. inactive button and page (≥ 3:1, or a
+  non-colour active cue), past text after any opacity, every `-tint` token has a matching child
+  token; both themes; no raw hex in components; screenshots regenerated.
 
-- [ ] **T-30 Four-day overview as main screen** (risk: medium, deps: T-29)
-  Acceptance: today + next 3 days as columns (today wider, raised, today ring), events top to
-  bottom in time order, time-of-day icon on each tile, now line in today's column, meals at
-  the bottom of each column; event tiles with child tint, edge and child badge (several
-  children: split tint + overlapping badges); dense rule from 6 events ("vorbei" strip, dense
-  tiles, "+N"); navigation rail on the right; 8 events + 3 meals fit 1280×800 and
-  2000×1200 without scrolling (Playwright); i18n DE + EN.
+- [ ] **T-29a Stable test hooks** (risk: low, deps: T-29)
+  Acceptance: `data-testid` hooks independent of the band layout (e.g. `board-ready`,
+  `day-column`, `event-tile`) and all e2e specs/`layout.ts` moved to them while the bands still
+  exist; one green commit; no behaviour change.
 
-- [ ] **T-31 Week view in the new tile language** (risk: low, deps: T-30)
-  Acceptance: week tiles tinted with child badge and time-of-day icon, special countdown day
-  in the child's tint and edge, moons in the column headers up to the target day, meals as a
-  three-row list; existing week e2e adjusted.
+- [ ] **T-30a Overview model and layout logic** (risk: medium, deps: T-29a)
+  Acceptance: `buildDayModel` kept and extended with `timeOfDay` per event; `buildOverviewModel`
+  (today + 3 days); pure `columnLayout` (vorbei strip, compact from 6 events, "+N", past first,
+  space-based capacity); `resolveChildTint` (token → `--color-child-N-tint`, other CSS colours →
+  `color-mix` with the surface, as `var()`/style, CSP-safe); all unit-tested incl. property-style
+  sweep like `bandLayout`.
 
-- [ ] **T-32 States and night mode per hand-off** (risk: medium, deps: T-30)
-  Acceptance: loading skeleton without spinner, offline/stale pill, friendly error card with
-  retry ≥ 64 px and parent line, empty day illustration with meals, night theme with dimmed
-  emoji and `--opacity-past-night`; contrast tests green; reduced motion respected.
+- [ ] **T-30b Four-day overview as main screen** (risk: medium, deps: T-30a)
+  Acceptance: today + next 3 days as columns, today clearly the widest (about 2×) with emoji
+  ≥ 3.5rem; events top to bottom, time-of-day icon (inline SVG or emoji per rule 1), now line
+  with accessible name, `current` ring (rule 3); all-day banner per column; tiles with child
+  tint, edge and badge (several children: split tint + overlapping badges; 3+: neutral + "+N");
+  meals at the bottom (plates with accessible names, short name in today's column, a place for
+  the `unspecified` slot); 🎉 0-night countdown state kept, countdown target in the child's
+  tint; navigation rail on the right reusing `ViewToggle`/auto-return, "Stand" time not a live
+  region, fullscreen control in the rail (rule 6); bands, `bandLayout` and legacy band tokens
+  removed; density matrix rewritten (1–12 events in today's column, 3 children, long German
+  title, 📅 fallback) fits 1280×800 and 2000×1200 without scrolling, incl. burn-in corners;
+  i18n DE + EN; `docs/screenshots` regenerated.
+
+- [ ] **T-31 Week view in the new tile language** (risk: low, deps: T-30b)
+  Acceptance: week tiles tinted with child badge and time-of-day icon; weekend columns stay
+  visually distinct (T-18); past events of today ranked last (T-24); "+N" only when there is
+  no room; countdown day in the child's tint and edge, moons in the column headers up to the
+  target day; up to 14 moons shown individually (no "+N" for counting); meals as a three-row
+  list; existing week, countdown and burn-in e2e adjusted.
+
+- [ ] **T-32 States and night mode per hand-off** (risk: medium, deps: T-30b)
+  Acceptance: loading skeleton (4 columns, no spinner), offline/stale pill merged into
+  `StatusBanner`, friendly error card (🧸, parent line, retry ≥ 64 px, short error code, no
+  fixed seconds) on top of the existing boundary logic (rule 5), calm 401 variant ("open the
+  link again" for parents), empty day illustration with meals; night theme with dimmed emoji in
+  `<Emoji>` and past events per rule 4; contrast tests green; reduced motion respected;
+  `csp.spec` green.
 
 **M5b exit:** milestone review, CI green.
 
@@ -442,7 +486,8 @@ v1.0.0 ships with the final look.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
-| 2026-11-22 | New milestone M5b (T-29–T-32): adopt the design hand-off in `docs/design/`; T-25 now depends on M5b | Final design from Claude Design replaces the placeholder theme and the band layout before v1.0.0 |
+| 2026-11-22 | M5b refined after a design × built-app comparison (child UX, tech, a11y/kiosk): merge rules 1–6, new T-29a (stable test hooks), T-30 split into T-30a (model/layout) and T-30b (UI + rail), acceptance criteria extended; T-25 kept as done (built before the hand-off landed) | Keep what the built app already solved (one symbol per meaning, no silent hiding, AA for past events, kiosk/boundary behaviour) while adopting the new look |
+| 2026-11-22 | New milestone M5b (T-29–T-32): adopt the design hand-off in `docs/design/`; M6 continues after M5b (T-25 was already built before) | Final design from Claude Design replaces the placeholder theme and the band layout before v1.0.0 |
 | 2026-11-22 | M4 review follow-ups: burn-in inner wrapper + fixed toggle place (T-22), glanceability pass (T-24), boundary reset test (T-20), night contrast for new surfaces (T-21), single fixture date constant (T-23) | M4 milestone review by reviewer-opus |
 | 2026-11-22 | T-18: the meal plan is shown inside the week columns instead of a separate meal screen | No extra screen, one glance: children and parents see events and meals of the whole week at once |
 | 2026-11-22 | M3 review: agenda `days` limit 14 → 31 and client range 8 → 31 (T-19, shared query for day/week/countdown); follow-ups to T-18 (shared frame, continuing events), T-20 (boundary auto-reset), T-21 (`useCurrentBand`), T-23 (e2e clock, `timezoneId`, docs), T-28 (release-please initial version) | M3 milestone review by reviewer-opus; countdown needs 30 days but `/api/agenda` capped at 14 |
