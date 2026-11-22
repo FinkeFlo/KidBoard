@@ -176,7 +176,7 @@ operation, works offline with the last known state.
      secrets.
   3. Feeds fetched in parallel with timeout (10 s) and size limit (5 MB); per-source fresh
      cache (TTL from `KIDBOARD_CACHE_TTL`, default 3600 s) and last-good cache (7 d) via
-     Cache API; on upstream failure the last-good data is served with
+     KV (`KIDBOARD_CACHE`, auto-provisioned) with Cache API/memory fallback; on upstream failure the last-good data is served with
      `status: 'stale'`, `stale: true`; no data at all → `status: 'error'` for that source,
      still 200 for the response if any source succeeded, 502 otherwise.
   4. Secrets read from env `CAL_<ID>_URL`; never logged, never in responses or error
@@ -367,5 +367,6 @@ operation, works offline with the last known state.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | T-10: worker cache uses an auto-provisioned KV binding (`KIDBOARD_CACHE`) with Cache API/memory fallback; cached window `[today−1, today+32)` | Cache API is a no-op on `*.workers.dev`; T-19 needs a 30-day countdown lookahead (T-10 review, structural) |
 | 2026-11-22 | M0 milestone review follow-ups: `autoReturnSeconds` in T-06, `format:check` in DoD, fixture loading note in T-08, typed `Env` in T-10, tsconfig split in T-11 | Findings of the M0 review by reviewer-opus |
 | 2026-11-22 | Worker test tooling renamed to `@cloudflare/vitest-plugin` (T-03, T-08, T-10) | `@cloudflare/vitest-pool-workers` is deprecated on npm and supports only Vitest 4 |
