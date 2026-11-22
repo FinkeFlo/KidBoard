@@ -55,11 +55,20 @@ export function seedOnlineState(
  * Revoked or wrong access token (401): calendar data must not stay visible on a
  * device that lost access. Every KidBoard query drops its data and takes the error,
  * so the status becomes `error` and the persister writes an empty cache.
+ *
+ * In-flight fetches of those queries are cancelled first, without `revert`: TanStack
+ * cancels a fetch with `revert` when its last observer leaves (here: the wiped config
+ * turns the board's agenda into the pending query), and reverting restores the state
+ * from before the fetch, i.e. the data just wiped, which the persister would then
+ * write back to storage (found by the T-23 e2e test).
  */
 function wipeOnUnauthorized(client: QueryClient, error: ApiError): void {
   for (const query of client.getQueryCache().getAll()) {
     if (queryKindOf(query.queryKey) !== undefined) {
+      // `silent`: no revert and no extra error dispatch; the state is set right below.
+      void query.cancel({ silent: true });
       query.setState({
+        fetchStatus: "idle",
         data: undefined,
         dataUpdatedAt: 0,
         dataUpdateCount: 0,

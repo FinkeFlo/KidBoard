@@ -15,3 +15,10 @@ MVP renders native emoji through one `<Emoji>` component (font stack
 `"Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif`, `role="img"`,
 `aria-label`). The component is the single seam to switch to an asset set later
 (planned M7 option `emojiStyle`).
+
+The component has two modes. With a non-empty `label` the emoji is an image for
+assistive tech (`role="img"`, `aria-label`). Without a label (or a blank one) it is
+**decorative**: `aria-hidden="true"`, no role, so screen readers skip it. Use the
+decorative mode whenever visible text next to it already says the same (meal cards, band
+headings, the child legend's avatars next to the names, the countdown visuals inside its
+labelled region), so nothing is announced twice.

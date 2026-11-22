@@ -1,11 +1,18 @@
 import { expect, type Page, test } from "@playwright/test";
 
-import { agenda, config, mockBoard, type MockEvent } from "./mockApi";
+import {
+  agenda,
+  at,
+  config,
+  mockBoard,
+  type MockEvent,
+  QUERY_CACHE_KEY,
+} from "./mockApi";
 
 const SHOT_DIR = process.env["E2E_SCREENSHOT_DIR"];
 
 /** Sunday evening in Berlin, inside the default night window 19:30-06:30. */
-const NIGHT_NOW = "2026-11-22T21:00:00+01:00";
+const NIGHT_NOW = at("21:00");
 const LIGHT_BG = "rgb(255, 248, 240)"; // --color-surface (light)
 const NIGHT_BG = "rgb(23, 18, 13)"; // --color-surface (night)
 
@@ -163,7 +170,7 @@ test.describe("night mode", () => {
     // 5 s before 19:30 Berlin; the clock keeps ticking.
     await mockBoard(page, {
       agenda: agenda(EVENTS, MEALS),
-      now: "2026-11-22T19:29:55+01:00",
+      now: at("19:29:55"),
     });
     await page.goto("/");
     await expect(page.getByTestId("day-band")).toHaveCount(3);
@@ -185,7 +192,7 @@ test.describe("night mode", () => {
     test.setTimeout(60_000);
     await mockBoard(page, {
       agenda: agenda(EVENTS, MEALS),
-      now: "2026-11-22T19:29:55+01:00",
+      now: at("19:29:55"),
     });
     await page.goto("/");
     await expect(page.getByTestId("day-band")).toHaveCount(3);
@@ -213,7 +220,7 @@ test.describe("night mode", () => {
       test.setTimeout(60_000);
       await mockBoard(page, {
         agenda: agenda(EVENTS, MEALS),
-        now: "2026-11-22T19:29:55+01:00",
+        now: at("19:29:55"),
       });
       await page.goto("/");
       await expect(page.getByTestId("day-band")).toHaveCount(3);
@@ -237,5 +244,122 @@ test.describe("night mode", () => {
       expect(seconds).toBeLessThan(0.001);
       await expect.poll(() => bodyBackground(page)).toBe(NIGHT_BG);
     });
+  });
+});
+
+test.describe("theme before the config is known", () => {
+  const THEME_KEY = "kidboard.theme";
+  const rememberedTheme = (page: Page): Promise<string | null> =>
+    page.evaluate((key: string) => window.localStorage.getItem(key), THEME_KEY);
+
+  /**
+   * From the next navigation on: no persisted query cache (a cold start without a known
+   * config), and `window.__firstPaintTheme` = the theme on <html> when <body> is created,
+   * i.e. before anything can be painted.
+   */
+  async function coldStart(page: Page): Promise<void> {
+    await page.addInitScript((cacheKey: string) => {
+      window.localStorage.removeItem(cacheKey);
+      const record = window as unknown as { __firstPaintTheme?: string | null };
+      new MutationObserver((_records, observer) => {
+        if (document.querySelector("body") !== null) {
+          record.__firstPaintTheme =
+            document.documentElement.getAttribute("data-theme");
+          observer.disconnect();
+        }
+      }).observe(document, { childList: true, subtree: true });
+    }, QUERY_CACHE_KEY);
+  }
+  const firstPaintTheme = (page: Page): Promise<string | null | undefined> =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __firstPaintTheme?: string | null })
+          .__firstPaintTheme,
+    );
+
+  for (const configFails of [true, false]) {
+    test(`a cold start at night paints the ${configFails ? "error screen" : "skeleton"} in night tokens`, async ({
+      page,
+    }) => {
+      const api = await mockBoard(page, {
+        agenda: agenda(EVENTS, MEALS),
+        now: NIGHT_NOW,
+      });
+      await page.goto("/");
+      await expect(page.getByTestId("day-band")).toHaveCount(3);
+      await expect.poll(() => rememberedTheme(page)).toBe("night");
+
+      await coldStart(page);
+      if (configFails) {
+        api.configStatus = 500;
+        api.config = { error: "server_misconfigured" };
+      } else {
+        await page.route("**/api/config", () => new Promise(() => undefined));
+      }
+      await page.goto("/");
+      if (configFails) {
+        // After the two retries of a 5xx.
+        await expect(page.getByRole("alert")).toHaveAttribute(
+          "data-error",
+          "failed",
+          { timeout: 15_000 },
+        );
+      } else {
+        await expect(page.getByRole("status")).toHaveText("Loading the plan");
+      }
+      expect(await firstPaintTheme(page)).toBe("night");
+      expect(await theme(page)).toBe("night");
+      expect(await bodyBackground(page)).toBe(NIGHT_BG);
+    });
+  }
+
+  test("the ?night override is never remembered", async ({ page }) => {
+    await mockBoard(page, { agenda: agenda(EVENTS, MEALS) });
+    await page.goto("/");
+    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect.poll(() => rememberedTheme(page)).toBe("light");
+
+    await page.goto("/?night=1");
+    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    expect(await theme(page)).toBe("night");
+    expect(await rememberedTheme(page)).toBe("light");
+
+    // A later cold start from a clean URL is light again, from the first paint on.
+    await coldStart(page);
+    await page.route("**/api/config", () => new Promise(() => undefined));
+    await page.goto("/");
+    await expect(page.getByRole("status")).toHaveText("Loading the plan");
+    expect(await firstPaintTheme(page)).toBe("light");
+    expect(await bodyBackground(page)).toBe(LIGHT_BG);
+  });
+
+  test("without usable localStorage the board still loads and follows the clock", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        get(): Storage {
+          throw new DOMException("blocked", "SecurityError");
+        },
+      });
+    });
+    await mockBoard(page, { agenda: agenda(EVENTS, MEALS), now: NIGHT_NOW });
+    await page.goto("/");
+    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    expect(
+      await page.evaluate(() => {
+        try {
+          return typeof window.localStorage;
+        } catch {
+          return "blocked";
+        }
+      }),
+    ).toBe("blocked");
+    expect(await theme(page)).toBe("night");
+    expect(await bodyBackground(page)).toBe(NIGHT_BG);
+    expect(errors).toEqual([]);
   });
 });

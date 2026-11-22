@@ -212,13 +212,20 @@ follows the clock face (skipped hour never matches, repeated hour matches twice)
 `useNightTheme(nightMode, zone)` (called by `Board`) recomputes it on the minute clock
 (`useNow`) and sets `<html data-theme="night|light">`, which swaps the colour/shadow
 variables in `tokens.css`; Tailwind's `night:` variant matches the same attribute. Until
-the config is known the theme is left untouched (light tokens), and the first known value
-applies without a fade. While the theme changes the hook sets
+the config is known the theme is left untouched, and the first known value applies
+without a fade. **Before first paint** a classic inline script in `index.html` re-applies
+the last theme the board applied (`localStorage` `kidboard.theme`, written by
+`rememberTheme` whenever the clock's theme is applied), so a cold start at night (config
+not yet known, or failing from the start) shows the skeleton or error screen in night
+tokens instead of a bright screen. Missing or blocked storage falls back to light tokens.
+The script needs no network and works with the current headers (no CSP); a future
+Content-Security-Policy must allow it by hash. While the theme changes the hook sets
 `data-theme-switching` on `<html>` for 0.8 s, during which `global.css` fades the colours
 over `--duration-slow` (variables do not animate on their own); under
 `prefers-reduced-motion` the durations are 0 and the switch is instant. `?night=1|0`
 forces night/day for testing; it is read once at startup and deliberately **not**
-persisted (a forgotten test link must not pin a kiosk after the next clean reload).
+persisted, neither as a parameter nor as the remembered theme (a forgotten test link must
+not pin a kiosk after the next clean reload).
 `<meta name="theme-color">` is updated at runtime to `--color-surface` in night mode and
 restored to the build-time value (brand accent) by day. The manifest `theme_color` stays
 static, because a manifest cannot change with the time of day; it only applies at
@@ -334,6 +341,43 @@ is refetched regardless of `staleTime` and never persisted (the persister's per-
 7-day check drops it); a 401 wipes it like all agenda data. `useAgenda` waits for the
 persisted cache to be restored before it creates the real query, so a reload on a later
 day (offline) is seeded from the restored agenda.
+
+### Day view (T-17)
+
+`apps/web/src/day/buildDayModel.ts` (pure, `buildDayModel(agenda, config, date, now)`)
+decides what belongs to a date (a date key in the config zone) and where it goes; every
+instant is read in the config zone, never the device zone. **Placement rules:**
+
+* **All-day events** (also multi-day ones) covering the date go to the top row, in feed
+  order. `end` is exclusive; a zero-length all-day event counts for its start day.
+* **Timed events** belong to every date from the date of their start to the date of
+  their last instant (`end − 1 ms`, so an event ending at midnight does not spill into the
+  next day; a zero-length event stays on its start day).
+* **Band** by start time (`bandOf`, wall clock of the zone; a boundary belongs to the later
+  band): `morning` from `morningStart`, `midday` from `middayStart`, `evening` from
+  `eveningStart`. Before `morningStart` (`night`) the event goes to the morning band (the
+  board has no night band). An event that started on an earlier day (multi-day,
+  crossing midnight) is in the morning band too, with a "continues" hint instead of its
+  original start time. Inside a band: by start, ties by title; above 4 events a band
+  lists them in two columns.
+* **Status** only on today: an event is `past` once its end has passed (zero-length: after
+  its start), `current` while running, else `upcoming`; all-day events are always
+  `upcoming`. The band containing `now` is `current`, earlier bands `past`; before
+  `morningStart` nothing is current or past. Past items recede via surface/text tokens
+  (not opacity, WCAG AA).
+* **Meals** of the date, ordered breakfast, lunch, dinner, unspecified.
+
+**States:** `DayLoading` (skeleton with the view's layout) until config and agenda are
+known; `DayEmpty` ("nothing planned" illustration) inside the board; `DayError` (child-calm
+emoji + sentence, parent-readable reason: `failed`, `offline`, `unauthorized`) only when
+there is no data at all. With data, offline or stale, the board stays and only the
+`DiscreetStatusBanner` in the bottom strip reports it (T-22). **Stale-banner delay:** the
+banner shows `stale` only after it has lasted **5 s** (`STALE_BANNER_DELAY_MS`,
+`useSettled`), because online every midnight is briefly `stale` (the new day is seeded from
+the cache until its fetch lands) and that must not flash on a wall display. `offline`,
+`error` and `unauthorized` show at once. E2E (`e2e/offline.spec.ts`) covers the offline
+reload through the service worker, `stale: true`, 502 with and without data, reconnect,
+offline across midnight and the 401 wipe, with the device in `America/Los_Angeles`.
 
 ### Board: day & week view (T-18)
 

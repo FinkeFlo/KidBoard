@@ -2,6 +2,12 @@ import { defineConfig } from "@playwright/test";
 
 const PORT = 4173;
 const executablePath = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE"];
+/**
+ * Device zone of every project. The board must follow the config zone (Europe/Berlin in
+ * the fixtures, nine hours ahead) and never the device zone, so the device runs in a
+ * non-UTC zone where most Berlin days start on the previous local date.
+ */
+const DEVICE_TIME_ZONE = "America/Los_Angeles";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -23,11 +29,19 @@ export default defineConfig({
   projects: [
     {
       name: "tablet-1280x800",
-      use: { browserName: "chromium", viewport: { width: 1280, height: 800 } },
+      use: {
+        browserName: "chromium",
+        viewport: { width: 1280, height: 800 },
+        timezoneId: DEVICE_TIME_ZONE,
+      },
     },
     {
       name: "tablet-2000x1200",
-      use: { browserName: "chromium", viewport: { width: 2000, height: 1200 } },
+      use: {
+        browserName: "chromium",
+        viewport: { width: 2000, height: 1200 },
+        timezoneId: DEVICE_TIME_ZONE,
+      },
     },
   ],
   webServer: {
