@@ -46,6 +46,11 @@
       "title": "The plan isn't here right now",
       "hint": "KidBoard keeps trying on its own. A grown-up can check the details below.",
       "offline": "No internet and no saved plan yet."
+    },
+    "hidden": {
+      "badge": "+{{count}}",
+      "earlier": "{{count}} already over",
+      "later": "{{count}} more later"
     }
   },
   "fullscreen": {

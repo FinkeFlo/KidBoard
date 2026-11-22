@@ -45,6 +45,8 @@
   /* Burn-in shift amplitude (T-22): the board moves by up to this much per axis. Must stay
      well below --spacing-gutter; the frame gives it back as padding so nothing overflows. */
   --spacing-burn-in: 0.5rem;
+  /* Natural height of a day-band tile; crowded bands shrink their tiles below it. */
+  --spacing-band-tile: 6.5rem;
   /* Minimum touch target for child interactions: >= 64px at every root size. */
   --spacing-touch: max(64px, 4rem);
 
@@ -66,6 +68,8 @@
   --color-text: #2b2118;
   --color-text-muted: #5e5044;
   --color-border: #d8c8b2;
+  /* Quiet parent controls (fullscreen glyph): faint, but >= 3:1 on every surface/band. */
+  --color-control-quiet: #8a7968;
   --color-accent: #a63a08;
   --color-on-accent: #ffffff;
   --color-danger: #b3261e;
@@ -107,6 +111,7 @@
   --color-text: #f2e6d6;
   --color-text-muted: #bdae9a;
   --color-border: #4a3d30;
+  --color-control-quiet: #7d6e5d;
   --color-accent: #f0a35e;
   --color-on-accent: #1a1008;
   --color-danger: #ff9a8f;

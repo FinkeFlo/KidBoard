@@ -9,8 +9,9 @@ export const FULLSCREEN_HOLD_MS = 700;
 /**
  * Parent control for fullscreen, a quiet corner overlay (outside the header, so it never
  * changes the header layout). Children must not toggle fullscreen by accident, so a
- * pointer needs a long press (`FULLSCREEN_HOLD_MS`); it is faint and shows only a small
- * glyph, but the hit area is a full 64 px touch target. Keyboard and assistive-tech
+ * pointer needs a long press (`FULLSCREEN_HOLD_MS`). It is quiet and shows only a small
+ * glyph in `--color-control-quiet` (no opacity, so it keeps >= 3:1 non-text contrast,
+ * WCAG 1.4.11), but the hit area is a full 64 px touch target. Keyboard and assistive-tech
  * activation (a click without pointer, `detail === 0`) works at once. The fullscreen
  * request runs on pointer-up, because browsers only grant it inside a user gesture.
  * Hidden where fullscreen is unsupported or the board already runs as an installed app.
@@ -62,7 +63,7 @@ export function FullscreenControl(): React.JSX.Element | null {
         // Pointer clicks have detail >= 1 and are handled above; keyboard/AT have 0.
         if (event.detail === 0) void toggle();
       }}
-      className="text-text-muted min-h-touch min-w-touch focus-visible:outline-accent fixed right-0 bottom-0 z-10 flex touch-none items-center justify-center opacity-40 select-none focus-visible:opacity-100 focus-visible:outline-4 focus-visible:-outline-offset-4"
+      className="text-control-quiet min-h-touch min-w-touch focus-visible:outline-accent fixed right-0 bottom-0 z-10 flex touch-none items-center justify-center select-none focus-visible:outline-4 focus-visible:-outline-offset-4"
     >
       <svg
         aria-hidden="true"

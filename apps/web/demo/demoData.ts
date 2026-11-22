@@ -62,14 +62,41 @@ interface Slot {
   childIds?: string[];
   /** Length in minutes (default 60). */
   minutes?: number;
+  /** Takes place Monday to Friday only; on Saturday and Sunday {@link Slot.weekend} replaces it. */
+  weekend?: Omit<Slot, "weekend">;
 }
 
-/** One entry per day of a repeating week, indexed by `offset % 7` from today. */
+/** Saturday or Sunday; pure calendar math on the `YYYY-MM-DD` key, no time zone. */
+function isWeekend(date: string): boolean {
+  const [year, month, day] = date.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return weekday === 0 || weekday === 6;
+}
+
+/**
+ * One entry per day of a repeating week, indexed by `offset % 7` from today (so today is
+ * always the busy day). Weekday-only slots (kindergarten) carry a weekend replacement.
+ */
 const WEEK: Slot[][] = [
   // Today: events in every band; the early ones are over by midday.
   [
     { title: "Swimming", icon: "🏊", time: "07:30", childIds: ["mia"] },
-    { title: "Kindergarten", icon: "🏫", time: "08:30", childIds: ["ben"] },
+    {
+      title: "Kindergarten",
+      icon: "🏫",
+      time: "08:30",
+      childIds: ["ben"],
+      weekend: {
+        title: "Pancake breakfast",
+        icon: "🥞",
+        time: "08:30",
+        childIds: ["ben"],
+      },
+    },
     { title: "Lunch with Grandma", icon: "👵", time: "12:30" },
     { title: "Football", icon: "⚽", time: "15:00", childIds: ["ben"] },
     { title: "Piano", icon: "🎹", time: "16:30", childIds: ["mia"] },
@@ -109,7 +136,7 @@ const MEAL_WEEK: { slot: MealSlot; title: string; icon: string }[][] = [
     { slot: "breakfast", title: "Oatmeal with berries", icon: "🥣" },
     { slot: "lunch", title: "Spaghetti with tomato sauce", icon: "🍝" },
     { slot: "dinner", title: "Vegetable soup and bread", icon: "🍲" },
-    { slot: "unspecified", title: "Apple slices", icon: "🍎" },
+    { slot: "lunch", title: "Apple slices", icon: "🍎" },
   ],
   [
     { slot: "breakfast", title: "Toast with jam", icon: "🍞" },
@@ -202,7 +229,10 @@ export function demoAgenda(
   } as const;
   for (let offset = 0; offset < AGENDA_DAYS; offset += 1) {
     const date = addCalendarDays(today, offset);
-    (WEEK[offset % 7] ?? []).forEach((slot, index) => {
+    const weekend = isWeekend(date);
+    (WEEK[offset % 7] ?? []).forEach((template, index) => {
+      const slot =
+        weekend && template.weekend !== undefined ? template.weekend : template;
       const id = `demo-${String(offset)}-${String(index)}`;
       const childIds = slot.childIds ?? [];
       if (slot.time === null) {

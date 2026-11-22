@@ -111,6 +111,14 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
     (band) => [`--color-band-${band}`, "--color-surface", 1.05] as const,
   ),
   ["--color-on-notice", "--color-surface", TEXT_AA] as const,
+  // Fullscreen glyph (`text-control-quiet`, no opacity) in the bottom-right corner: on
+  // the page, a meal card or the weekend (Sunday) week column, WCAG 1.4.11.
+  ...[
+    "--color-surface",
+    "--color-surface-raised",
+    "--color-surface-sunken",
+    ...BANDS.map((band) => `--color-band-${band}`),
+  ].map((bg) => ["--color-control-quiet", bg, UI_AA] as const),
   ["--color-danger", "--color-surface", TEXT_AA] as const,
   ...CHILD_TOKENS.flatMap((child) => [
     ["--color-on-child", child, TEXT_AA] as const,

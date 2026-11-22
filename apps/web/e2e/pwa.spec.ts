@@ -76,6 +76,8 @@ test("is installable: manifest with token colours and icons, active service work
   context,
 }) => {
   await mockApi(context);
+  // Midday clock: the token comparison below expects the light (day) theme.
+  await fixClock(page);
   await page.goto("/");
 
   const manifestHref = await page

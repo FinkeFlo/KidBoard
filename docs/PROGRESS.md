@@ -29,6 +29,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-22 Burn-in protection | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; banner moved to bottom slot so the toggle never moves |
 | 2026-11-22 | T-23 Offline & stale UX end-to-end | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; fixed 401 wipe race (revert-cancel restored data); theme remembered before first paint |
 | 2026-11-22 | T-24 Visual screenshots | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; pre-existing 4-event band overflow found, moved to follow-up |
+| 2026-11-22 | M5 review fixes | Opus (builder-opus) | Opus (reviewer-opus) | 2 | Wake lock outside error boundary, fullscreen glyph token (≥3:1), dense day bands (+N, past hidden first), single error announcement, demo weekdays; orchestrator pinned pwa.spec clock (failed after 19:30 Berlin) |
 
 ## Escalations
 
@@ -49,6 +50,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 
 | Date | Milestone | Reviewer | Verdict | Notes |
 |---|---|---|---|---|
+| 2026-11-22 | M5 | Opus 5.5 (reviewer-opus) | PASS after fixes | Blocking: wake lock dropped during error fallback, fullscreen glyph contrast, missing T-23 escalation row; plus pre-existing day-band clipping. All fixed (2 re-review rounds). Context7 unreachable for the first review (installed sources checked). Follow-ups in T-25/T-27. |
 | 2026-11-22 | M4 | Opus 5.5 (reviewer-opus) | PASS after docs fix | Only finding: missing T-19 escalation row (added). CI + CodeQL green at 55c3587. Follow-ups folded into T-20/21/22/23/24. |
 | 2026-11-22 | M3 | Opus 5.5 (reviewer-opus) | PASS (round 2) | Round 1: offline-no-data text claimed a saved plan (fixed), countdown needs 31 days vs `/api/agenda` cap 14 (plan change in T-19), escalation rows missing (added). Context7 unreachable for reviewers. Follow-ups folded into T-18/20/21/23/28. |
 | 2026-11-22 | M2 | Opus 5.5 (reviewer-opus) | PASS (round 2) | Round 1 found date-only keys formatted a day early west of UTC (fixed in 815815d). Context7 unreachable for reviewers; APIs checked against installed sources. Follow-ups folded into T-15/16/17/21/23/25/27. |
