@@ -8,7 +8,8 @@ All files in this directory are **synthetic**. They are hand-written test data.
 
 ## Files
 
-Used by `apps/worker/src/ical/expandCalendar.test.ts` (loaded via Vite `?raw` imports).
+Used by `apps/worker/src/ical/expandCalendar.test.ts` and `apps/worker/src/app.test.ts`
+(loaded via Vite `?raw` imports).
 All fixtures use CRLF line endings, a Google-style header (`X-WR-TIMEZONE`) and a
 `VTIMEZONE` for `Europe/Berlin`.
 
@@ -23,3 +24,5 @@ All fixtures use CRLF line endings, a Google-style header (`X-WR-TIMEZONE`) and 
 | `runaway.ics`                 | unbounded `FREQ=MINUTELY` (iteration cap)                                                                                          |
 | `edge-cases.ics`              | all-day series, SEQUENCE, orphan override, RDATE-only + EXDATE, broken event                                                       |
 | `empty.ics` / `truncated.ics` | empty calendar / truncated (malformed) file                                                                                        |
+| `api-events.ics`              | API integration test: events feed around 2026-03-09 (child prefix, all-day, weekly series, outside window)                         |
+| `api-meals.ics`               | API integration test: meals feed (all-day with slot prefix, timed dinner, unspecified)                                             |

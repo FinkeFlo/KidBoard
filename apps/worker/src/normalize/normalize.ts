@@ -171,7 +171,8 @@ function compareText(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-function compareEvents(a: CalendarEvent, b: CalendarEvent): number {
+/** Order of {@link normalize}: all-day first, then start, title, id. */
+export function compareEvents(a: CalendarEvent, b: CalendarEvent): number {
   if (a.allDay !== b.allDay) {
     return a.allDay ? -1 : 1;
   }
@@ -182,7 +183,8 @@ function compareEvents(a: CalendarEvent, b: CalendarEvent): number {
   );
 }
 
-function compareMeals(a: Meal, b: Meal): number {
+/** Order of {@link normalize}: date, slot, title, id. */
+export function compareMeals(a: Meal, b: Meal): number {
   return (
     compareText(a.date, b.date) ||
     SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot] ||

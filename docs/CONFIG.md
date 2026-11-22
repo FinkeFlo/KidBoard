@@ -18,11 +18,11 @@ git-ignored). In production use `wrangler secret put NAME` or the hosting dashbo
 
 | Name                      | Required | Default            | Description                                                                                                                                      |
 | ------------------------- | -------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CAL_<ID>_URL`            | yes, one per calendar | -     | Secret iCal address of the calendar with id `<ID>` (upper case), e.g. `CAL_KINDER_URL`. Google Calendar: Settings > calendar > "Secret address in iCal format". Never commit it. |
-| `KIDBOARD_ACCESS_TOKEN`   | no       | unset (no check)   | If set, API requests must present this token as `Authorization: Bearer <token>` or `?key=<token>`.                                                                                                    |
+| `CAL_<ID>_URL`            | yes, one per calendar | -     | Secret iCal address of the calendar with id `<ID>` (upper case), e.g. `CAL_KINDER_URL`. Google Calendar: Settings > calendar > "Secret address in iCal format". `https://`, `http://` or `webcal://` (fetched as `https://`). Never commit it. A missing or invalid value marks only that calendar as `error`. |
+| `KIDBOARD_ACCESS_TOKEN`   | no       | unset (no check)   | If set (non-empty), API requests must present this token as `Authorization: Bearer <token>` or `?key=<token>`, else `401`. Prefer the header: `?key=` ends up in request logs and browser history. `/api/health` stays public (it only returns `{ "ok": true }`). |
 | `KIDBOARD_ALLOWED_ORIGINS`| no       | same origin only   | Comma-separated list of allowed CORS origins, e.g. `http://localhost:5173`.                                                                      |
-| `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh.                                                                                                          |
-| `KIDBOARD_CONFIG`         | no       | built-in defaults  | The JSON document described below (single line).                                                                                                 |
+| `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh (integer 60-86400; other values fall back to 3600 with a log warning). With the KV cache at least `ceil(calendars × 86400 / 500)` (KV Free plan write quota; 2 calendars → 346).                                    |
+| `KIDBOARD_CONFIG`         | yes      | -                  | The JSON document described below (single line). Missing or invalid: the API answers `500` and the log lists the validation errors.             |
 
 The root `.env.example` only lists tooling variables (e.g. `PLAYWRIGHT_CHROMIUM_EXECUTABLE`).
 
@@ -63,18 +63,49 @@ Notes: calendar `mia` and child `mia` are separate namespaces, so the same slug 
 for both. The final schema is defined in T-06 (`packages/shared`); if this document and the
 schema ever disagree, the schema wins and this page must be fixed.
 
+## API behavior
+
+| Endpoint                                | Notes                                                                                                                                                                                                                  |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`                       | Always `{ "ok": true }`; public, does not read the config or the feeds.                                                                                                                                               |
+| `GET /api/config`                       | Public part of `KIDBOARD_CONFIG` with defaults applied.                                                                                                                                                                |
+| `GET /api/agenda?from=YYYY-MM-DD&days=N` | `days` 1-14 (default 8), `from` default today in `timeZone`. `[from, from + days)` must lie within yesterday ... today + 31 days (the cached window `[today − 1, today + 32)`), else `400`. `200` if any calendar has data (`ok` or `stale`), `502` otherwise. |
+
+Feeds are fetched with a 10 s timeout and a 5 MB limit. Each calendar's normalized data
+for the window is stored once per refresh: it is fresh for `KIDBOARD_CACHE_TTL` and kept
+7 days as last-good, served with `status: "stale"` when the feed fails (an old entry may
+cover only part of the requested range). The store is the Workers KV namespace
+`KIDBOARD_CACHE`, which Wrangler creates automatically on the first deploy (declared
+without an id in `apps/worker/wrangler.jsonc`); without that binding the Cache API is
+used, which only works on a custom domain (not on `*.workers.dev`). All API responses
+carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and
+`Referrer-Policy: no-referrer`.
+
 ## Deutsche Kurzfassung
 
 **Geheimnisse** (iCal-URLs, optionales Zugriffstoken) liegen als Worker-Secrets bzw. lokal in
 `apps/worker/.dev.vars` (Vorlage: `.dev.vars.example`, nie einchecken). Pro Kalender gibt es
-`CAL_<ID>_URL` (ID in Großbuchstaben). Optional: `KIDBOARD_ACCESS_TOKEN`,
-`KIDBOARD_ALLOWED_ORIGINS`, `KIDBOARD_CACHE_TTL` (Sekunden, Standard 3600).
+`CAL_<ID>_URL` (ID in Großbuchstaben; fehlt sie, zeigt nur dieser Kalender einen Fehler).
+Optional: `KIDBOARD_ACCESS_TOKEN` (dann brauchen alle API-Aufrufe außer `/api/health` den
+Token als `Authorization: Bearer <token>` oder `?key=<token>`; besser den Header, denn `?key=`
+landet in Request-Logs; `/api/health` bleibt öffentlich und liefert nur `{ "ok": true }`),
+`KIDBOARD_ALLOWED_ORIGINS`, `KIDBOARD_CACHE_TTL` (Sekunden, 60-86400, Standard 3600; mit
+KV-Cache mindestens `Kalender × 86400 / 500`).
 
-**Nicht geheime Einstellungen** stehen als JSON in `KIDBOARD_CONFIG` (Vorlage:
-`config.example.json`). Alle Optionen außer `calendars` haben Standardwerte: `locale`
+**Nicht geheime Einstellungen** stehen als JSON in `KIDBOARD_CONFIG` (Pflicht; Vorlage:
+`config.example.json`; fehlerhaft → API antwortet `500`, das Log nennt die Fehler). Alle Optionen außer `calendars` haben Standardwerte: `locale`
 (`de`/`en`/`auto`), `timeZone` (IANA, Standard `Europe/Berlin`), `children` (id, name, color,
 avatar), `calendars` (id, kind `events`/`meals`, optional `childId`, `label`), `bands`
 (Tagesabschnitte, `HH:mm` aufsteigend), `nightMode` (an/aus, Start, Ende), `countdown.emojis`
 (Termine mit diesen Icons bekommen den "Noch x Mal schlafen"-Countdown), `refreshMinutes`,
 `autoReturnSeconds` (Rückkehr zur Tagesansicht nach Inaktivität). Die Tabelle oben nennt Typ,
 Standardwert und Beispiel jeder Option.
+
+**API:** `/api/agenda?from=JJJJ-MM-TT&days=N` liefert 1-14 Tage (Standard 8 ab heute) innerhalb
+von gestern bis heute + 31 Tage. Kalender werden mit 10 s Timeout und 5 MB Limit geladen und pro
+Kalender im KV-Namespace `KIDBOARD_CACHE` gespeichert (legt Wrangler beim ersten Deploy selbst an;
+ohne Binding: Cache API, die nur mit eigener Domain funktioniert): frisch für
+`KIDBOARD_CACHE_TTL`, danach bis 7 Tage als letzter guter Stand. Fällt ein Kalender aus, wird
+dieser Stand mit `status: "stale"` geliefert (ein alter Stand deckt evtl. nur einen Teil des
+Zeitraums ab), ohne Stand `error`. Antwort `200`, wenn mindestens ein Kalender Daten hat, sonst
+`502`.

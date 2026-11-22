@@ -17,9 +17,11 @@ CAL_ESSEN_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPL
 # Optional: comma-separated list of allowed CORS origins (default: same origin only).
 KIDBOARD_ALLOWED_ORIGINS="http://localhost:5173"
 
-# Optional: how long fetched feeds count as fresh, in seconds (default 3600).
+# Optional: how long fetched feeds count as fresh, in seconds (default 3600, 60-86400;
+# with the KV cache at least sources x 86400 / 500).
 KIDBOARD_CACHE_TTL=3600
 
-# Non-secret settings as one JSON document (shape: config.example.json, options:
-# docs/CONFIG.md). Paste it as a single line, or set it as a plain variable instead.
-# KIDBOARD_CONFIG='{"locale":"de","timeZone":"Europe/Berlin","calendars":[{"id":"kinder","kind":"events"}]}'
+# Required: non-secret settings as one JSON document (shape: config.example.json,
+# options: docs/CONFIG.md), as a single line. Its calendars match CAL_KINDER_URL and
+# CAL_ESSEN_URL above.
+KIDBOARD_CONFIG='{"locale":"de","timeZone":"Europe/Berlin","children":[{"id":"mia","name":"Mia","color":"#E4572E","avatar":"🦊"}],"calendars":[{"id":"kinder","kind":"events","label":"Kinder"},{"id":"essen","kind":"meals","label":"Essen"}]}'

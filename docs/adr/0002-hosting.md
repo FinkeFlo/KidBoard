@@ -26,3 +26,7 @@ Option 1 as the default. Option 3 is documented and supported through a thin ada
   origins (dev server) only.
 * Cache API is per data center and evictable; the client keeps its own persisted copy
   (ADR-0006).
+* The Workers Cache API only works on custom domains, not on `*.workers.dev`. The
+  source cache therefore uses an auto-provisioned KV namespace (`KIDBOARD_CACHE`,
+  declared without an id in `wrangler.jsonc`) and falls back to the Cache API when the
+  binding is missing (ADR-0006).

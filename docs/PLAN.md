@@ -168,7 +168,7 @@ operation, works offline with the last known state.
   4. Output sorted (all-day first, then by start, then title) and validated against the zod
      schema in tests.
 
-- [ ] **T-10 Worker API** (risk: **high** → Opus, deps: T-09)
+- [x] **T-10 Worker API** (risk: **high** → Opus, deps: T-09)
   Acceptance:
   1. `GET /api/agenda?from=YYYY-MM-DD&days=N` (1 ≤ N ≤ 14, default 8, `from` default today
      in config zone) returns `AgendaResponse`; input validated → 400 on bad input.

@@ -324,11 +324,17 @@ describe("performance on a realistic feed", () => {
     };
     const optimized = measure({});
     const full = measure(REFERENCE);
+    // The API's cached window (`[today - 1, today + 32)`, 33 days; see app.ts).
+    const apiWindow = { from: "2026-03-22", to: "2026-04-24" };
+    const optimizedApi = measure(apiWindow);
+    const fullApi = measure({ ...REFERENCE, ...apiWindow });
     // Recorded in ADR-0003. Generous bound: CI machines are slower than workstations.
     console.info(
-      `expandCalendar realistic feed: optimized ${optimized.toFixed(1)} ms, full ${full.toFixed(1)} ms`,
+      `expandCalendar realistic feed: 8 days optimized ${optimized.toFixed(1)} ms, full ${full.toFixed(1)} ms; 33 days optimized ${optimizedApi.toFixed(1)} ms, full ${fullApi.toFixed(1)} ms`,
     );
     expect(optimized).toBeLessThan(full / 3);
     expect(optimized).toBeLessThan(250);
+    expect(optimizedApi).toBeLessThan(fullApi / 3);
+    expect(optimizedApi).toBeLessThan(250);
   });
 });

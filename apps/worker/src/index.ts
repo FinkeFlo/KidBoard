@@ -1,11 +1,8 @@
-import { APP_NAME } from "@kidboard/shared";
-import { Hono } from "hono";
+import { createApp } from "./app";
+import type { Env } from "./env";
 
-const app = new Hono();
+const app = createApp();
 
-app.get("/api/health", (c) => {
-  c.header("X-App-Name", APP_NAME);
-  return c.json({ ok: true });
-});
-
-export default app;
+export default {
+  fetch: app.fetch,
+} satisfies ExportedHandler<Env>;

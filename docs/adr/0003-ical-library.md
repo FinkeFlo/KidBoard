@@ -63,12 +63,17 @@ Equivalence with full iteration is proven by a differential test
 5 zone variants × 6 DTSTARTs incl. DST days, with/without UNTIL, UTC EXDATEs and
 overrides, two windows); `fastForward.test.ts` pins which shapes are fast-forwarded.
 
-Measured on the realistic feed above (window of 8 days), best of three runs per call:
+Measured on the realistic feed above (window of 8 days unless noted), best of three runs per call:
 
 | Environment | Optimized | Full iteration |
 |---|---|---|
 | local workerd via `@cloudflare/vitest-plugin`, 4 vCPU dev container | 10–32 ms | 230–480 ms |
+| same, 33-day window of the API (`[today − 1, today + 32)`, T-10) | 21–26 ms | 264–331 ms |
 | Node 22, same machine | ≈ 9.5 ms | – |
+
+The 33-day API window costs about the same as 8 days (re-measured in T-10, three runs:
+8 days 22–31 ms vs 33 days 21–26 ms; workerd timers have 1 ms resolution): the cost is
+dominated by iterating series up to the window, not by the instances inside it.
 
 The spread comes from machine load (a reviewer run measured 22 ms vs 303 ms); the
 ratio is consistently 15–25×. Production CPU time on Cloudflare is not measured here.

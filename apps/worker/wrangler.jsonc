@@ -7,5 +7,8 @@
     "directory": "../web/dist",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
-  }
+  },
+  // Source cache (ADR-0006). No id on purpose: Wrangler provisions the namespace on the
+  // first deploy (also for dashboard/Git deploys); `wrangler dev` uses a local one.
+  "kv_namespaces": [{ "binding": "KIDBOARD_CACHE" }]
 }
