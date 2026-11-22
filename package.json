@@ -1,6 +1,6 @@
 {
   "name": "kidboard",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Icon-first family calendar and meal plan for a wall-mounted kiosk tablet.",
