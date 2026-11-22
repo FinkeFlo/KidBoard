@@ -184,6 +184,29 @@ describe("rescopeAgenda", () => {
     ).toBeUndefined();
   });
 
+  it("re-scopes a 31-day response to the next day as a 30-day seed (T-19)", () => {
+    const month = agendaFixture({
+      range: { from: "2026-11-22", to: "2026-12-23" },
+      events: [
+        timed(
+          "first",
+          "2026-11-22T09:00:00+01:00",
+          "2026-11-22T10:00:00+01:00",
+        ),
+        allDay("party", "2026-12-22", "2026-12-23"),
+      ],
+      meals: [meal("old", "2026-11-22"), meal("last", "2026-12-22")],
+    });
+    const seeded = rescopeAgenda(month, { from: "2026-11-23", days: 31 });
+    expect(seeded?.range).toEqual({ from: "2026-11-23", to: "2026-12-23" });
+    expect(seeded?.events.map((e) => e.id)).toEqual(["party"]);
+    expect(seeded?.meals.map((m) => m.id)).toEqual(["last"]);
+    // Six days later (offline, within 7 days) it still seeds, now 25 days long.
+    expect(
+      rescopeAgenda(month, { from: "2026-11-28", days: 31 })?.range,
+    ).toEqual({ from: "2026-11-28", to: "2026-12-23" });
+  });
+
   it("does not modify the cached agenda", () => {
     const original = cachedAgenda();
     rescopeAgenda(original, { from: "2026-11-23", days: 8 });

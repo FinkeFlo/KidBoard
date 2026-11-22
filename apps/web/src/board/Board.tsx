@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
+import { buildCountdown } from "../countdown/buildCountdown";
+import { CountdownBadge } from "../countdown/CountdownBadge";
 import {
   useApiErrorKind,
   useConfig,
@@ -36,6 +38,8 @@ const DEFAULT_AUTO_RETURN_SECONDS = 120;
  * any data a failure shows {@link DayError}. With data (also stale or offline) the board
  * stays up and only the discreet banner reports it.
  * The week view returns to the day view after `config.autoReturnSeconds` of inactivity.
+ * The "How many sleeps?" countdown (T-19) sits in the header: full on the week view, a
+ * compact badge on the day view; it is built from the same agenda query (31 days).
  */
 export function Board(): React.JSX.Element {
   const config = useConfig().data;
@@ -62,6 +66,7 @@ export function Board(): React.JSX.Element {
         : {
             day: buildDayModel(data, config, today, now),
             week: buildWeekModel(data, config, today, now),
+            countdown: buildCountdown(data.events, today, config.timeZone),
           },
     [config, today, data, now],
   );
@@ -77,6 +82,14 @@ export function Board(): React.JSX.Element {
       format={format}
       view={view}
       onViewChange={setView}
+      countdown={
+        models.countdown === undefined ? undefined : (
+          <CountdownBadge
+            countdown={models.countdown}
+            variant={view === "day" ? "compact" : "full"}
+          />
+        )
+      }
     >
       {view === "day" ? (
         <DayBoard

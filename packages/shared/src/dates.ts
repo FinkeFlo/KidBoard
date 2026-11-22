@@ -78,3 +78,27 @@ export function addCalendarDays(date: string, days: number): string {
   shifted.setUTCFullYear(year, month - 1, day + days);
   return formatUtcDate(shifted);
 }
+
+function utcDayNumber(date: string): number {
+  if (!isDateKey(date)) {
+    throw new RangeError("date must be YYYY-MM-DD");
+  }
+  const [year, month, day] = date.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
+  const at = new Date(0);
+  at.setUTCFullYear(year, month - 1, day);
+  return Math.round(at.getTime() / 86_400_000);
+}
+
+/**
+ * Calendar days from `from` to `to` (both `YYYY-MM-DD`): positive if `to` is later,
+ * 0 for the same date. Pure calendar arithmetic (UTC day numbers), so a DST change in
+ * between never makes a day 23 or 25 hours long. Throws a `RangeError` for a malformed
+ * date.
+ */
+export function calendarDaysBetween(from: string, to: string): number {
+  return utcDayNumber(to) - utcDayNumber(from);
+}

@@ -991,7 +991,8 @@ describe("CORS", () => {
 describe("GET /api/agenda – input validation", () => {
   it.each([
     ["?days=0", "days"],
-    ["?days=15", "days"],
+    ["?days=32", "days"],
+    ["?days=100", "days"],
     ["?days=abc", "days"],
     ["?days=1.5", "days"],
     ["?days=-1", "days"],
@@ -1015,6 +1016,8 @@ describe("GET /api/agenda – input validation", () => {
     ["?from=2026-03-07", "before the cached window"],
     ["?from=2026-03-28&days=14", "past the cached window"],
     ["?from=2026-04-05&days=8", "past the cached window"],
+    ["?from=2026-03-07&days=31", "31 days from the day before the window"],
+    ["?from=2026-03-11&days=31", "31 days from today + 2"],
     ["?from=2027-01-01&days=1", "far future"],
   ])("rejects %s (%s) with 400", async (query) => {
     const response = await harness().call(`/api/agenda${query}`);
@@ -1025,13 +1028,30 @@ describe("GET /api/agenda – input validation", () => {
     });
   });
 
-  it("accepts the window edges and the maximum of 14 days", async () => {
+  it("accepts the window edges and the maximum of 31 days", async () => {
     serveIcs(KINDER_URL, eventsIcs);
     serveIcs(ESSEN_URL, mealsIcs);
     const h = harness();
-    expect((await agenda(h, "?days=14")).body.range).toEqual({
+    // The client's request (T-19): today plus the 30 days the countdown looks ahead.
+    const month = await agenda(h, "?days=31");
+    expect(month.status).toBe(200);
+    expect(month.body.range).toEqual({ from: "2026-03-09", to: "2026-04-09" });
+    // Covers the whole range, across the DST change (2026-03-29).
+    expect(month.body.events.map((e) => e.start)).toContain(
+      "2026-04-06T08:00:00+02:00",
+    );
+    expect((await agenda(h, "?from=2026-03-09&days=31")).body.range).toEqual({
       from: "2026-03-09",
-      to: "2026-03-23",
+      to: "2026-04-09",
+    });
+    // A client clock a day off around midnight still fits the window.
+    expect((await agenda(h, "?from=2026-03-08&days=31")).body.range).toEqual({
+      from: "2026-03-08",
+      to: "2026-04-08",
+    });
+    expect((await agenda(h, "?from=2026-03-10&days=31")).body.range).toEqual({
+      from: "2026-03-10",
+      to: "2026-04-10",
     });
     expect((await agenda(h, "?from=2026-03-08&days=14")).status).toBe(200);
     expect((await agenda(h, "?from=2026-04-09&days=1")).body.range).toEqual({

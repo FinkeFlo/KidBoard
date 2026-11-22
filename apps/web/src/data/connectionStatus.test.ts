@@ -6,6 +6,7 @@ import {
   isAgendaIncomplete,
   type QueryHealth,
 } from "./connectionStatus";
+import { AGENDA_DAYS } from "./queries";
 import { queryKeys } from "./queryKeys";
 import { agendaFixture } from "./testing.test-utils";
 
@@ -149,6 +150,19 @@ describe("isAgendaIncomplete", () => {
 
   it("is true for a midnight seed (dataUpdatedAt 0), even when it covers all days", () => {
     expect(isAgendaIncomplete(key, covering("2026-12-01"), 0)).toBe(true);
+  });
+
+  it("with the board's 31 days (T-19): a full response is complete, the 30-day seed after midnight is not", () => {
+    const month = queryKeys.agenda({ from: "2026-11-23", days: AGENDA_DAYS });
+    expect(AGENDA_DAYS).toBe(31);
+    expect(isAgendaIncomplete(month, covering("2026-12-24"), FETCHED)).toBe(
+      false,
+    );
+    // Yesterday's 31-day response re-scoped to today ends one day early.
+    expect(isAgendaIncomplete(month, covering("2026-12-23"), FETCHED)).toBe(
+      true,
+    );
+    expect(isAgendaIncomplete(month, covering("2026-12-24"), 0)).toBe(true);
   });
 
   it("is false without data or for keys and data of another shape", () => {

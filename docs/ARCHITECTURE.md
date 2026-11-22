@@ -169,7 +169,8 @@ Order of operations on the raw `SUMMARY`:
 * Recurrences are fast-forwarded where provably equivalent and capped per series and
   per feed (CPU budget, ADR-0003); a hit cap is reported as `truncated`.
 * Day boundaries, bands (morning/midday/evening) and "nights until" are computed with
-  `@date-fns/tz` (`TZDate`) in the configured zone, not the device zone.
+  `@date-fns/tz` (`TZDate`, `tzOffset`) in the configured zone, not the device zone;
+  "nights until" is the calendar-day difference of the date keys (T-19).
 * "Today" (`YYYY-MM-DD` in the configured zone) comes from one shared helper,
   `todayInZone` in `packages/shared` (`@date-fns/tz` `tzOffset`), used by the worker
   window and the client's `range.from`, so both always name the same day.
@@ -212,7 +213,8 @@ invalid response never replaces shown or persisted data; with data it shows as `
 without data as `error`. A 200 agenda that is worker-stale or has a failed source is
 `stale` too. A 401 wipes all calendar data (memory and storage) and the stored token:
 status `error`, `useApiErrorKind()` = `unauthorized`. Persisted queries older than 7 days
-are dropped. The config `locale` is applied to i18n as soon as the config is
+are dropped, and so are agendas superseded by a later-fetched one that reaches at least
+as far (T-19, ADR-0006). The config `locale` is applied to i18n as soon as the config is
 known (fetched or restored). Rules in detail: [ADR-0006](adr/0006-caching-offline.md).
 
 ### Clock & day rollover (T-16)
@@ -244,7 +246,9 @@ families in other zones and then jump. In practice the gate only applies to the 
 first visit (or after 7 days without data): the persisted config is restored at
 startup, also offline.
 
-**Rollover:** `useTodayAgenda(days = 8)` = config zone → `useToday` → `useAgenda({ from:
+**Rollover:** `useTodayAgenda(days = AGENDA_DAYS)` (31: today plus the 30 days the
+countdown looks ahead, T-19; day, week and countdown share this one query, its status
+and its offline seed) = config zone → `useToday` → `useAgenda({ from:
 today, days })`. At midnight the new `from` is a new query key, fetched at once. Until
 that succeeds the new query is seeded (TanStack `initialData`, `initialDataUpdatedAt: 0`)
 from the most recent cached agenda whose range covers the new day, re-scoped to the new
@@ -270,7 +274,7 @@ day (offline) is seeded from the restored agenda.
 ### Board: day & week view (T-18)
 
 `apps/web/src/board/`: `Board` loads config and agenda, then renders `BoardFrame`
-(`<main>`, header with today's date, `DiscreetStatusBanner`, `ChildLegend` and the
+(`<main>`, header with today's date, the countdown (T-19), `DiscreetStatusBanner`, `ChildLegend` and the
 pictorial `ViewToggle` ☀️/🗓️) around `DayBoard` or `WeekBoard`. View state is local to
 `Board` (day on start). `useAutoReturn` switches back to the day view after
 `config.autoReturnSeconds` (default 120) without `pointerdown`/`pointermove`/`touchstart`/
@@ -283,15 +287,43 @@ screen, one glance). **Most important events** (they get the 3 icon slots, the r
 becomes "+N"): 1. `countdown` events, 2. all-day events, 3. timed events by start (a
 multi-day event continuing from an earlier day counts as the earliest), ties by title.
 Weekend = Saturday/Sunday of the date key (zone-independent calendar math).
-The week fits the existing 8-day agenda query (`AGENDA_DAYS`, raised by T-19).
+The week uses the board's one agenda query (`AGENDA_DAYS` = 31 since T-19).
+
+### Countdown "How many sleeps?" (T-19)
+
+`apps/web/src/countdown/`: `buildCountdown(events, today, zone)` (pure) and
+`CountdownBadge`. Rules:
+
+* Candidates: events with `countdown: true` whose **start date** (config zone; all-day:
+  the date key) is today or up to 30 nights ahead (`COUNTDOWN_MAX_NIGHTS`); the nearest
+  wins. Nights = calendar-day difference (`calendarDaysBetween` in `packages/shared`,
+  UTC day numbers of the date keys), so 23 h / 25 h DST days still count as one night.
+* Today → 0 nights → "today!" state, for the whole start day (also after a timed event
+  has ended); tomorrow → 1 🌙.
+* **In progress vs. future:** an event that started on an earlier day is under way, not
+  awaited. It is skipped and the next upcoming countdown event is shown (a two-week
+  holiday does not read "today!" for two weeks).
+* **Several countdowns on the same (nearest) day** share one countdown: all of them are
+  named in the label (localized list), the badge shows up to 3 of their icons; order:
+  all-day first, then start time, then title.
+* Rendering: ≤ 14 nights one 🌙 each, in rows of 7 (a week per row); beyond, one 🌙 and
+  "×N". Week view: `full` variant in the header; day view: `compact` badge (smaller)
+  in the same place. The visuals are `aria-hidden`; a region "How many sleeps?" carries
+  a localized label with i18next plurals (`countdown.nights_one/_other`). Static, no
+  animation (nothing to reduce for `prefers-reduced-motion`).
+* Data: the countdown reads the board's agenda (31 days). After midnight without a new
+  response the seed covers 30 days (one day short, status `stale`); the countdown works
+  on it and only misses events on the 30th night ahead until the real response lands.
 
 ### Worker API details (T-10)
 
 - **Window:** per source the worker expands and normalizes a fixed rolling window
   `[today − 1, today + 32)` (config zone; 32 days ahead so countdowns up to 30 days
   ahead are covered, T-19) once per TTL and caches the result; `/api/agenda` only
-  filters it. `[from, from + days)` must lie inside the window (`days` ≤ 14), otherwise
-  `400`. No on-demand expansion outside it (CPU budget, ADR-0003).
+  filters it. `[from, from + days)` must lie inside the window (`days` ≤ 31 – was 14,
+  raised to 31 in T-19 –, default 8), otherwise `400`. A 31-day range fits for every
+  `from` from `today − 1` to `today + 1` (e.g. `from` = today, `days` = 31 ends at
+  `today + 31`); anything reaching past `today + 32` is a `400`. No on-demand expansion outside it (CPU budget, ADR-0003).
 - **Storage (ADR-0006):** one JSON entry per source (validated with the shared zod
   schemas on read) under the key `v1/source/<sourceId>/<hash>`, kept 7 days. It is
   *fresh* while it was expanded for the current window and is younger than the TTL, and

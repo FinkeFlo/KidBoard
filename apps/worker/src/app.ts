@@ -22,8 +22,13 @@ import { logError, logWarn } from "./log";
 
 /** Default `days` of `/api/agenda`. */
 export const DEFAULT_DAYS = 8;
-/** Maximum `days` of `/api/agenda`. */
-export const MAX_DAYS = 14;
+/**
+ * Maximum `days` of `/api/agenda`: 31 = today plus the 30 days the countdown looks
+ * ahead (T-19), so day, week and countdown share one request. A 31-day range fits the
+ * window for every `from` from `today - 1` to `today + 1` (a client clock up to a day
+ * off around midnight still gets an answer); further out it is a 400.
+ */
+export const MAX_DAYS = 31;
 /**
  * Cached window per source, relative to today in the config zone: `[today - 1,
  * today + 32)`. Expansion runs once per window and TTL; requests are served by

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   addCalendarDays,
+  calendarDaysBetween,
   dateKeyInZone,
   isDateKey,
   todayInZone,
@@ -115,5 +116,41 @@ describe("isDateKey", () => {
     expect(isDateKey("2026-02-29")).toBe(false);
     expect(isDateKey("2026-13-01")).toBe(false);
     expect(isDateKey("2026-11-22T00:00:00Z")).toBe(false);
+  });
+});
+
+describe("calendarDaysBetween", () => {
+  it("counts calendar days, negative backwards, 0 for the same day", () => {
+    expect(calendarDaysBetween("2026-11-22", "2026-11-22")).toBe(0);
+    expect(calendarDaysBetween("2026-11-22", "2026-11-23")).toBe(1);
+    expect(calendarDaysBetween("2026-11-23", "2026-11-22")).toBe(-1);
+    expect(calendarDaysBetween("2026-11-22", "2026-12-22")).toBe(30);
+    expect(calendarDaysBetween("2026-12-31", "2027-01-01")).toBe(1);
+    expect(calendarDaysBetween("2028-02-28", "2028-03-01")).toBe(2);
+    expect(calendarDaysBetween("0099-12-31", "0100-01-01")).toBe(1);
+  });
+
+  it("ignores DST changes in between (23 h and 25 h days count as one day)", () => {
+    // Europe/Berlin springs forward on 2026-03-29 and falls back on 2026-10-25.
+    expect(calendarDaysBetween("2026-03-28", "2026-03-30")).toBe(2);
+    expect(calendarDaysBetween("2026-10-24", "2026-10-26")).toBe(2);
+    expect(calendarDaysBetween("2026-03-01", "2026-11-01")).toBe(245);
+  });
+
+  it("is the inverse of addCalendarDays", () => {
+    for (const days of [-40, -1, 0, 1, 13, 14, 15, 30, 31, 400]) {
+      expect(
+        calendarDaysBetween("2026-03-20", addCalendarDays("2026-03-20", days)),
+      ).toBe(days);
+    }
+  });
+
+  it("rejects malformed or impossible dates", () => {
+    expect(() => calendarDaysBetween("2026-02-30", "2026-03-01")).toThrow(
+      RangeError,
+    );
+    expect(() => calendarDaysBetween("2026-03-01", "tomorrow")).toThrow(
+      RangeError,
+    );
   });
 });

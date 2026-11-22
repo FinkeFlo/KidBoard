@@ -50,7 +50,7 @@ function timed(id: string, start: string, end: string): CalendarEvent {
   };
 }
 
-/** Agenda the worker would send for `[from, from + 8)`. */
+/** Agenda the worker would send for `[from, from + 31)` (`AGENDA_DAYS`). */
 function agendaFrom(from: string, to: string, title: string): AgendaResponse {
   return agendaFixture({
     range: { from, to },
@@ -65,8 +65,8 @@ function agendaFrom(from: string, to: string, title: string): AgendaResponse {
   });
 }
 
-const DAY1 = agendaFrom("2026-11-22", "2026-11-30", "Swimming");
-const DAY2 = agendaFrom("2026-11-23", "2026-12-01", "Football");
+const DAY1 = agendaFrom("2026-11-22", "2026-12-23", "Swimming");
+const DAY2 = agendaFrom("2026-11-23", "2026-12-24", "Football");
 
 interface Board {
   today: string | undefined;
@@ -184,7 +184,7 @@ afterEach(() => {
 describe("midnight rollover", () => {
   it("online: fetches the new range at midnight, never showing loading or empty", async () => {
     const board = await readyBeforeMidnight();
-    expect(agendaUrls()).toEqual(["/api/agenda?from=2026-11-22&days=8"]);
+    expect(agendaUrls()).toEqual(["/api/agenda?from=2026-11-22&days=31"]);
 
     const mark = await passMidnight(board);
     await waitFor(() => {
@@ -192,8 +192,8 @@ describe("midnight rollover", () => {
       expect(board.result.current.agenda.isFetching).toBe(false);
     });
     expect(agendaUrls()).toEqual([
-      "/api/agenda?from=2026-11-22&days=8",
-      "/api/agenda?from=2026-11-23&days=8",
+      "/api/agenda?from=2026-11-22&days=31",
+      "/api/agenda?from=2026-11-23&days=31",
     ]);
     expect(
       board.result.current.agenda.data?.events.map((e) => e.title),
@@ -231,7 +231,7 @@ describe("midnight rollover", () => {
     const shown = board.result.current;
     expect(shown.agenda.data?.range).toEqual({
       from: "2026-11-23",
-      to: "2026-11-30",
+      to: "2026-12-23",
     });
     expect(shown.status).toBe("stale");
     // The very first render of the new day still carries the old status: the status
@@ -246,7 +246,7 @@ describe("midnight rollover", () => {
 
     release?.();
     await waitFor(() => {
-      expect(board.result.current.agenda.data?.range.to).toBe("2026-12-01");
+      expect(board.result.current.agenda.data?.range.to).toBe("2026-12-24");
     });
     await waitFor(() => {
       expect(board.result.current.status).toBe("ready");
@@ -270,7 +270,7 @@ describe("midnight rollover", () => {
     expect(status).toBe("offline");
     expect(agenda.data?.range).toEqual({
       from: "2026-11-23",
-      to: "2026-11-30",
+      to: "2026-12-23",
     });
     // Only what overlaps the new range is left.
     expect(agenda.data?.events.map((e) => e.title)).toEqual(["Swimming"]);
@@ -289,7 +289,7 @@ describe("midnight rollover", () => {
       ).toEqual(["Football"]);
     });
     expect(board.result.current.status).toBe("ready");
-    expect(agendaUrls()[1]).toBe("/api/agenda?from=2026-11-23&days=8");
+    expect(agendaUrls()[1]).toBe("/api/agenda?from=2026-11-23&days=31");
   });
 
   it("502 right after midnight: keeps the seed and reports stale", async () => {
@@ -299,7 +299,7 @@ describe("midnight rollover", () => {
       {
         status: 502,
         body: agendaFixture({
-          range: { from: "2026-11-23", to: "2026-12-01" },
+          range: { from: "2026-11-23", to: "2026-12-24" },
           sources: [{ id: "family", status: "error" }],
           events: [],
         }),
@@ -354,7 +354,7 @@ describe("midnight rollover", () => {
       expect(board.result.current.status).toBe("error");
     });
     // The new range was requested (seeded meanwhile) and answered with 401.
-    expect(agendaUrls()[1]).toBe("/api/agenda?from=2026-11-23&days=8");
+    expect(agendaUrls()[1]).toBe("/api/agenda?from=2026-11-23&days=31");
     expect(board.result.current.errorKind).toBe("unauthorized");
     expect(board.result.current.agenda.data).toBeUndefined();
     await act(() => new Promise((resolve) => setTimeout(resolve, 1200)));
@@ -477,7 +477,7 @@ describe("before the config has loaded", () => {
       status: 200,
       body: agendaFixture({
         timeZone: "Asia/Tokyo",
-        range: { from: "2026-11-23", to: "2026-12-01" },
+        range: { from: "2026-11-23", to: "2026-12-24" },
       }),
     });
     const board = renderBoard();
@@ -485,6 +485,6 @@ describe("before the config has loaded", () => {
       expect(board.result.current.status).toBe("ready");
     });
     expect(board.result.current.today).toBe("2026-11-23");
-    expect(agendaUrls()).toEqual(["/api/agenda?from=2026-11-23&days=8"]);
+    expect(agendaUrls()).toEqual(["/api/agenda?from=2026-11-23&days=31"]);
   });
 });
