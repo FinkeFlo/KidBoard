@@ -476,7 +476,7 @@ not address. These rules apply to every M5b task:
   `pnpm audit --prod` without high/critical; release-please release `v1.0.0` published;
   branch-protection settings documented/applied; `CLAUDE.md` switched to PR workflow;
   M7+ plan refined. (M3 follow-up) release-please `initial-version` set (e.g. `0.1.0`) so it never proposes
-  1.0.0 early; maintainer enables "Allow GitHub Actions to create and approve pull requests".
+  1.0.0 early; maintainer enables "Allow GitHub Actions to create and approve pull requests". (Pre-release) release-please runs only on manual dispatch; the maintainer cuts the release, then the `push` trigger is restored.
 
 ## M7+ – Later (not in MVP)
 
@@ -493,6 +493,7 @@ not address. These rules apply to every M5b task:
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | release-please switched to manual dispatch; early 1.0.0 release PR closed by the maintainer, who cuts the release himself | The automatic release PR proposed 1.0.0 too early |
 | 2026-11-22 | T-26 (Vercel) removed from v1.0.0, tracked as issue #3; T-27 no longer depends on it | Maintainer decision: Cloudflare is the only deploy target for v1.0.0 |
 | 2026-11-22 | New T-27a: mandatory UI/UX dummy test loop with three agents (Haiku, Sonnet, Opus) before the release, fix + Sonnet re-check until clean | Maintainer request before v1.0.0 |
 | 2026-11-22 | M5b refined after a design × built-app comparison (child UX, tech, a11y/kiosk): merge rules 1–6, new T-29a (stable test hooks), T-30 split into T-30a (model/layout) and T-30b (UI + rail), acceptance criteria extended; T-25 kept as done (built before the hand-off landed) | Keep what the built app already solved (one symbol per meaning, no silent hiding, AA for past events, kiosk/boundary behaviour) while adopting the new look |
