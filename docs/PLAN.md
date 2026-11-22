@@ -456,7 +456,7 @@ not address. These rules apply to every M5b task:
 - [ ] **T-27 Documentation** (risk: low, deps: T-25)
   Acceptance: README EN + DE complete: features, screenshots, Google Calendar setup (where
   to find the secret iCal address, creating separate calendars, sharing caveats), title
-  conventions with examples, configuration reference, deploy (Cloudflare + Vercel), kiosk
+  conventions with examples, configuration reference, deploy (Cloudflare), kiosk
   tips (Fully Kiosk settings, PWA install, screen dimming), troubleshooting, privacy note. (M2 follow-up) CONFIG.md EN + DE documents the tablet token flow: open `/?key=` once,
   token stored + stripped from URL, forgotten after a 401. (M5 follow-up) Kiosk tips explain the hidden
   bottom-right fullscreen control (press and hold), wake-lock behaviour and its limits (battery
