@@ -1,5 +1,5 @@
-import { DayView } from "./day/DayView";
+import { Board } from "./board/Board";
 
 export function App(): React.JSX.Element {
-  return <DayView />;
+  return <Board />;
 }

@@ -10,7 +10,8 @@
       "past": "Already over",
       "current": "Happening now"
     },
-    "forEveryone": "For everyone"
+    "forEveryone": "For everyone",
+    "continues": "Continues"
   },
   "meal": {
     "slot": {
@@ -46,5 +47,17 @@
       "hint": "KidBoard keeps trying on its own. A grown-up can check the details below.",
       "offline": "No internet and no saved plan yet."
     }
+  },
+  "board": {
+    "viewGroup": "View",
+    "day": "Day view",
+    "week": "Week view"
+  },
+  "week": {
+    "label": "Next seven days",
+    "more": "{{count}} more",
+    "meals": "Meals",
+    "moreBadge": "+{{count}}",
+    "mealEntry": "{{slot}}: {{title}}"
   }
 }

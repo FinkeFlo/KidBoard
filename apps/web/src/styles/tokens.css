@@ -34,6 +34,9 @@
   --text-heading--line-height: 2.75rem;
   --text-display: 3.5rem;
   --text-display--line-height: 1;
+  /* Hero icons of the week columns (icon-first board). */
+  --text-icon: 4.5rem;
+  --text-icon--line-height: 1;
 
   /* Spacing: base unit (p-4 = 1rem, scales with the root size) plus named steps. */
   --spacing: 0.25rem;

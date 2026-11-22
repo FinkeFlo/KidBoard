@@ -154,4 +154,40 @@ describe("EventTile", () => {
       screen.getByRole("article").style.getPropertyValue("--child-color"),
     ).toBe("var(--color-border)");
   });
+
+  it("shows a continues hint instead of the original start for a continuing event", () => {
+    render(
+      <EventTile
+        event={eventFixture({ start: "2026-11-21T20:00:00+01:00" })}
+        childList={[]}
+        format={format}
+        continues
+      />,
+    );
+    expect(screen.getByText(en.event.continues)).toBeInTheDocument();
+    expect(screen.queryByText("8:00 PM")).toBeNull();
+  });
+
+  it("announces 'for everyone' when no id of the event is a configured child", () => {
+    render(
+      <EventTile
+        event={eventFixture({ childIds: ["ghost"] })}
+        childList={[MIA]}
+        format={format}
+      />,
+    );
+    expect(screen.getByText(en.event.forEveryone)).toHaveClass("sr-only");
+    expect(screen.queryByRole("list")).toBeNull();
+  });
+
+  it("does not announce 'for everyone' when at least one configured child is shown", () => {
+    render(
+      <EventTile
+        event={eventFixture({ childIds: ["ghost", "mia"] })}
+        childList={[MIA]}
+        format={format}
+      />,
+    );
+    expect(screen.queryByText(en.event.forEveryone)).toBeNull();
+  });
 });

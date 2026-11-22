@@ -44,11 +44,19 @@ export interface MockEvent {
   /** `HH:mm` on today, or `null` for an all-day event. */
   time: string | null;
   childIds?: string[];
+  /** Days after today (default 0). */
+  day?: number;
+  countdown?: boolean;
+}
+
+/** `2026-11-22` plus `offset` calendar days (pure calendar math). */
+export function dateOf(offset: number): string {
+  return new Date(Date.UTC(2026, 10, 22 + offset)).toISOString().slice(0, 10);
 }
 
 export function agenda(
   events: MockEvent[],
-  meals: { slot: string; title: string; icon: string }[],
+  meals: { slot: string; title: string; icon: string; day?: number }[],
 ): unknown {
   return {
     generatedAt: NOW,
@@ -64,14 +72,15 @@ export function agenda(
         icon: event.icon,
         iconIsFallback: false,
         childIds: event.childIds ?? [],
-        countdown: false,
+        countdown: event.countdown ?? false,
       };
+      const day = dateOf(event.day ?? 0);
       if (event.time === null) {
         return {
           ...base,
           allDay: true,
-          start: "2026-11-22",
-          end: "2026-11-23",
+          start: day,
+          end: dateOf((event.day ?? 0) + 1),
         };
       }
       // One hour long, on today.
@@ -80,14 +89,14 @@ export function agenda(
       return {
         ...base,
         allDay: false,
-        start: `2026-11-22T${event.time}:00+01:00`,
-        end: `2026-11-22T${endHour}:${minute}:00+01:00`,
+        start: `${day}T${event.time}:00+01:00`,
+        end: `${day}T${endHour}:${minute}:00+01:00`,
       };
     }),
     meals: meals.map((meal, index) => ({
       id: `m${String(index)}`,
       sourceId: "meals",
-      date: "2026-11-22",
+      date: dateOf(meal.day ?? 0),
       slot: meal.slot,
       title: meal.title,
       icon: meal.icon,

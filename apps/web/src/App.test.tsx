@@ -3,13 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 
-vi.mock("./day/DayView", () => ({
-  DayView: (): React.JSX.Element => <main>day view</main>,
+vi.mock("./board/Board", () => ({
+  Board: (): React.JSX.Element => <main>board</main>,
 }));
 
 describe("App", () => {
-  it("renders the day view", () => {
+  it("renders the board", () => {
     render(<App />);
-    expect(screen.getByRole("main")).toHaveTextContent("day view");
+    expect(screen.getByRole("main")).toHaveTextContent("board");
   });
 });

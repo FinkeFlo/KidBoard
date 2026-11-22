@@ -267,6 +267,24 @@ is refetched regardless of `staleTime` and never persisted (the persister's per-
 persisted cache to be restored before it creates the real query, so a reload on a later
 day (offline) is seeded from the restored agenda.
 
+### Board: day & week view (T-18)
+
+`apps/web/src/board/`: `Board` loads config and agenda, then renders `BoardFrame`
+(`<main>`, header with today's date, `DiscreetStatusBanner`, `ChildLegend` and the
+pictorial `ViewToggle` ☀️/🗓️) around `DayBoard` or `WeekBoard`. View state is local to
+`Board` (day on start). `useAutoReturn` switches back to the day view after
+`config.autoReturnSeconds` (default 120) without `pointerdown`/`pointermove`/`touchstart`/
+`keydown`; every activity restarts the countdown.
+
+`apps/web/src/week/buildWeekModel.ts` (pure): 7 columns from today in the config zone
+(`addCalendarDays`), each built with `buildDayModel(agenda, config, date, now)`, so day
+and week agree on what belongs to a day. Meals are part of the columns (no extra
+screen, one glance). **Most important events** (they get the 3 icon slots, the rest
+becomes "+N"): 1. `countdown` events, 2. all-day events, 3. timed events by start (a
+multi-day event continuing from an earlier day counts as the earliest), ties by title.
+Weekend = Saturday/Sunday of the date key (zone-independent calendar math).
+The week fits the existing 8-day agenda query (`AGENDA_DAYS`, raised by T-19).
+
 ### Worker API details (T-10)
 
 - **Window:** per source the worker expands and normalizes a fixed rolling window
