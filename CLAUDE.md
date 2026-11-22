@@ -33,7 +33,9 @@ pnpm build          # all packages
 ```
 
 Quality gate before every commit: `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build`
-(`pnpm test:e2e` needs `pnpm build` first).
+(`pnpm test:e2e` needs `pnpm build` first). Also run gitleaks before pushing when tests contain
+secret-like strings (`gitleaks git . --redact`); CI fails on any finding. Synthetic test markers should be
+low-entropy (e.g. `TESTONLY-not-a-secret`); true false positives go into `.gitleaksignore`.
 
 ## Non-negotiable rules
 

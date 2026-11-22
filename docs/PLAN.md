@@ -206,13 +206,15 @@ operation, works offline with the last known state.
   4. Layout scales fluidly between 1280×800 and 2000×1200 without scrolling (root font size
      from viewport); `prefers-reduced-motion` disables transitions.
   5. App-level error boundary with friendly fallback.
+  7. `pnpm dev` works on a fresh clone (worker needs `apps/web/dist`: predev build or placeholder; documented).
   6. Split `apps/web` tsconfig: browser code without Node types; a separate
      `tsconfig.node.json` for vite/vitest/playwright configs and e2e.
 
 - [ ] **T-12 i18n** (risk: low, deps: T-11)
   Acceptance:
   1. i18next + react-i18next, bundled `de` / `en` resources, typed keys.
-  2. Language: config `locale` → else browser language → else `de`; `<html lang>` updated.
+  2. Language: config `locale` → else browser language → else `de`; `<html lang>` updated;
+     docs/CONFIG.md `auto` fallback aligned.
   3. Test: both locales have identical key sets and no empty values.
   4. Date/time formatting helpers use the active locale and configured time zone.
   5. Lint/test guard against hard-coded UI strings in JSX (e.g. `i18next/no-literal-string`
@@ -227,6 +229,7 @@ operation, works offline with the last known state.
      `config.refreshMinutes`, refetch on focus/reconnect).
   3. `useAgenda(range)` and `useConnectionStatus()` exposing
      `loading | ready | offline | stale | error` deterministically (unit tests for each).
+  5. Client request timeout > worker upstream timeout + margin (≈ 11 s), so stale data can arrive.
   4. Tests with MSW or fetch mocks: first load, refetch, offline with persisted data,
      schema-invalid response treated as error without wiping persisted data.
 
@@ -321,7 +324,8 @@ operation, works offline with the last known state.
   refetch.
 
 - [ ] **T-24 Visual screenshots** (risk: medium, deps: T-21, T-23)
-  Acceptance: Playwright generates screenshots of day + week view at 1280×800 and
+  Acceptance: a dev/screenshot fixture with dates relative to "today" (or recurring) exists so manual dev
+  and screenshots show realistic data; Playwright generates screenshots of day + week view at 1280×800 and
   2000×1200 in light and night mode with fixture data (Mia 🦊 / Ben 🐻 example) into
   `docs/screenshots/`; a CI job runs them (artifact upload), committed copies are used in
   the README.
@@ -367,6 +371,7 @@ operation, works offline with the last known state.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | M1 review follow-ups: fresh-clone `pnpm dev` (T-11), locale fallback docs (T-12), client timeout (T-13), relative dev fixture (T-24) | M1 milestone review by reviewer-opus |
 | 2026-11-22 | T-10: worker cache uses an auto-provisioned KV binding (`KIDBOARD_CACHE`) with Cache API/memory fallback; cached window `[today−1, today+32)` | Cache API is a no-op on `*.workers.dev`; T-19 needs a 30-day countdown lookahead (T-10 review, structural) |
 | 2026-11-22 | M0 milestone review follow-ups: `autoReturnSeconds` in T-06, `format:check` in DoD, fixture loading note in T-08, typed `Env` in T-10, tsconfig split in T-11 | Findings of the M0 review by reviewer-opus |
 | 2026-11-22 | Worker test tooling renamed to `@cloudflare/vitest-plugin` (T-03, T-08, T-10) | `@cloudflare/vitest-pool-workers` is deprecated on npm and supports only Vitest 4 |
