@@ -398,7 +398,7 @@ not address. These rules apply to every M5b task:
   non-colour active cue), past text after any opacity, every `-tint` token has a matching child
   token; both themes; no raw hex in components; screenshots regenerated.
 
-- [ ] **T-29a Stable test hooks** (risk: low, deps: T-29)
+- [x] **T-29a Stable test hooks** (risk: low, deps: T-29)
   Acceptance: `data-testid` hooks independent of the band layout (e.g. `board-ready`,
   `day-column`, `event-tile`) and all e2e specs/`layout.ts` moved to them while the bands still
   exist; one green commit; no behaviour change.

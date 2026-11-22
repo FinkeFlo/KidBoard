@@ -48,8 +48,9 @@ export async function expectNoOverflow(page: Page): Promise<void> {
       rect.right <= box.right + 0.5 &&
       rect.bottom <= box.bottom + 0.5;
     const screen = new DOMRect(0, 0, viewport.width, viewport.height);
+    // band-specific: day-band in the list below is replaced in T-30b
     for (const el of document.querySelectorAll<HTMLElement>(
-      "main, header, [data-testid=countdown], [data-testid=day-band], [data-testid=week-day], article",
+      "main, header, [data-testid=countdown], [data-testid=day-band], [data-testid=day-column], article",
     )) {
       const name = `${el.tagName}[${el.dataset["testid"] ?? ""}] ${el.textContent.slice(0, 24)}`;
       if (el.scrollHeight > el.clientHeight + 1) problems.push(`${name} h`);
@@ -72,9 +73,10 @@ export async function expectNoOverflow(page: Page): Promise<void> {
         }
       }
     }
-    // Every list item lies inside its column / band.
+    // Every list item lies inside its day column / band.
+    // band-specific: day-band is replaced in T-30b
     for (const column of document.querySelectorAll(
-      "[data-testid=week-day], [data-testid=day-band]",
+      "[data-testid=day-column], [data-testid=day-band]",
     )) {
       const box = column.getBoundingClientRect();
       for (const item of column.querySelectorAll("li")) {

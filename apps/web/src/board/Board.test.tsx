@@ -346,7 +346,7 @@ describe("Board", () => {
       fireEvent.click(screen.getByRole("button", { name: en.board.week }));
       expect(screen.getByTestId("week-board")).toBeInTheDocument();
       expect(screen.queryByTestId("day-band")).not.toBeInTheDocument();
-      expect(screen.getAllByTestId("week-day")).toHaveLength(7);
+      expect(screen.getAllByTestId("day-column")).toHaveLength(7);
       // Header (date and legend) and toggle stay.
       expect(
         screen.getByRole("heading", { level: 1, name: "Sunday" }),

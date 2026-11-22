@@ -19,7 +19,7 @@ test.describe("countdown", () => {
       "30 more sleeps until Christmas party",
     );
     await expect(page.getByTestId("countdown-grouped")).toHaveText("🌙×30");
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
     await expectNoOverflow(page);
     if (SHOT_DIR !== undefined) {
       await page.screenshot({
@@ -28,7 +28,7 @@ test.describe("countdown", () => {
     }
 
     await page.getByRole("button", { name: "Week view" }).click();
-    await expect(page.getByTestId("week-day")).toHaveCount(7);
+    await expect(page.getByTestId("day-column")).toHaveCount(7);
     await expect(countdown).toHaveAttribute("data-variant", "full");
     await expect(countdown).toContainText(
       "30 more sleeps until Christmas party",

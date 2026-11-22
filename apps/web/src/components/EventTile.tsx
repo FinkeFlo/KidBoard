@@ -77,6 +77,7 @@ export function EventTile({
   return (
     <article
       aria-labelledby={titleId}
+      data-testid="event-tile"
       data-status={status}
       data-all-day={event.allDay}
       style={childColorStyle(kids[0]?.color)}

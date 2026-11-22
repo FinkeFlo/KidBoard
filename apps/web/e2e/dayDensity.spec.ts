@@ -8,6 +8,7 @@ import { agenda, mockBoard, type MockEvent } from "./mockApi";
  * an all-day row, plus four meals; both tablet sizes run it as their own project. Every
  * event stays fully visible inside its band (nothing clipped), and above the band's
  * capacity a "+N" tile says how many are not shown instead of hiding them silently.
+ * band-specific: replaced in T-30b (the whole matrix is rewritten for the column layout).
  */
 
 const BAND_STARTS = { morning: 6, midday: 11, evening: 17 } as const;
@@ -49,8 +50,9 @@ for (const allDay of [false, true]) {
         agenda: agenda(allDay ? [ALL_DAY, ...events] : events, MEALS),
       });
       await page.goto("/");
-      await expect(page.getByTestId("day-band")).toHaveCount(3);
+      await expect(page.getByTestId("board-ready")).toBeVisible();
       for (const band of BANDS) {
+        // band-specific: replaced in T-30b
         const section = page.locator(
           `[data-testid=day-band][data-band=${band}]`,
         );
@@ -77,6 +79,7 @@ test("more events than a band can show end in +N tiles: past ones first, what co
   await mockBoard(page, { agenda: agenda([ALL_DAY, ...events], MEALS) });
   await page.goto("/");
   for (const band of BANDS) {
+    // band-specific: replaced in T-30b
     const section = page.locator(`[data-testid=day-band][data-band=${band}]`);
     await expect(section.getByTestId("day-band-more").first()).toBeVisible();
     const shown = await section.getByRole("article").count();
@@ -104,12 +107,14 @@ test("more events than a band can show end in +N tiles: past ones first, what co
     }
   }
   // At the fixed 12:00 the morning is over: its oldest events are summed up first.
+  // band-specific: replaced in T-30b
   const morning = page.locator("[data-testid=day-band][data-band=morning]");
   await expect(morning.getByTestId("day-band-more")).toHaveAttribute(
     "data-kind",
     "earlier",
   );
   // Midday is in progress: no past event takes a slot from what is going on or next.
+  // band-specific: replaced in T-30b
   const midday = page.locator("[data-testid=day-band][data-band=midday]");
   await expect(midday.locator("article[data-status=past]")).toHaveCount(0);
   await expect(

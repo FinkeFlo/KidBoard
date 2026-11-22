@@ -38,6 +38,7 @@ export function BoardFrame({
   const { x, y } = useBurnInShift();
   return (
     <main
+      data-testid="board-ready"
       // The gutter gives `burn-in` back to the inner wrapper as padding, so the shifted
       // wrapper (at most `burn-in` either way) stays inside the original gutter. The bottom
       // strip (`touch`, reserved for the fullscreen control, T-20) gets `burn-in` on top, so

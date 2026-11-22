@@ -28,7 +28,7 @@ function renderWeek(
     Date.parse("2026-11-22T12:00:00+01:00"),
   );
   render(<WeekBoard days={days} childList={[MIA, BEN]} format={format} />);
-  return screen.getAllByTestId("week-day");
+  return screen.getAllByTestId("day-column");
 }
 
 describe("WeekBoard", () => {

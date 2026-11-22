@@ -34,7 +34,7 @@ async function expectNoOverflow(page: Page): Promise<void> {
     const clipped: string[] = [];
     const outside: string[] = [];
     for (const el of document.querySelectorAll<HTMLElement>(
-      "main, [data-testid=week-board], [data-testid=week-day], header",
+      "main, [data-testid=week-board], [data-testid=day-column], header",
     )) {
       if (el.scrollHeight > el.clientHeight + 1) {
         clipped.push(`${el.tagName} ${el.textContent.slice(0, 30)} h`);
@@ -54,7 +54,9 @@ async function expectNoOverflow(page: Page): Promise<void> {
     }
     // Everything inside a column lies inside that column.
     const escaping: string[] = [];
-    for (const column of document.querySelectorAll("[data-testid=week-day]")) {
+    for (const column of document.querySelectorAll(
+      "[data-testid=day-column]",
+    )) {
       const box = column.getBoundingClientRect();
       for (const child of column.querySelectorAll("li")) {
         const rect = child.getBoundingClientRect();
@@ -103,7 +105,7 @@ test.describe("week view", () => {
 
     await toWeek.click();
     await expect(toWeek).toHaveAttribute("aria-pressed", "true");
-    const columns = page.getByTestId("week-day");
+    const columns = page.getByTestId("day-column");
     await expect(columns).toHaveCount(7);
     // Today first (Sunday 22nd); weekdays follow; Sun and Sat are weekend columns.
     await expect(columns.first().getByRole("heading")).toHaveText("Sunday");
@@ -152,7 +154,10 @@ test.describe("week view", () => {
     }
 
     await toDay.click();
-    await expect(page.getByTestId("day-band")).toHaveCount(3);
+    await expect(
+      page.locator('[data-testid=day-column][data-today="true"]'),
+    ).toHaveCount(1);
+    await expect(page.getByTestId("day-column")).toHaveCount(1);
     await expect(page.getByTestId("week-board")).toHaveCount(0);
   });
 
@@ -172,9 +177,9 @@ test.describe("week view", () => {
           name: locale === "en" ? "Week view" : "Wochenansicht",
         })
         .click();
-      await expect(page.getByTestId("week-day")).toHaveCount(7);
+      await expect(page.getByTestId("day-column")).toHaveCount(7);
       const wrapped = await page.evaluate(() =>
-        [...document.querySelectorAll("[data-testid=week-day] h2")]
+        [...document.querySelectorAll("[data-testid=day-column] h2")]
           .filter((h) => {
             const size = parseFloat(getComputedStyle(h).fontSize);
             return (
@@ -194,10 +199,10 @@ test.describe("week view", () => {
     });
     await page.goto("/");
     await page.getByRole("button", { name: "Week view" }).click();
-    await expect(page.getByTestId("week-day")).toHaveCount(7);
+    await expect(page.getByTestId("day-column")).toHaveCount(7);
     await expect(
       page
-        .getByTestId("week-day")
+        .getByTestId("day-column")
         .first()
         .getByRole("img", { name: "Swimming" }),
     ).toBeVisible();
@@ -230,7 +235,7 @@ test.describe("week view", () => {
     });
     await page.goto("/");
     await page.getByRole("button", { name: "Week view" }).click();
-    const columns = page.getByTestId("week-day");
+    const columns = page.getByTestId("day-column");
     const today = columns.first();
     await expect(
       today
