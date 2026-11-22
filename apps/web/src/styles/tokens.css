@@ -1,0 +1,133 @@
+/*
+ * KidBoard design tokens (placeholder theme, see docs/design/README.md).
+ *
+ * Single source of truth: every value lives here as a CSS variable. `@theme static`
+ * exposes the variables to Tailwind 4 (utilities such as `bg-surface`, `rounded-card`,
+ * `text-title`) and always emits them to :root, even when unused. The night set only
+ * overrides the colour/shadow variables under `[data-theme="night"]` on <html>.
+ * `tokens.test.ts` parses this file and verifies WCAG AA contrast of the used pairs.
+ *
+ * Swapping in the final design means editing this file only, not the components.
+ */
+
+@theme static {
+  /* Reset the Tailwind defaults of every namespace we define ourselves. */
+  --color-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --text-*: initial;
+  --font-*: initial;
+  --spacing-*: initial;
+
+  /* Typography (rem: scales with the fluid root font size from global.css). */
+  --font-sans: "Nunito Variable", ui-rounded, system-ui, sans-serif;
+  --text-caption: 0.875rem;
+  --text-caption--line-height: 1.25rem;
+  --text-body: 1.125rem;
+  --text-body--line-height: 1.6rem;
+  --text-title: 1.5rem;
+  --text-title--line-height: 2rem;
+  --text-heading: 2.25rem;
+  --text-heading--line-height: 2.75rem;
+  --text-display: 3.5rem;
+  --text-display--line-height: 1;
+
+  /* Spacing: base unit (p-4 = 1rem, scales with the root size) plus named steps. */
+  --spacing: 0.25rem;
+  --spacing-gutter: 1.5rem;
+  --spacing-page: 2.5rem;
+  /* Minimum touch target for child interactions: >= 64px at every root size. */
+  --spacing-touch: max(64px, 4rem);
+
+  /* Shape. */
+  --radius-chip: 0.75rem;
+  --radius-card: 1.25rem;
+  --radius-tile: 1.75rem;
+  --radius-pill: 9999px;
+
+  /* Motion. Utilities: `duration-(--duration-normal)`. Zeroed for reduced motion below. */
+  --duration-fast: 120ms;
+  --duration-normal: 250ms;
+  --duration-slow: 600ms;
+
+  /* Colours: surfaces and text (light). */
+  --color-surface: #fff8f0;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #f3e9db;
+  --color-text: #2b2118;
+  --color-text-muted: #5e5044;
+  --color-border: #d8c8b2;
+  --color-accent: #a63a08;
+  --color-on-accent: #ffffff;
+  --color-danger: #b3261e;
+  --color-on-danger: #ffffff;
+  --color-notice: #f6e7c8;
+  --color-on-notice: #3d2c10;
+
+  /* Colours: day bands (surface + accent, text on the surface uses --color-text). */
+  --color-band-morning: #fff0c2;
+  --color-band-morning-accent: #8a5300;
+  --color-band-midday: #dcefff;
+  --color-band-midday-accent: #005e92;
+  --color-band-evening: #eae0f7;
+  --color-band-evening-accent: #5a3c99;
+
+  /*
+   * Colours: child palette. Okabe-Ito based hues, darkened so that each colour reaches
+   * >= 3:1 against the surfaces (edges, dots) and >= 4.5:1 with its on-colour text.
+   * Never rely on colour alone: avatars also carry an emoji.
+   */
+  --color-child-1: #c2410c;
+  --color-child-2: #0072b2;
+  --color-child-3: #007a5a;
+  --color-child-4: #9f3f7c;
+  --color-child-5: #a15c00;
+  --color-child-6: #5b5f73;
+  --color-on-child: #ffffff;
+
+  /* Elevation (light). */
+  --shadow-card: 0 0.125rem 0.5rem rgb(43 33 24 / 0.1);
+  --shadow-raised: 0 0.5rem 1.5rem rgb(43 33 24 / 0.16);
+}
+
+/* Night mode: warm, nearly black, dimmed. Activated via <html data-theme="night">. */
+[data-theme="night"] {
+  --color-surface: #17120d;
+  --color-surface-raised: #221b14;
+  --color-surface-sunken: #100c08;
+  --color-text: #f2e6d6;
+  --color-text-muted: #bdae9a;
+  --color-border: #4a3d30;
+  --color-accent: #f0a35e;
+  --color-on-accent: #1a1008;
+  --color-danger: #ff9a8f;
+  --color-on-danger: #2a0a07;
+  --color-notice: #3a2d18;
+  --color-on-notice: #f6e3bd;
+
+  --color-band-morning: #2b2214;
+  --color-band-morning-accent: #f2b866;
+  --color-band-midday: #16222c;
+  --color-band-midday-accent: #7cc3ee;
+  --color-band-evening: #231c30;
+  --color-band-evening-accent: #c3a6f0;
+
+  --color-child-1: #f0824a;
+  --color-child-2: #56b4e9;
+  --color-child-3: #2fc79a;
+  --color-child-4: #e08dbf;
+  --color-child-5: #e8a93a;
+  --color-child-6: #a9aec4;
+  --color-on-child: #1a1008;
+
+  --shadow-card: 0 0.125rem 0.5rem rgb(0 0 0 / 0.5);
+  --shadow-raised: 0 0.5rem 1.5rem rgb(0 0 0 / 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+  }
+}

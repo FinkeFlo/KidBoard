@@ -55,7 +55,13 @@ export default defineConfig(
     },
   },
   {
-    files: ["apps/web/vite.config.ts", "apps/worker/**/*.ts"],
+    files: [
+      "apps/web/vite.config.ts",
+      "apps/web/vitest.config.ts",
+      "apps/web/playwright.config.ts",
+      "apps/web/e2e/**/*.ts",
+      "apps/worker/**/*.ts",
+    ],
     languageOptions: { globals: globals.node },
   },
 );

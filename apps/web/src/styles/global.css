@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* Night mode variant: `night:bg-...` applies under <html data-theme="night">. */
+@custom-variant night (&:where([data-theme="night"], [data-theme="night"] *));
+
+@layer base {
+  /*
+   * Fluid root size: 16px at 1280x800 up to 24px at 2000x1200 (2vh / 1.25vw, whichever is
+   * smaller), so rem-based layouts scale with the tablet without scrolling.
+   */
+  html {
+    font-size: clamp(12px, min(1.25vw, 2vh), 32px);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+  }
+
+  /* Reduced motion: no transitions or animations anywhere (CLAUDE.md rule 7). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter @kidboard/web --filter @kidboard/worker dev",
+    "dev": "node scripts/ensure-web-dist.mjs && pnpm --parallel --filter @kidboard/web --filter @kidboard/worker dev",
     "build": "pnpm --filter @kidboard/web build && pnpm --filter @kidboard/worker build",
     "lint": "eslint --max-warnings=0 .",
     "typecheck": "tsc -p tsconfig.json && pnpm -r --workspace-concurrency=1 typecheck",
