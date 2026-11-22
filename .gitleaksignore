@@ -1,0 +1,2 @@
+# Known false positives (synthetic test strings). Fingerprints: <commit>:<file>:<rule>:<line>
+cfcb01ad601085e1e6b9afddb9c7fa7da3bf2eab:apps/worker/src/ical/expandCalendar.test.ts:generic-api-key:593

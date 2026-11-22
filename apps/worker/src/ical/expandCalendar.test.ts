@@ -590,7 +590,7 @@ describe("expandCalendar – empty and malformed feeds (AC 7)", () => {
     ).toEqual([]);
   });
 
-  const secret = "private-0123456789abcdef";
+  const secret = "TESTONLY-not-a-secret-marker";
   const cases: [string, string, string][] = [
     ["empty string", "", "empty"],
     ["whitespace only", " \r\n\t ", "empty"],

@@ -22,6 +22,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 |---|---|---|---|
 | 2026-11-22 | T-04 | Sonnet → Opus | High-risk task (CI/release pipeline) |
 | 2026-11-22 | T-08 | Sonnet → Opus | High-risk task (iCal/recurrence/time zones); reviewer reported structural perf problem in round 1 |
+| 2026-11-22 | T-10 | Sonnet → Opus | High-risk task (security/secrets, caching) |
 
 ## Milestone reviews
 
