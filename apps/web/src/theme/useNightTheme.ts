@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 import { useNow } from "../time";
 import { isNight, type NightMode, parseNightOverride } from "./night";
+import { rememberTheme } from "./themeMemory";
 
 /** Attribute that enables the colour transition on <html> while the theme switches. */
 const SWITCHING_ATTR = "data-theme-switching";
@@ -29,8 +30,11 @@ function applyTheme(night: boolean): void {
  * Night mode (T-21): sets `data-theme="night"|"light"` on <html>, which swaps the token
  * set (`tokens.css`). Active inside `nightMode` of the config in its time zone, re-evaluated
  * on the minute clock; `?night=1|0` forces it (read once, not persisted). Until the config
- * is known the theme is left untouched (light tokens) and the first value applies at once. The change fades over `--duration-slow` (see
- * `global.css`); under `prefers-reduced-motion` it is instant. Returns whether it is night.
+ * is known the theme is left untouched: the theme the boot script in `index.html` applied
+ * before first paint (the last remembered one, see `themeMemory.ts`), else light tokens.
+ * The first known value applies at once and is remembered unless it is a `?night`
+ * override. A change fades over `--duration-slow` (see `global.css`); under
+ * `prefers-reduced-motion` it is instant. Returns whether it is night.
  */
 export function useNightTheme(
   nightMode: NightMode | undefined,
@@ -68,13 +72,17 @@ export function useNightTheme(
       }, SWITCHING_MS);
     }
     applyTheme(night);
+    // Only the clock's theme is remembered for the next cold start, never `?night`.
+    if (override === undefined) {
+      rememberTheme(night);
+    }
     return () => {
       if (timer !== undefined) {
         clearTimeout(timer);
         root.removeAttribute(SWITCHING_ATTR);
       }
     };
-  }, [night, known]);
+  }, [night, known, override]);
 
   return night;
 }

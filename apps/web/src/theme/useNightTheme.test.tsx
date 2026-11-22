@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { NightMode } from "./night";
+import { THEME_STORAGE_KEY } from "./themeMemory";
 import { useNightTheme } from "./useNightTheme";
 
 const BERLIN = "Europe/Berlin";
@@ -29,7 +30,12 @@ beforeEach(() => {
   );
 });
 
+const remembered = (): string | null =>
+  window.localStorage.getItem(THEME_STORAGE_KEY);
+
 afterEach(() => {
+  vi.restoreAllMocks();
+  window.localStorage.clear();
   vi.useRealTimers();
   window.history.replaceState(null, "", "/");
   document.documentElement.removeAttribute("data-theme");
@@ -136,6 +142,64 @@ describe("useNightTheme", () => {
     document.querySelector('meta[name="theme-color"]')?.remove();
     vi.useFakeTimers({ now: at("2026-11-22T23:00:00Z") });
     const { unmount } = renderHook(() => useNightTheme(NIGHT, BERLIN));
+    expect(theme()).toBe("night");
+    unmount();
+  });
+
+  it("remembers the clock's theme for the next cold start, also after a switch", () => {
+    vi.useFakeTimers({ now: at("2026-11-22T18:29:30Z") }); // 19:29:30 Berlin
+    const { unmount } = renderHook(() => useNightTheme(NIGHT, BERLIN));
+    expect(remembered()).toBe("light");
+    advance(60_000); // 19:30:30
+    expect(remembered()).toBe("night");
+    unmount();
+  });
+
+  it("remembers nothing until the config is known", () => {
+    vi.useFakeTimers({ now: at("2026-11-22T23:00:00Z") });
+    window.localStorage.setItem(THEME_STORAGE_KEY, "night");
+    const { unmount } = renderHook(() => useNightTheme(undefined, undefined));
+    expect(remembered()).toBe("night");
+    unmount();
+  });
+
+  it("keeps the theme the boot script applied until the config is known", () => {
+    vi.useFakeTimers({ now: at("2026-11-22T11:00:00Z") }); // midday
+    document.documentElement.dataset["theme"] = "night"; // remembered from last night
+    const { rerender, unmount } = renderHook(
+      ({ mode }: { mode: NightMode | undefined }) =>
+        useNightTheme(mode, mode === undefined ? undefined : BERLIN),
+      { initialProps: { mode: undefined as NightMode | undefined } },
+    );
+    expect(theme()).toBe("night");
+    rerender({ mode: NIGHT });
+    expect(theme()).toBe("light");
+    expect(document.documentElement.hasAttribute("data-theme-switching")).toBe(
+      false,
+    );
+    expect(remembered()).toBe("light");
+    unmount();
+  });
+
+  it.each(["/?night=1", "/?night=0"])(
+    "never remembers the %s override",
+    (url) => {
+      vi.useFakeTimers({ now: at("2026-11-22T23:00:00Z") });
+      window.localStorage.setItem(THEME_STORAGE_KEY, "untouched");
+      window.history.replaceState(null, "", url);
+      const { unmount } = renderHook(() => useNightTheme(NIGHT, BERLIN));
+      expect(remembered()).toBe("untouched");
+      unmount();
+    },
+  );
+
+  it("still applies the theme when storage is blocked", () => {
+    vi.useFakeTimers({ now: at("2026-11-22T23:00:00Z") });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    const { result, unmount } = renderHook(() => useNightTheme(NIGHT, BERLIN));
+    expect(result.current).toBe(true);
     expect(theme()).toBe("night");
     unmount();
   });

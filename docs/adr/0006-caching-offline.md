@@ -59,7 +59,11 @@ fails, and say so discreetly.
     drops its data (status `error`, `useApiErrorKind()` = `unauthorized`), so the
     persister writes an empty cache and a revoked device stops showing calendar data,
     and the stored token is forgotten (a new `?key=` link is needed anyway; keeping a
-    dead token would only produce more 401s). The persister stores every KidBoard query **with data**,
+    dead token would only produce more 401s). In-flight fetches of those queries are cancelled
+    without `revert` before the wipe: TanStack reverts a fetch cancelled because its
+    last observer left (the wiped config turns the agenda into the pending query) to the
+    state from before the fetch, which would bring the wiped data back into memory and
+    storage (found by the T-23 e2e test). The persister stores every KidBoard query **with data**,
     also after a failed refetch (TanStack's default persists `success` only, which would
     wipe the last-good agenda on the first 502). Stored queries are reduced to their data
     (no error objects); on restore each query is re-validated and dropped if invalid.
@@ -75,7 +79,10 @@ fails, and say so discreetly.
     a query in use without data: failed → `error`, offline → `offline`, else `loading`;
     offline → `offline`; failed refetch, `AgendaResponse.stale`, any
     `sources[].status === "error"`, or an incomplete agenda (midnight seed, or
-    `range.to` before `from + days`) → `stale`; else `ready`. "Offline" is
+    `range.to` before `from + days`) → `stale`; else `ready`. The banner shows
+    `stale` only after it has lasted 5 s (`STALE_BANNER_DELAY_MS`): online, every
+    midnight is `stale` for a moment until the new day's fetch lands, which must not
+    flash; `offline`, `error` and `unauthorized` show at once. "Offline" is
     `onlineManager`, seeded from `navigator.onLine` at startup and then driven by
     `online`/`offline` events.
   * The optional access token is taken once from `?key=`, stored under its own

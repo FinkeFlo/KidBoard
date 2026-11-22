@@ -341,7 +341,7 @@ operation, works offline with the last known state.
   max shift + banner + 14 moons; the view toggle keeps a fixed place when a banner appears
   (reserve a banner slot or keep the toggle on header row 1).
 
-- [ ] **T-23 Offline & stale UX end-to-end** (risk: **high** → Opus, deps: T-13, T-14, T-17)
+- [x] **T-23 Offline & stale UX end-to-end** (risk: **high** → Opus, deps: T-13, T-14, T-17)
   Acceptance: Playwright: load online → go offline → reload → last state + discreet
   offline hint; API returns `stale: true` → stale hint; API 502 with persisted data →
   data + hint; API 502 without data → error state; back online → hint disappears after

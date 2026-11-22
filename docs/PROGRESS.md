@@ -27,6 +27,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-20 Wake lock & fullscreen | Sonnet (builder) | Sonnet (reviewer) | 2 | PASS round 2; wake lock re-acquired while visible, control strip reserved |
 | 2026-11-22 | T-21 Night mode | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; useCurrentBand removed |
 | 2026-11-22 | T-22 Burn-in protection | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; banner moved to bottom slot so the toggle never moves |
+| 2026-11-22 | T-23 Offline & stale UX end-to-end | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; fixed 401 wipe race (revert-cancel restored data); theme remembered before first paint |
 
 ## Escalations
 

@@ -1,5 +1,7 @@
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
+import { agenda, fixClock, waitForServiceWorker } from "./mockApi";
+
 /** Low-entropy synthetic token (gitleaks-friendly). */
 const TOKEN = "TESTONLY-not-a-secret";
 
@@ -8,6 +10,7 @@ const CONFIG = {
   timeZone: "Europe/Berlin",
   calendars: [{ id: "family", kind: "events" }],
 };
+const AGENDA = agenda([{ title: "Swimming", icon: "🏊", time: "15:00" }], []);
 
 interface ManifestIcon {
   src: string;
@@ -43,6 +46,8 @@ async function mockApi(context: BrowserContext): Promise<string[]> {
     switch (new URL(url).pathname) {
       case "/api/config":
         return route.fulfill({ json: CONFIG });
+      case "/api/agenda":
+        return route.fulfill({ json: AGENDA });
       case "/api/health":
         return route.fulfill({ json: { ok: true } });
       default:
@@ -50,21 +55,6 @@ async function mockApi(context: BrowserContext): Promise<string[]> {
     }
   });
   return seen;
-}
-
-/** Wait until the service worker is active and controls the page. */
-async function waitForControl(page: Page): Promise<string> {
-  return page.evaluate(async () => {
-    const registration = await navigator.serviceWorker.ready;
-    if (!navigator.serviceWorker.controller) {
-      await new Promise<void>((resolve) => {
-        navigator.serviceWorker.addEventListener("controllerchange", () => {
-          resolve();
-        });
-      });
-    }
-    return registration.active?.scriptURL ?? "";
-  });
 }
 
 /** Every URL stored in any Cache Storage cache of the origin. */
@@ -142,7 +132,7 @@ test("is installable: manifest with token colours and icons, active service work
     expect(response.headers()["content-type"]).toContain("image/png");
   }
 
-  const scriptUrl = await waitForControl(page);
+  const scriptUrl = await waitForServiceWorker(page);
   expect(new URL(scriptUrl).pathname).toBe("/sw.js");
   expect(
     await page.evaluate(
@@ -156,9 +146,10 @@ test("loads the app shell offline after the first visit and never caches API or 
   context,
 }) => {
   const apiRequests = await mockApi(context);
+  await fixClock(page);
   await page.goto(`/?key=${TOKEN}`);
-  await expect(page.getByRole("main")).toBeVisible();
-  await waitForControl(page);
+  await expect(page.getByRole("article", { name: "Swimming" })).toBeVisible();
+  await waitForServiceWorker(page);
 
   // An API call made while the worker is in control goes through it to the network.
   const apiStatus = await page.evaluate(async () => {
@@ -175,7 +166,7 @@ test("loads the app shell offline after the first visit and never caches API or 
   await expect(page.locator("body")).toContainText('"ok":true');
   await expect(page.getByRole("main")).toHaveCount(0);
   await page.goto("/");
-  await waitForControl(page);
+  await waitForServiceWorker(page);
 
   const stored = await cachedUrls(page);
   expect(stored.length).toBeGreaterThan(0);
@@ -191,7 +182,9 @@ test("loads the app shell offline after the first visit and never caches API or 
 
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByRole("main")).toBeVisible();
+  // The cached shell renders the persisted day with the discreet offline hint.
+  await expect(page.getByRole("article", { name: "Swimming" })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("No internet");
   const offlineStyle = await page.evaluate(async () => {
     await document.fonts.ready;
     return {
@@ -203,7 +196,7 @@ test("loads the app shell offline after the first visit and never caches API or 
 
   // Deep links fall back to the cached shell as well.
   await page.goto("/some/deep/link");
-  await expect(page.getByRole("main")).toBeVisible();
+  await expect(page.getByRole("article", { name: "Swimming" })).toBeVisible();
 
   const storedAfter = await cachedUrls(page);
   expect(
