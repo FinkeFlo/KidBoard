@@ -203,6 +203,24 @@ generated on every build by `@vite-pwa/assets-generator` from the original artwo
 `apps/web/public/kidboard-icon.svg` (`apps/web/pwa-assets.config.ts`). The app polls for a
 new `sw.js` hourly; a new worker activates at once and the page reloads by itself.
 
+### Kiosk: wake lock, fullscreen, boundary reset (T-20)
+
+`apps/web/src/kiosk/`: `useWakeLock()` requests the Screen Wake Lock while the page is
+visible and re-requests from the sentinel's `release` event (system release while still
+visible; a kiosk rarely sees `visibilitychange`), on `visibilitychange` and on `focus`. A
+rejected request (low battery, policy) is retried by a single timer (10 s, doubling, max
+2 min; cleared on success and unmount); a missing API is a silent no-op. `useFullscreen()` wraps the Fullscreen API (`fullscreenchange`) and
+reports `available: false` where unsupported or when the board already runs as an installed
+app (`display-mode: standalone|fullscreen` without an active fullscreen element).
+`FullscreenControl` is a fixed bottom-right corner overlay. `BoardFrame` reserves the
+bottom strip for it (`pb-touch`, 64 px), so it never covers content; burn-in shifts (T-22)
+stay inside that gutter: faint glyph, 64 px hit area, **long press (700 ms)** for
+pointers so children cannot trigger it by accident; the request runs on pointer-up
+(user gesture); keyboard/assistive-tech clicks act at once.
+`AppErrorBoundary` resets itself after 5 s, doubling per failed retry up to 5 min; the
+backoff starts over when the children ran 60 s without failing. The retry button resets
+at once.
+
 ### Client data layer (T-13)
 
 `apps/web/src/data/`: typed API client (zod-validated, 15 s timeout > worker's ~11 s

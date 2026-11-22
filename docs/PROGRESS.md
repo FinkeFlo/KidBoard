@@ -24,6 +24,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-17 Day view | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; Context7 unreachable for reviewer |
 | 2026-11-22 | T-18 Week view & navigation | Sonnet (builder) | Sonnet (reviewer) | 2 | PASS round 2; week icons enlarged (icon-first) |
 | 2026-11-22 | T-19 "How many sleeps?" countdown | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; persister drops superseded agendas (payload size) |
+| 2026-11-22 | T-20 Wake lock & fullscreen | Sonnet (builder) | Sonnet (reviewer) | 2 | PASS round 2; wake lock re-acquired while visible, control strip reserved |
 
 ## Escalations
 

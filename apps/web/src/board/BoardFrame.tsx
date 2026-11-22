@@ -35,7 +35,10 @@ export function BoardFrame({
   children,
 }: BoardFrameProps): React.JSX.Element {
   return (
-    <main className="bg-surface text-text gap-gutter p-gutter flex h-full flex-col">
+    <main // `pb-touch` reserves the bottom strip of the page for the fullscreen control (T-20),
+      // so the corner overlay never sits on content.
+      className="bg-surface text-text gap-gutter p-gutter pb-touch flex h-full flex-col"
+    >
       <header className="gap-gutter flex shrink-0 items-center justify-between">
         <div className="shrink-0">
           <h1 className="text-display font-extrabold">

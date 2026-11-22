@@ -48,6 +48,10 @@
       "offline": "Kein Internet und noch kein gespeicherter Plan."
     }
   },
+  "fullscreen": {
+    "enter": "Vollbild an (gedrückt halten)",
+    "exit": "Vollbild aus (gedrückt halten)"
+  },
   "board": {
     "viewGroup": "Ansicht",
     "day": "Tagesansicht",

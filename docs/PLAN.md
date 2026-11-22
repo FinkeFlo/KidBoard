@@ -320,7 +320,7 @@ operation, works offline with the last known state.
 
 ## M5 – Kiosk features
 
-- [ ] **T-20 Wake lock & fullscreen** (risk: medium, deps: M4)
+- [x] **T-20 Wake lock & fullscreen** (risk: medium, deps: M4)
   Acceptance: Screen Wake Lock requested when visible and re-acquired on
   `visibilitychange`; graceful no-op where unsupported; small, unobtrusive parent control
   for fullscreen (Fullscreen API); unit tests with mocked APIs. (M3 follow-up) `AppErrorBoundary` auto-resets after a delay with backoff so an unattended
