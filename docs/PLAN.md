@@ -65,7 +65,7 @@ operation, works offline with the last known state.
   4. A deliberately bad commit message is rejected (shown in review via
      `pnpm exec commitlint` on a sample).
 
-- [ ] **T-03 Test setup** (risk: low, deps: T-01)
+- [x] **T-03 Test setup** (risk: low, deps: T-01)
   Acceptance:
   1. Vitest projects for `shared` (node), `web` (jsdom + Testing Library + jest-dom
      matchers), `worker` (`@cloudflare/vitest-pool-workers`). `pnpm test` runs all.
