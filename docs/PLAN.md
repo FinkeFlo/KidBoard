@@ -257,7 +257,7 @@ operation, works offline with the last known state.
   (parent-readable "access link expired, open the new `?key=` link", de + en); move
   `AppErrorBoundary` above `DataProvider` in `main.tsx`.
 
-- [ ] **T-16 Clock & day rollover** (risk: **high** → Opus, deps: T-12)
+- [x] **T-16 Clock & day rollover** (risk: **high** → Opus, deps: T-12)
   Acceptance:
   1. `useNow()` ticks each minute aligned to the minute boundary; `useToday()` derives the
      date in the configured zone and changes exactly at local midnight without reload.

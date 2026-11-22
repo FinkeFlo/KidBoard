@@ -39,7 +39,15 @@ fails, and say so discreetly.
 * **Client details** (T-13, `apps/web/src/data/`):
   * `refetchInterval` = `config.refreshMinutes` (60 min until the config is known).
     Midnight: the view derives `range.from` from "today" in the config zone (T-16); a
-    new day is a new query key and fetches by itself.
+    new day is a new query key and fetches by itself. Until that fetch succeeds the new
+    query is seeded (`initialData`, marked outdated with `dataUpdatedAt` 0, never
+    persisted) from a cached agenda covering the new day, re-scoped to the new range,
+    so offline or on a 502 the status stays `offline`/`stale` instead of empty or
+    `loading`. Only real responses younger than 7 days are used as a source (never an
+    earlier seed). A seeded agenda (`dataUpdatedAt` 0) or one that ends before
+    `from + days` of its query key is `stale`, never `ready`, until the real response
+    lands, also while that fetch is in flight (details: ARCHITECTURE.md "Clock & day
+    rollover").
   * Requests time out after 15 s (headers + body). The worker needs up to ~11 s (10 s
     upstream timeout + 1 s flight margin) before it answers with last-good data, so a
     slow upstream still delivers stale data. Network/timeout/5xx/429 errors are retried
@@ -60,8 +68,9 @@ fails, and say so discreetly.
     than 7 days (old agenda keys do not pile up).
   * Connection status (`useConnectionStatus`), first match wins: restoring → `loading`;
     a query in use without data: failed → `error`, offline → `offline`, else `loading`;
-    offline → `offline`; failed refetch, `AgendaResponse.stale` or any
-    `sources[].status === "error"` → `stale`; else `ready`. "Offline" is
+    offline → `offline`; failed refetch, `AgendaResponse.stale`, any
+    `sources[].status === "error"`, or an incomplete agenda (midnight seed, or
+    `range.to` before `from + days`) → `stale`; else `ready`. "Offline" is
     `onlineManager`, seeded from `navigator.onLine` at startup and then driven by
     `online`/`offline` events.
   * The optional access token is taken once from `?key=`, stored under its own

@@ -1,4 +1,8 @@
-import { AgendaResponseSchema } from "@kidboard/shared";
+import {
+  addCalendarDays,
+  AgendaResponseSchema,
+  isDateKey,
+} from "@kidboard/shared";
 import {
   notifyManager,
   onlineManager,
@@ -17,13 +21,16 @@ const AgendaHealthSchema = AgendaResponseSchema.pick({
   sources: true,
 });
 
+const AgendaCoverageSchema = AgendaResponseSchema.pick({ range: true });
+
 /**
  * - `loading`: restoring the persisted cache, or the first fetch is still running.
  * - `ready`: data shown is current.
  * - `offline`: the device is offline (data shown, if any, is the last known state).
  * - `stale`: data shown, but the last refresh failed, or the worker served last-good
  *   data (`AgendaResponse.stale`) or no data at all for at least one calendar
- *   (`sources[].status === "error"`).
+ *   (`sources[].status === "error"`), or the agenda is a midnight seed / covers fewer
+ *   days than requested ({@link isAgendaIncomplete}).
  * - `error`: a needed query has no data at all and its fetch failed.
  */
 export type ConnectionStatus =
@@ -87,6 +94,41 @@ export function isAgendaDegraded(data: unknown): boolean {
   );
 }
 
+/**
+ * True if the agenda data of an agenda query is not a complete, real response for its
+ * key (`[…, from, days]`):
+ * - it was seeded from another range at midnight (`dataUpdatedAt === 0`, see
+ *   `useAgenda`): the last known state, not a response for this range, or
+ * - it covers fewer days than requested (`range.to < from + days`), e.g. a seed from a
+ *   cached range that ends earlier.
+ * Either way the board shows `stale` (never `ready`) until the real fetch lands.
+ */
+export function isAgendaIncomplete(
+  queryKey: readonly unknown[],
+  data: unknown,
+  dataUpdatedAt: number,
+): boolean {
+  if (data === undefined) {
+    return false;
+  }
+  if (dataUpdatedAt === 0) {
+    return true;
+  }
+  const from = queryKey[2];
+  const days = queryKey[3];
+  const parsed = AgendaCoverageSchema.safeParse(data);
+  if (
+    !parsed.success ||
+    typeof from !== "string" ||
+    typeof days !== "number" ||
+    !isDateKey(from) ||
+    !Number.isInteger(days)
+  ) {
+    return false;
+  }
+  return parsed.data.range.to < addCalendarDays(from, days);
+}
+
 /** Health of a cached query, `undefined` if it is not a KidBoard query in use. */
 export function queryHealth(query: Query): QueryHealth | undefined {
   const kind = queryKindOf(query.queryKey);
@@ -96,7 +138,14 @@ export function queryHealth(query: Query): QueryHealth | undefined {
   return {
     hasData: query.state.data !== undefined,
     isError: query.state.status === "error",
-    dataStale: kind === "agenda" && isAgendaDegraded(query.state.data),
+    dataStale:
+      kind === "agenda" &&
+      (isAgendaDegraded(query.state.data) ||
+        isAgendaIncomplete(
+          query.queryKey,
+          query.state.data,
+          query.state.dataUpdatedAt,
+        )),
   };
 }
 

@@ -170,6 +170,9 @@ Order of operations on the raw `SUMMARY`:
   per feed (CPU budget, ADR-0003); a hit cap is reported as `truncated`.
 * Day boundaries, bands (morning/midday/evening) and "nights until" are computed with
   `@date-fns/tz` (`TZDate`) in the configured zone, not the device zone.
+* "Today" (`YYYY-MM-DD` in the configured zone) comes from one shared helper,
+  `todayInZone` in `packages/shared` (`@date-fns/tz` `tzOffset`), used by the worker
+  window and the client's `range.from`, so both always name the same day.
 * All-day events use date-only strings with exclusive end, multi-day events appear on
   every covered day.
 
@@ -183,7 +186,7 @@ Order of operations on the raw `SUMMARY`:
 | TanStack Query persisted cache | last `/api/agenda` + `/api/config` | 7 days |
 
 The client refetches every `refreshMinutes` (default hourly), on `visibilitychange`/`online`,
-and after midnight (new day = new agenda query key, T-16).
+and after midnight (new day = new agenda query key, seeded from the cache meanwhile, T-16).
 
 ### PWA / service worker (T-14)
 
@@ -211,6 +214,58 @@ without data as `error`. A 200 agenda that is worker-stale or has a failed sourc
 status `error`, `useApiErrorKind()` = `unauthorized`. Persisted queries older than 7 days
 are dropped. The config `locale` is applied to i18n as soon as the config is
 known (fetched or restored). Rules in detail: [ADR-0006](adr/0006-caching-offline.md).
+
+### Clock & day rollover (T-16)
+
+`apps/web/src/time/`: pure logic in `clock.ts` (`startOfMinute`, `msUntilNextMinute`,
+`minuteOfDay`, `bandOf(instant, bands, zone)` → `night | morning | midday | evening`,
+boundaries belong to the later band, `night` = before `morningStart`), hooks in
+`hooks.ts`:
+
+* `useNow()`: current time floored to the minute. One shared `setTimeout` chain
+  (`minuteClock.ts`) wakes all consumers at each minute boundary; every delay is
+  computed afresh from `Date.now()` (late or throttled timers and system clock jumps
+  correct themselves at the next firing, nothing is accumulated). `visibilitychange`
+  (visible) and `pageshow` wake it at once, so a tab that slept across midnight shows
+  the new day immediately. The timer and listeners exist only while something is
+  subscribed.
+* `useToday(zone)`: `todayInZone(Date.now(), zone)`; changes exactly at local midnight
+  of the config zone (minute boundaries are local minute boundaries for all
+  whole-minute offsets), also on DST nights and when the DST change happens at midnight,
+  whatever the device zone. Re-renders only when the date changes.
+* `useCurrentBand(now, bands, zone)`: `bandOf` memoized for the view.
+
+**Before the config has loaded** the time zone is unknown. KidBoard deliberately gates
+instead of guessing a default zone: `useToday`/`useCurrentBand` return `undefined`,
+`useTodayAgenda` sends no agenda request (its agenda query stays pending, so the
+connection status is `loading`, or `offline` without network), and views show their
+loading state. A default such as `Europe/Berlin` would fetch and show the wrong day for
+families in other zones and then jump. In practice the gate only applies to the very
+first visit (or after 7 days without data): the persisted config is restored at
+startup, also offline.
+
+**Rollover:** `useTodayAgenda(days = 8)` = config zone → `useToday` → `useAgenda({ from:
+today, days })`. At midnight the new `from` is a new query key, fetched at once. Until
+that succeeds the new query is seeded (TanStack `initialData`, `initialDataUpdatedAt: 0`)
+from the most recent cached agenda whose range covers the new day, re-scoped to the new
+range (`agendaSeed.ts`; same overlap rules as the worker; `range.to` never claims days
+the cache does not cover). Only real responses younger than 7 days qualify (the
+persister's max-age rule, applied to in-memory data too; seeds never qualify), so over
+several offline days each day is seeded from the last real response while it covers
+the day. So offline or after a 502 the board keeps showing the last state with status
+`offline`/`stale`, never empty or `loading`. A seed is never `ready`: an agenda query
+whose data is a seed (`dataUpdatedAt` 0) or ends before `from + days` (from the query
+key) counts as `stale` until the real response lands, also while that fetch is still
+running online (both rules on purpose: even a seed that covers every requested day is
+the last known state, not an answer for the new range). For one render right at the
+rollover the status can still show the previous value, until the new query's observer
+has subscribed. `initialData` rather than
+`placeholderData`: placeholder data disappears once the fetch fails and is invisible to
+the cache-based connection status. The seed is marked outdated (`dataUpdatedAt` 0), so it
+is refetched regardless of `staleTime` and never persisted (the persister's per-query
+7-day check drops it); a 401 wipes it like all agenda data. `useAgenda` waits for the
+persisted cache to be restored before it creates the real query, so a reload on a later
+day (offline) is seeded from the restored agenda.
 
 ### Worker API details (T-10)
 

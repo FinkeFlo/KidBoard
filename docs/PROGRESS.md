@@ -20,6 +20,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-13 Data layer | Opus (builder-opus) | Opus (reviewer-opus) | 2 | PASS round 2; fixed per-query 7d max age, 401 wipe, degraded-source stale |
 | 2026-11-22 | T-14 PWA | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1 |
 | 2026-11-22 | T-15 Core components | Sonnet (builder) | Sonnet (reviewer) | 2 | PASS round 2; removed duplicate error boundary, decorative icons next to visible titles |
+| 2026-11-22 | T-16 Clock & day rollover | Opus (builder-opus) | Opus (reviewer-opus) | 2 | PASS round 2; partial seed reported stale, seed respects 7d max age; Context7 unreachable for reviewer (installed source checked) |
 
 ## Escalations
 

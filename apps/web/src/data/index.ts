@@ -12,6 +12,12 @@ export {
   useConnectionStatus,
 } from "./connectionStatus";
 export { DataProvider } from "./DataProvider";
-export { useAgenda, useConfig } from "./queries";
+export {
+  AGENDA_DAYS,
+  type TodayAgenda,
+  useAgenda,
+  useConfig,
+  useTodayAgenda,
+} from "./queries";
 export { createQueryClient, seedOnlineState } from "./queryClient";
 export { getLocalStorage } from "./storage";

@@ -1,4 +1,10 @@
-import { APP_NAME, DateStringSchema, toPublicConfig } from "@kidboard/shared";
+import {
+  addCalendarDays,
+  APP_NAME,
+  DateStringSchema,
+  todayInZone,
+  toPublicConfig,
+} from "@kidboard/shared";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
@@ -6,7 +12,6 @@ import { validator } from "hono/validator";
 import { z } from "zod";
 
 import { buildAgenda } from "./agenda/buildAgenda";
-import { addDays, todayIn } from "./agenda/dates";
 import { type Flight, loadSource } from "./agenda/loadSource";
 import { loadConfig } from "./config/loadConfig";
 import type { AppEnv } from "./env";
@@ -211,14 +216,14 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
       const { config } = loaded;
       const query = c.req.valid("query");
       const nowMs = now();
-      const today = todayIn(nowMs, config.timeZone);
+      const today = todayInZone(nowMs, config.timeZone);
       const window = {
-        from: addDays(today, -WINDOW_DAYS_BEFORE),
-        to: addDays(today, WINDOW_DAYS_AFTER),
+        from: addCalendarDays(today, -WINDOW_DAYS_BEFORE),
+        to: addCalendarDays(today, WINDOW_DAYS_AFTER),
       };
       const days = query.days ?? DEFAULT_DAYS;
       const from = query.from ?? today;
-      const to = addDays(from, days);
+      const to = addCalendarDays(from, days);
       if (from < window.from || to > window.to) {
         return badRequest(
           c,

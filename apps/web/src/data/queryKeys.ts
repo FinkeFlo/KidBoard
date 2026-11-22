@@ -17,9 +17,19 @@ export const queryKeys = {
     range.from,
     range.days,
   ],
+  /**
+   * Agenda whose range is not known yet (config or persisted cache still loading). It
+   * never fetches and never has data; it exists so that the connection status counts
+   * the agenda as "needed but missing" (`loading`/`offline`) during that time.
+   */
+  agendaPending: (): readonly ["kidboard", "agenda", "pending"] => [
+    QUERY_ROOT,
+    "agenda",
+    "pending",
+  ],
 };
 
-export type QueryKind = "config" | "agenda";
+export type QueryKind = "config" | "agenda" | "agendaPending";
 
 /** Which KidBoard query a key belongs to, `undefined` for foreign keys. */
 export function queryKindOf(
@@ -38,6 +48,13 @@ export function queryKindOf(
     typeof queryKey[3] === "number"
   ) {
     return "agenda";
+  }
+  if (
+    queryKey[1] === "agenda" &&
+    queryKey.length === 3 &&
+    queryKey[2] === "pending"
+  ) {
+    return "agendaPending";
   }
   return undefined;
 }
