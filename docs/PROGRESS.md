@@ -8,6 +8,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-01 Workspace scaffold | Sonnet 5.5 | Sonnet 5.5 | 2 | Round 1: named non-handler export crashed workerd. |
 | 2026-11-22 | T-02 Lint, format, git hooks | Sonnet 5.5 | Sonnet 5.5 | 1 | Orchestrator spot-checked lefthook config against Context7. |
 | 2026-11-22 | T-03 Test setup | Sonnet 5.5 | Sonnet 5.5 | 1 | Uses @cloudflare/vitest-plugin (renamed from vitest-pool-workers, which is deprecated). |
+| 2026-11-22 | T-05 Community & config files | Sonnet 5.5 | Sonnet 5.5 | 2 | Round 1: autoReturnSeconds default inconsistent with T-18. Built in parallel with T-04. |
 
 ## Escalations
 
