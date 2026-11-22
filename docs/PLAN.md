@@ -333,7 +333,7 @@ operation, works offline with the last known state.
   `ring-accent`. (M2 follow-up) `<meta name="theme-color">` follows night mode, or the reason it doesn't is
   documented.
 
-- [ ] **T-22 Burn-in protection** (risk: low, deps: T-11)
+- [x] **T-22 Burn-in protection** (risk: low, deps: T-11)
   Acceptance: whole layout shifts by a few px on a slow orbit every few minutes, never
   causes overflow/scrolling; under reduced motion shifts happen without animation; tests
   with fake timers.

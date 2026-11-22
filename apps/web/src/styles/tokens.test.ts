@@ -171,6 +171,19 @@ describe("token structure", () => {
     expect(touch).toMatch(/^max\(64px,\s*4rem\)$/);
   });
 
+  it("keeps the burn-in amplitude well below the gutter (both rem based, so at every root size)", () => {
+    const rem = (name: string): number => {
+      const value = light.get(name) ?? "";
+      expect(value, name).toMatch(/^\d+(\.\d+)?rem$/);
+      return parseFloat(value);
+    };
+    const burnIn = rem("--spacing-burn-in");
+    expect(burnIn).toBeGreaterThan(0);
+    expect(burnIn).toBeLessThanOrEqual(rem("--spacing-gutter") / 2);
+    // "A few px": 8 px at the 16 px root of 1280x800, 12 px at the 24 px root of 2000x1200.
+    expect(burnIn * 16).toBeLessThanOrEqual(12);
+  });
+
   it("disables transition and animation durations for reduced motion", () => {
     expect(tokensCss).toMatch(
       /prefers-reduced-motion:\s*reduce\)\s*\{\s*:root\s*\{[^}]*--duration-normal:\s*0ms/,

@@ -242,6 +242,31 @@ pointers so children cannot trigger it by accident; the request runs on pointer-
 backoff starts over when the children ran 60 s without failing. The retry button resets
 at once.
 
+### Burn-in protection & banner slot (T-22)
+
+`apps/web/src/burnin/`: `burnInOffset(stepIndex)` (pure) walks an 8-point square ring
+(`BURN_IN_ORBIT`, units of `--spacing-burn-in` = 0.5 rem, i.e. 8 px at 1280x800 and 12 px at
+2000x1200; the corners are the maximum shift); `burnInStepIndex(now)` = `floor(epoch /
+5 min)`, so every device follows the same deterministic schedule (a full orbit takes 40 min).
+`useBurnInShift()` reads it on the minute clock (`useNow`, no timer of its own).
+`BoardFrame` applies it as a `transform` on an **inner wrapper** (`data-testid=burn-in-shift`),
+never on `<main>`: `<main>` gives `burn-in` of its gutter back as the wrapper's padding, and
+its bottom strip is `touch + burn-in` tall, so the shifted wrapper stays inside the original
+gutter and above the fullscreen strip (amplitude 0.5 rem < gutter 1.5 rem; unit-tested
+against the tokens). The step glides over `--duration-slow`; under `prefers-reduced-motion`
+the durations are 0 (also `motion-reduce:transition-none`), so it jumps without animation.
+`transform` is part of the `data-theme-switching` transition list (T-21), so a step that
+coincides with the night switch (19:30/06:30 are step boundaries) does not jump.
+Test hook: `?burnin=0..7` pins an orbit index (1, 3, 5, 7 = corners = max shift); read once,
+not persisted. **Not shifted:** the fullscreen control (faint, fixed 64 px target in the
+reserved corner: a stable target matters more than its negligible burn-in risk) and the
+loading/error screens (transient, no board chrome).
+
+The offline/stale banner no longer lives in the header: it has a fixed slot in the reserved
+bottom strip, centred left of the fullscreen control (`inset-x-touch`). Appearing or
+disappearing never reflows the header, so the view toggle keeps its place (e2e checks identical
+toggle positions with and without banner, both views and viewports).
+
 ### Client data layer (T-13)
 
 `apps/web/src/data/`: typed API client (zod-validated, 15 s timeout > worker's ~11 s

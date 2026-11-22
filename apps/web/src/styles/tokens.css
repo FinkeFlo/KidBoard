@@ -42,6 +42,9 @@
   --spacing: 0.25rem;
   --spacing-gutter: 1.5rem;
   --spacing-page: 2.5rem;
+  /* Burn-in shift amplitude (T-22): the board moves by up to this much per axis. Must stay
+     well below --spacing-gutter; the frame gives it back as padding so nothing overflows. */
+  --spacing-burn-in: 0.5rem;
   /* Minimum touch target for child interactions: >= 64px at every root size. */
   --spacing-touch: max(64px, 4rem);
 
