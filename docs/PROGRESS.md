@@ -12,12 +12,14 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-04 CI, release, dependency updates | Opus 5.5 (builder-opus) | Opus 5.5 (reviewer-opus) | 1 | High risk (CI/release) → Opus. gitleaks CLI instead of action (license). Release PRs need repo setting 'Allow GitHub Actions to create PRs'. |
 | 2026-11-22 | T-06 Shared data model & config schema | Sonnet 5.5 | Sonnet 5.5 | 1 | zod 4 strictObject for config; DTOs strip unknown keys. |
 | 2026-11-22 | T-07 Title parser | Sonnet 5.5 | Sonnet 5.5 | 1 | emoji-regex v11 used without `u` flag; text symbols like © filtered. Built in parallel with T-08. |
+| 2026-11-22 | T-08 iCal parsing & recurrence expansion | Opus 5.5 (builder-opus) | Opus 5.5 (reviewer-opus) | 4 | R1: RDATE PERIOD, TZID w/o VTIMEZONE, ADR; orchestrator added perf (Free plan 10 ms CPU) → fast-forward + equivalence tests (232→~10-30 ms). R2: infinite loop on unsatisfiable RRULE → per-iterator guard. R3: pin ical.js 2.2.1 + canary. |
 
 ## Escalations
 
 | Date | Task | From → To | Reason |
 |---|---|---|---|
 | 2026-11-22 | T-04 | Sonnet → Opus | High-risk task (CI/release pipeline) |
+| 2026-11-22 | T-08 | Sonnet → Opus | High-risk task (iCal/recurrence/time zones); reviewer reported structural perf problem in round 1 |
 
 ## Milestone reviews
 

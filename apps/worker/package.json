@@ -9,8 +9,10 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@date-fns/tz": "^1.5.0",
     "@kidboard/shared": "workspace:*",
-    "hono": "^4.13.0"
+    "hono": "^4.13.0",
+    "ical.js": "2.2.1"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.9.0",
