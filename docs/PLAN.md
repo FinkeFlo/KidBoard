@@ -365,9 +365,40 @@ operation, works offline with the last known state.
 
 **M5 exit:** milestone review, CI green.
 
+## M5b – Design hand-off
+
+Adopts the final design from `docs/design/` (Claude Design, 2026-11-22). Runs before M6 so
+v1.0.0 ships with the final look.
+
+- [ ] **T-29 Final design tokens** (risk: medium, deps: M5)
+  Acceptance: `apps/web/src/styles/tokens.css` replaced by `docs/design/tokens.css`;
+  `tokens.test.ts` extended with the pairs listed in `docs/design/README.md` (text on child
+  tints, time-of-day accents on tints, today ring, nav, soft error) in both themes; no raw
+  hex in components; screenshots regenerated.
+
+- [ ] **T-30 Four-day overview as main screen** (risk: medium, deps: T-29)
+  Acceptance: today + next 3 days as columns (today wider, raised, today ring), events top to
+  bottom in time order, time-of-day icon on each tile, now line in today's column, meals at
+  the bottom of each column; event tiles with child tint, edge and child badge (several
+  children: split tint + overlapping badges); dense rule from 6 events ("vorbei" strip, dense
+  tiles, "+N"); navigation rail on the right; 8 events + 3 meals fit 1280×800 and
+  2000×1200 without scrolling (Playwright); i18n DE + EN.
+
+- [ ] **T-31 Week view in the new tile language** (risk: low, deps: T-30)
+  Acceptance: week tiles tinted with child badge and time-of-day icon, special countdown day
+  in the child's tint and edge, moons in the column headers up to the target day, meals as a
+  three-row list; existing week e2e adjusted.
+
+- [ ] **T-32 States and night mode per hand-off** (risk: medium, deps: T-30)
+  Acceptance: loading skeleton without spinner, offline/stale pill, friendly error card with
+  retry ≥ 64 px and parent line, empty day illustration with meals, night theme with dimmed
+  emoji and `--opacity-past-night`; contrast tests green; reduced motion respected.
+
+**M5b exit:** milestone review, CI green.
+
 ## M6 – Deploy, docs, v1.0.0
 
-- [x] **T-25 Cloudflare deploy** (risk: **high** → Opus, deps: M5)
+- [x] **T-25 Cloudflare deploy** (risk: **high** → Opus, deps: M5; built before M5b, see change log)
   Acceptance: root `pnpm deploy:cloudflare` builds web + deploys worker; "Deploy to
   Cloudflare" button in README; documented secrets (`wrangler secret put CAL_KINDER_URL`)
   and vars; `wrangler deploy --dry-run` in CI; step-by-step guide verified as far as
@@ -411,6 +442,7 @@ operation, works offline with the last known state.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | New milestone M5b (T-29–T-32): adopt the design hand-off in `docs/design/`; T-25 now depends on M5b | Final design from Claude Design replaces the placeholder theme and the band layout before v1.0.0 |
 | 2026-11-22 | M4 review follow-ups: burn-in inner wrapper + fixed toggle place (T-22), glanceability pass (T-24), boundary reset test (T-20), night contrast for new surfaces (T-21), single fixture date constant (T-23) | M4 milestone review by reviewer-opus |
 | 2026-11-22 | T-18: the meal plan is shown inside the week columns instead of a separate meal screen | No extra screen, one glance: children and parents see events and meals of the whole week at once |
 | 2026-11-22 | M3 review: agenda `days` limit 14 → 31 and client range 8 → 31 (T-19, shared query for day/week/countdown); follow-ups to T-18 (shared frame, continuing events), T-20 (boundary auto-reset), T-21 (`useCurrentBand`), T-23 (e2e clock, `timezoneId`, docs), T-28 (release-please initial version) | M3 milestone review by reviewer-opus; countdown needs 30 days but `/api/agenda` capped at 14 |
