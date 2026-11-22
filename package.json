@@ -1,0 +1,18 @@
+{
+  "name": "kidboard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Icon-first family calendar and meal plan for a wall-mounted kiosk tablet.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @kidboard/web --filter @kidboard/worker dev",
+    "build": "pnpm --filter @kidboard/web build && pnpm --filter @kidboard/worker build",
+    "lint": "echo \"lint: placeholder until T-02\"",
+    "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
+    "test": "echo \"test: placeholder until T-03\"",
+    "test:e2e": "echo \"test:e2e: placeholder until T-03\"",
+    "format": "echo \"format: placeholder until T-02\"",
+    "format:check": "echo \"format:check: placeholder until T-02\""
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@kidboard/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@kidboard/shared": "workspace:*",
+    "hono": "^4.13.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "wrangler": "^4.0.0"
+  }
+}
