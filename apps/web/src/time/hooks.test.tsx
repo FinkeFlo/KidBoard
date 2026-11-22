@@ -1,17 +1,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Bands } from "./clock";
-import { useCurrentBand, useNow, useToday } from "./hooks";
+import { useNow, useToday } from "./hooks";
 
 const at = (iso: string): number => Date.parse(iso);
 const HOUR_MS = 3_600_000;
-
-const BANDS: Bands = {
-  morningStart: "06:00",
-  middayStart: "11:00",
-  eveningStart: "17:00",
-};
 
 function startAt(iso: string): void {
   vi.useFakeTimers({ now: at(iso) });
@@ -207,40 +200,6 @@ describe("useToday", () => {
     expect(result.current).toBe("2026-11-23");
     rerender({ zone: "Europe/Berlin" });
     expect(result.current).toBe("2026-11-22");
-    unmount();
-  });
-});
-
-describe("useCurrentBand", () => {
-  it("moves through the bands as time passes, switching at the boundaries", () => {
-    startAt("2026-11-22T04:59:00Z"); // 05:59 Berlin
-    const { result, unmount } = renderHook(() =>
-      useCurrentBand(useNow(), BANDS, "Europe/Berlin"),
-    );
-    expect(result.current).toBe("night");
-    advance(60_000); // 06:00
-    expect(result.current).toBe("morning");
-    advance(5 * HOUR_MS - 60_000); // 10:59
-    expect(result.current).toBe("morning");
-    advance(60_000); // 11:00
-    expect(result.current).toBe("midday");
-    advance(6 * HOUR_MS - 60_000); // 16:59
-    expect(result.current).toBe("midday");
-    advance(60_000); // 17:00
-    expect(result.current).toBe("evening");
-    advance(7 * HOUR_MS - 60_000); // 23:59
-    expect(result.current).toBe("evening");
-    advance(60_000); // 00:00
-    expect(result.current).toBe("night");
-    unmount();
-  });
-
-  it("is undefined until bands and zone are known", () => {
-    startAt("2026-11-22T10:00:00Z");
-    const { result, unmount } = renderHook(() =>
-      useCurrentBand(useNow(), undefined, undefined),
-    );
-    expect(result.current).toBeUndefined();
     unmount();
   });
 });

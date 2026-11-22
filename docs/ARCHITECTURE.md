@@ -203,6 +203,27 @@ generated on every build by `@vite-pwa/assets-generator` from the original artwo
 `apps/web/public/kidboard-icon.svg` (`apps/web/pwa-assets.config.ts`). The app polls for a
 new `sw.js` hourly; a new worker activates at once and the page reloads by itself.
 
+### Night mode (T-21)
+
+`apps/web/src/theme/`: `isNight(instant, nightMode, zone)` (pure) is true in
+`[start, end)` of the wall clock of the config zone; `end` before `start` spans midnight
+(19:30-06:30), `enabled: false` is never night. Wall-clock minutes mean a DST night
+follows the clock face (skipped hour never matches, repeated hour matches twice).
+`useNightTheme(nightMode, zone)` (called by `Board`) recomputes it on the minute clock
+(`useNow`) and sets `<html data-theme="night|light">`, which swaps the colour/shadow
+variables in `tokens.css`; Tailwind's `night:` variant matches the same attribute. Until
+the config is known the theme is left untouched (light tokens), and the first known value
+applies without a fade. While the theme changes the hook sets
+`data-theme-switching` on `<html>` for 0.8 s, during which `global.css` fades the colours
+over `--duration-slow` (variables do not animate on their own); under
+`prefers-reduced-motion` the durations are 0 and the switch is instant. `?night=1|0`
+forces night/day for testing; it is read once at startup and deliberately **not**
+persisted (a forgotten test link must not pin a kiosk after the next clean reload).
+`<meta name="theme-color">` is updated at runtime to `--color-surface` in night mode and
+restored to the build-time value (brand accent) by day. The manifest `theme_color` stays
+static, because a manifest cannot change with the time of day; it only applies at
+install/splash time.
+
 ### Kiosk: wake lock, fullscreen, boundary reset (T-20)
 
 `apps/web/src/kiosk/`: `useWakeLock()` requests the Screen Wake Lock while the page is
@@ -239,7 +260,8 @@ known (fetched or restored). Rules in detail: [ADR-0006](adr/0006-caching-offlin
 
 `apps/web/src/time/`: pure logic in `clock.ts` (`startOfMinute`, `msUntilNextMinute`,
 `minuteOfDay`, `bandOf(instant, bands, zone)` → `night | morning | midday | evening`,
-boundaries belong to the later band, `night` = before `morningStart`), hooks in
+boundaries belong to the later band, `night` = before `morningStart`; the day model
+calls it directly with the minute-clock `now`, there is no band hook), hooks in
 `hooks.ts`:
 
 * `useNow()`: current time floored to the minute. One shared `setTimeout` chain
@@ -253,10 +275,9 @@ boundaries belong to the later band, `night` = before `morningStart`), hooks in
   of the config zone (minute boundaries are local minute boundaries for all
   whole-minute offsets), also on DST nights and when the DST change happens at midnight,
   whatever the device zone. Re-renders only when the date changes.
-* `useCurrentBand(now, bands, zone)`: `bandOf` memoized for the view.
 
 **Before the config has loaded** the time zone is unknown. KidBoard deliberately gates
-instead of guessing a default zone: `useToday`/`useCurrentBand` return `undefined`,
+instead of guessing a default zone: `useToday` returns `undefined`,
 `useTodayAgenda` sends no agenda request (its agenda query stays pending, so the
 connection status is `loading`, or `offline` without network), and views show their
 loading state. A default such as `Europe/Berlin` would fetch and show the wrong day for

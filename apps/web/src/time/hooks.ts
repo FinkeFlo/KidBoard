@@ -1,7 +1,7 @@
 import { todayInZone } from "@kidboard/shared";
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
-import { type BandId, bandOf, type Bands, startOfMinute } from "./clock";
+import { startOfMinute } from "./clock";
 import { minuteClock } from "./minuteClock";
 
 /*
@@ -41,22 +41,4 @@ export function useToday(timeZone: string | undefined): string | undefined {
     [timeZone],
   );
   return useSyncExternalStore(minuteClock.subscribe, snapshot, snapshot);
-}
-
-/**
- * Band of `now` (pass {@link useNow}) for the config `bands` in `timeZone`, see
- * `bandOf`. `undefined` until the config (bands and zone) is known.
- */
-export function useCurrentBand(
-  now: number,
-  bands: Bands | undefined,
-  timeZone: string | undefined,
-): BandId | undefined {
-  return useMemo(
-    () =>
-      bands === undefined || timeZone === undefined
-        ? undefined
-        : bandOf(now, bands, timeZone),
-    [now, bands, timeZone],
-  );
 }
