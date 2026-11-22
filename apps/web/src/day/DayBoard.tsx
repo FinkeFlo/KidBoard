@@ -10,10 +10,15 @@ import type { DayBand } from "../time";
 import type { DayBandModel, DayEvent, DayModel } from "./buildDayModel";
 import { DayEmpty } from "./DayStates";
 
+/**
+ * Band symbols. They must not repeat a symbol with another meaning on the board: 🌙 is the
+ * countdown's "one sleep" and ☀️ the day-view toggle, so midday is the sun with a face
+ * and the evening a sunset (never a moon).
+ */
 const BAND_SYMBOL: Record<DayBand, string> = {
   morning: "🌅",
-  midday: "☀️",
-  evening: "🌙",
+  midday: "🌞",
+  evening: "🌆",
 };
 
 // Full class names so Tailwind can see them.

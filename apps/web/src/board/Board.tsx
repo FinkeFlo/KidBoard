@@ -100,7 +100,11 @@ export function Board(): React.JSX.Element {
           format={format}
         />
       ) : (
-        <WeekBoard days={models.week} format={format} />
+        <WeekBoard
+          days={models.week}
+          childList={config.children}
+          format={format}
+        />
       )}
     </BoardFrame>
   );

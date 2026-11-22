@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
+import { demoApiPlugin } from "./demo/demoPlugin.ts";
 import { createPwaOptions } from "./pwa/options.ts";
 import { readPwaColors } from "./pwa/tokenColors.ts";
 
@@ -17,8 +18,14 @@ export const appDefine: Record<string, string> = {
   __APP_VERSION__: JSON.stringify(pkg.version),
 };
 
-export default defineConfig({
-  plugins: [react(), tailwindcss(), VitePWA(createPwaOptions(readPwaColors()))],
+// `vite --mode demo` (`pnpm dev:demo`) serves synthetic demo data instead of the worker's API.
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    react(),
+    tailwindcss(),
+    VitePWA(createPwaOptions(readPwaColors())),
+    ...(mode === "demo" ? [demoApiPlugin()] : []),
+  ],
   define: appDefine,
   server: { proxy: { "/api": "http://localhost:8787" } },
-});
+}));

@@ -44,19 +44,25 @@ export function isWeekendDate(date: string): boolean {
 
 /**
  * Ranks a day's events by importance for the icon budget of a week column:
+ * 0. events that are already over (only today has them) go last: the column answers
+ *    "what is still to come?", and a past event may only fill a slot nothing else wants,
  * 1. countdown events (the child is waiting for them),
  * 2. all-day events (they shape the whole day),
  * 3. timed events by start time (the earliest first; a continuing multi-day event counts
  *    as starting at the beginning of the day, i.e. first),
  * ties by title, then feed order. The input is not modified.
+ *
+ * Receding is done by ranking, not by dimming: faded icons would break WCAG AA contrast.
  */
 export function rankByImportance(events: readonly DayEvent[]): DayEvent[] {
   const tier = ({ event }: DayEvent): number =>
     event.countdown ? 0 : event.allDay ? 1 : 2;
+  const over = ({ status }: DayEvent): number => (status === "past" ? 1 : 0);
   const startMs = ({ event, continues }: DayEvent): number =>
     event.allDay || continues ? 0 : Date.parse(event.start);
   return [...events].sort(
     (a, b) =>
+      over(a) - over(b) ||
       tier(a) - tier(b) ||
       startMs(a) - startMs(b) ||
       a.event.title.localeCompare(b.event.title),

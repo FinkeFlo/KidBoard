@@ -10,7 +10,10 @@ export const MOONS_PER_ROW = 7;
 /** Event icons shown when several countdown events fall on the same day. */
 export const MAX_COUNTDOWN_ICONS = 3;
 
+/** 🌙 means "one sleep" and nothing else on the board (the day bands use other symbols). */
 const MOON = "🌙";
+/** Pictorial "today!" cue next to the word, so non-readers see that the day has come. */
+export const TODAY_CUE = "🎉";
 
 export type CountdownVariant = "full" | "compact";
 
@@ -21,13 +24,14 @@ const SIZES: Record<
 > = {
   full: {
     icon: "text-heading",
-    moon: "text-title",
+    moon: "text-heading",
     text: "text-title",
     box: "gap-3 px-4 py-2",
   },
+  // Moons are the part a child counts at a glance, so they stay big (heading, not body).
   compact: {
     icon: "text-title",
-    moon: "text-body",
+    moon: "text-heading",
     text: "text-body",
     box: "gap-2 px-3 py-1",
   },
@@ -83,7 +87,7 @@ export interface CountdownBadgeProps {
 
 /**
  * "How many sleeps?" (T-19): the awaited event icon(s) and one 🌙 per night (up to
- * {@link MAX_INDIVIDUAL_MOONS}, in rows of a week), or 🌙 ×N beyond. Today: the icons and
+ * {@link MAX_INDIVIDUAL_MOONS}, in rows of a week), or 🌙 ×N beyond. Today: the icons, 🎉 and
  * "Today!". The visuals are hidden from assistive tech; a localized, pluralized label
  * says the same in words. Static (no animation), so reduced motion needs nothing extra.
  */
@@ -115,8 +119,14 @@ export function CountdownBadge({
       </span>
       <span aria-hidden="true" className="flex items-center">
         {isToday ? (
-          <span className={`${size.text} font-extrabold`}>
-            {t("countdown.today")}
+          <span
+            data-testid="countdown-today"
+            className="flex items-center gap-2"
+          >
+            <Emoji emoji={TODAY_CUE} className={size.moon} />
+            <span className={`${size.text} font-extrabold`}>
+              {t("countdown.today")}
+            </span>
           </span>
         ) : (
           <Moons nights={countdown.nights} variant={variant} />

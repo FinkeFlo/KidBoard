@@ -392,8 +392,14 @@ pictorial `ViewToggle` ☀️/🗓️) around `DayBoard` or `WeekBoard`. View st
 (`addCalendarDays`), each built with `buildDayModel(agenda, config, date, now)`, so day
 and week agree on what belongs to a day. Meals are part of the columns (no extra
 screen, one glance). **Most important events** (they get the 3 icon slots, the rest
-becomes "+N"): 1. `countdown` events, 2. all-day events, 3. timed events by start (a
-multi-day event continuing from an earlier day counts as the earliest), ties by title.
+becomes "+N"): 0. events already over today rank **last** (the column answers "what is
+still to come?"; ranking instead of dimming keeps WCAG AA contrast), 1. `countdown`
+events, 2. all-day events, 3. timed events by start (a multi-day event continuing from
+an earlier day counts as the earliest), ties by title. An icon of a child's event sits
+in a ring in the (first) child's colour with a small avatar per child (colour is never
+the only cue); events without a child have no ring.
+**One meaning per symbol:** 🌙 only counts sleeps (countdown), ☀️ is the day-view toggle;
+the day bands use 🌅 / 🌞 / 🌆.
 Weekend = Saturday/Sunday of the date key (zone-independent calendar math).
 The week uses the board's one agenda query (`AGENDA_DAYS` = 31 since T-19).
 
@@ -415,13 +421,24 @@ The week uses the board's one agenda query (`AGENDA_DAYS` = 31 since T-19).
   named in the label (localized list), the badge shows up to 3 of their icons; order:
   all-day first, then start time, then title.
 * Rendering: ≤ 14 nights one 🌙 each, in rows of 7 (a week per row); beyond, one 🌙 and
-  "×N". Week view: `full` variant in the header; day view: `compact` badge (smaller)
-  in the same place. The visuals are `aria-hidden`; a region "How many sleeps?" carries
+  "×N". Week view: `full` variant in the header; day view: `compact` badge (smaller
+  icon, but heading-sized moons) in the same place. Today shows 🎉 next to "Today!". The visuals are `aria-hidden`; a region "How many sleeps?" carries
   a localized label with i18next plurals (`countdown.nights_one/_other`). Static, no
   animation (nothing to reduce for `prefers-reduced-motion`).
 * Data: the countdown reads the board's agenda (31 days). After midnight without a new
   response the seed covers 30 days (one day short, status `stale`); the countdown works
   on it and only misses events on the 30th night ahead until the real response lands.
+
+### Demo data & screenshots (T-24)
+
+`apps/web/demo/demoData.ts`: synthetic config and agenda (Mia 🦊 / Ben 🐻) built from
+"today" in the config zone (a repeating week of events and meals for 31 days plus one
+countdown event), so nothing goes stale. `pnpm dev:demo` serves it from a dev-only Vite
+plugin (`--mode demo`, `apply: "serve"`, never in a build). `pnpm screenshots` (own
+Playwright config, `apps/web/screenshots/`, after `pnpm build`) mocks the API with the
+same data, pins the clock (`fixClock`), `?burnin=0`, `?night=` and reduced motion, and
+writes day/week x light/night x 1280x800/2000x1200 PNGs to `docs/screenshots/`; it is
+not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the PNGs.
 
 ### Worker API details (T-10)
 

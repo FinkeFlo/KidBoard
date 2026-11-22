@@ -1,6 +1,9 @@
+import type { CalendarEvent, Child } from "@kidboard/shared";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ChildAvatar } from "../components/ChildAvatar";
+import { childColorStyle } from "../components/childColor";
 import { Emoji } from "../components/Emoji";
 import {
   type FormatContext,
@@ -9,11 +12,72 @@ import {
 } from "../i18n/format";
 import type { WeekDay } from "./buildWeekModel";
 
+/** Children an event is for (unknown ids skipped), in the event's order. */
+function kidsOf(event: CalendarEvent, childList: readonly Child[]): Child[] {
+  return event.childIds.flatMap((id) => {
+    const child = childList.find((c) => c.id === id);
+    return child === undefined ? [] : [child];
+  });
+}
+
+/**
+ * One event icon of a week column. For a child's event the icon sits in a ring in that
+ * child's colour (the first child, like the day view's tile edge) with a small avatar per
+ * child in the corner, so "whose is this?" reads at a glance without words; the colour is
+ * never the only cue (the avatar emoji and a screen reader text say who).
+ */
+function WeekIcon({
+  event,
+  childList,
+}: {
+  event: CalendarEvent;
+  childList: readonly Child[];
+}): React.JSX.Element {
+  const { t } = useTranslation();
+  const kids = kidsOf(event, childList);
+  const first = kids[0];
+  return (
+    <li
+      data-testid="week-icon"
+      data-child-ids={kids.map((child) => child.id).join(" ")}
+      style={childColorStyle(first?.color)}
+      className={`rounded-tile relative p-1 ${
+        first === undefined
+          ? ""
+          : "bg-surface-raised ring-4 ring-(--child-color)"
+      }`}
+    >
+      <Emoji emoji={event.icon} label={event.title} className="text-icon" />
+      {kids.length > 0 && (
+        <>
+          <span className="absolute -end-2 -bottom-2 flex">
+            {kids.map((child) => (
+              <ChildAvatar
+                key={child.id}
+                decorative
+                child={child}
+                className="border-surface-raised text-body -ms-2 size-8 border-2 first:ms-0"
+              />
+            ))}
+          </span>
+          <span className="sr-only">
+            {t("week.forChildren", {
+              names: kids.map((child) => child.name),
+            })}
+          </span>
+        </>
+      )}
+    </li>
+  );
+}
+
 function WeekColumn({
   day,
+  childList,
   format,
 }: {
   day: WeekDay;
+  childList: readonly Child[];
   format: FormatContext;
 }): React.JSX.Element {
   const { t } = useTranslation();
@@ -47,13 +111,7 @@ function WeekColumn({
       {(day.icons.length > 0 || day.more > 0) && (
         <ul className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
           {day.icons.map((event) => (
-            <li key={event.id}>
-              <Emoji
-                emoji={event.icon}
-                label={event.title}
-                className="text-icon"
-              />
-            </li>
+            <WeekIcon key={event.id} event={event} childList={childList} />
           ))}
           {day.more > 0 && (
             <li className="text-title text-text-muted font-extrabold">
@@ -101,11 +159,17 @@ function WeekColumn({
 
 export interface WeekBoardProps {
   days: readonly WeekDay[];
+  /** Configured children; `event.childIds` are looked up here (unknown ids skipped). */
+  childList: readonly Child[];
   format: FormatContext;
 }
 
 /** Seven day columns side by side (today first) with icons and meals. Presentational. */
-export function WeekBoard({ days, format }: WeekBoardProps): React.JSX.Element {
+export function WeekBoard({
+  days,
+  childList,
+  format,
+}: WeekBoardProps): React.JSX.Element {
   const { t } = useTranslation();
   return (
     <div
@@ -115,7 +179,12 @@ export function WeekBoard({ days, format }: WeekBoardProps): React.JSX.Element {
       className="grid min-h-0 flex-1 grid-cols-7 gap-3"
     >
       {days.map((day) => (
-        <WeekColumn key={day.date} day={day} format={format} />
+        <WeekColumn
+          key={day.date}
+          day={day}
+          childList={childList}
+          format={format}
+        />
       ))}
     </div>
   );

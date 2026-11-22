@@ -20,6 +20,10 @@ The worker serves `apps/web/dist` (`assets.directory`). `pnpm dev` therefore fir
 (fresh clone). Delete `apps/web/dist` or run `pnpm build` to refresh it; use the Vite dev
 server URL for live reload.
 
+`pnpm dev:demo` starts only the web app (Vite) with synthetic demo data relative to today
+(Mia and Ben, a week of events and meals, a countdown) - no worker, secrets or calendar
+needed.
+
 For local worker secrets copy `apps/worker/.dev.vars.example` to `apps/worker/.dev.vars`
 (see [docs/CONFIG.md](docs/CONFIG.md)).
 
@@ -29,6 +33,7 @@ For local worker secrets copy `apps/worker/.dev.vars.example` to `apps/worker/.d
 pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build
 pnpm test:e2e       # Playwright (tablet viewports)
 pnpm format         # auto-format
+pnpm screenshots    # regenerate docs/screenshots (after pnpm build)
 ```
 
 The gate must be green before every commit and pull request.
@@ -72,6 +77,8 @@ Worker-Secrets: `apps/worker/.dev.vars.example` nach `apps/worker/.dev.vars` kop
 
 `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build` muss vor jedem
 Commit und Pull Request grün sein. E2E-Tests: `pnpm test:e2e`, Formatieren: `pnpm format`.
+`pnpm dev:demo` startet nur die Web-App mit synthetischen Demo-Daten (relativ zu heute);
+`pnpm screenshots` (nach `pnpm build`) erzeugt `docs/screenshots` neu.
 
 ### Commits
 

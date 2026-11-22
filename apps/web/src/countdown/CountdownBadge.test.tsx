@@ -85,11 +85,24 @@ describe("CountdownBadge", () => {
     expect(screen.getByTestId("countdown-grouped")).toHaveTextContent("×30");
   });
 
-  it("shows the today state without moons", () => {
-    const badge = renderBadge(0);
-    expect(moonCount(badge)).toBe(0);
-    expect(badge).toHaveTextContent("Today!");
-    expect(badge).toHaveTextContent("Today is the day: Birthday party!");
+  it("shows the today state without moons but with a pictorial 🎉 cue, in both variants", () => {
+    for (const variant of ["full", "compact"] as const) {
+      const badge = renderBadge(0, [party()], variant);
+      expect(moonCount(badge)).toBe(0);
+      expect(badge).toHaveTextContent("Today!");
+      expect(badge).toHaveTextContent("Today is the day: Birthday party!");
+      const cue = screen.getByTestId("countdown-today");
+      expect(cue).toHaveTextContent("🎉");
+      // A picture for children, decorative for assistive tech (the label says it).
+      expect(cue.closest('[aria-hidden="true"]')).not.toBeNull();
+      cleanup();
+    }
+  });
+
+  it("has no 🎉 cue while nights are left", () => {
+    renderBadge(1);
+    expect(screen.queryByTestId("countdown-today")).toBeNull();
+    expect(screen.queryByText("🎉")).toBeNull();
   });
 
   it("names several events of the same day as a localized list, at most 3 icons", () => {
@@ -142,14 +155,36 @@ describe("CountdownBadge", () => {
     );
   });
 
-  it("is smaller in the compact variant", () => {
+  it("has a smaller event icon in the compact variant", () => {
     const full = renderBadge(2, [party()], "full");
     expect(full).toHaveAttribute("data-variant", "full");
     expect(full.querySelector(".text-heading")).not.toBeNull();
+    const icon = (badge: HTMLElement): Element | undefined =>
+      [...badge.querySelectorAll(".font-emoji")].find(
+        (el) => el.textContent === "🎂",
+      );
+    expect(icon(full)).toHaveClass("text-heading");
     cleanup();
     const compact = renderBadge(2, [party()], "compact");
     expect(compact).toHaveAttribute("data-variant", "compact");
-    expect(compact.querySelector(".text-heading")).toBeNull();
-    expect(compact.querySelector(".text-title")).not.toBeNull();
+    expect(icon(compact)).toHaveClass("text-title");
+    expect(icon(compact)).not.toHaveClass("text-heading");
+  });
+
+  it("draws the compact moons large (heading size), not body size", () => {
+    const compact = renderBadge(3, [party()], "compact");
+    const moonEls = [...compact.querySelectorAll(".font-emoji")].filter(
+      (el) => el.textContent === MOON,
+    );
+    expect(moonEls).toHaveLength(3);
+    for (const el of moonEls) {
+      expect(el).toHaveClass("text-heading");
+      expect(el).not.toHaveClass("text-body");
+    }
+    cleanup();
+    // Grouped (> 14 nights) uses the same moon size.
+    renderBadge(20, [party()], "compact");
+    const grouped = screen.getByTestId("countdown-grouped");
+    expect(grouped.querySelector(".font-emoji")).toHaveClass("text-heading");
   });
 });

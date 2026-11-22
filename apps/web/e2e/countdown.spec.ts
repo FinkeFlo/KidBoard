@@ -84,16 +84,49 @@ test.describe("countdown", () => {
     }
   });
 
+  test("compact moons on the day view are large, and no 🎉 cue while nights are left", async ({
+    page,
+  }) => {
+    await mockBoard(page, { agenda: withCountdown(6) });
+    await page.goto("/");
+    await expect(page.getByTestId("countdown")).toHaveAttribute(
+      "data-variant",
+      "compact",
+    );
+    expect(await moons(page)).toBe(6);
+    await expect(page.getByTestId("countdown-today")).toHaveCount(0);
+    const sizes = await page.evaluate(() => {
+      const px = (el: Element | null): number =>
+        el === null ? 0 : Number.parseFloat(getComputedStyle(el).fontSize);
+      const moon = [
+        ...document.querySelectorAll("[data-testid=countdown] .font-emoji"),
+      ].find((el) => el.textContent === "🌙");
+      const heading = document.querySelector("h1");
+      return { moon: px(moon ?? null), title: px(heading) };
+    });
+    // The day-view heading is display-sized; the moon is at least 2 x the body text size
+    // (--text-body is 1.125rem; the root size is 16 px at 1280 wide and grows with the screen).
+    const root = await page.evaluate(() =>
+      Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
+    );
+    expect(sizes.moon).toBeGreaterThanOrEqual(root * 2);
+    expect(sizes.moon).toBeLessThan(sizes.title);
+    await expectNoOverflow(page);
+  });
+
   test("today: the today state in both views", async ({ page }) => {
     await mockBoard(page, { agenda: withCountdown(0) });
     await page.goto("/");
     const countdown = page.getByRole("region", { name: "How many sleeps?" });
     await expect(countdown).toHaveAttribute("data-nights", "0");
     await expect(countdown).toContainText("Today!");
+    // A picture for children who cannot read "Today!": the party popper.
+    await expect(page.getByTestId("countdown-today")).toContainText("🎉");
     expect(await moons(page)).toBe(0);
     await expectNoOverflow(page);
     await page.getByRole("button", { name: "Week view" }).click();
     await expect(countdown).toHaveAttribute("data-variant", "full");
+    await expect(page.getByTestId("countdown-today")).toContainText("🎉");
     await expect(countdown).toContainText("Today is the day: Christmas party!");
     await expectNoOverflow(page);
   });

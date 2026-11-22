@@ -11,7 +11,11 @@ export default defineProject({
     environment: "jsdom",
     // Token tests read the raw CSS source (`?raw`); by default Vitest blanks CSS modules.
     css: true,
-    include: ["src/**/*.test.{ts,tsx}", "pwa/**/*.test.ts"],
+    include: [
+      "src/**/*.test.{ts,tsx}",
+      "pwa/**/*.test.ts",
+      "demo/**/*.test.ts",
+    ],
     setupFiles: ["./vitest.setup.ts"],
   },
 });
