@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PLACEHOLDER_TEXT } from "../placeholder-text";
+import en from "../i18n/locales/en.json";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 
 let shouldThrow = true;
@@ -43,7 +43,7 @@ describe("AppErrorBoundary", () => {
     );
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: PLACEHOLDER_TEXT.errorTitle }),
+      screen.getByRole("heading", { name: en.error.title }),
     ).toBeInTheDocument();
     expect(screen.getByText("boom <b>not html</b>")).toBeInTheDocument();
   });
@@ -55,9 +55,7 @@ describe("AppErrorBoundary", () => {
       </AppErrorBoundary>,
     );
     shouldThrow = false;
-    await userEvent.click(
-      screen.getByRole("button", { name: PLACEHOLDER_TEXT.errorRetry }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: en.error.retry }));
     expect(screen.getByText("recovered")).toBeInTheDocument();
   });
 });

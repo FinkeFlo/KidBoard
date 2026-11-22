@@ -1,0 +1,10 @@
+{
+  "app": {
+    "placeholderPage": "Platzhalterseite"
+  },
+  "error": {
+    "title": "Hoppla, da ist etwas schiefgelaufen",
+    "hint": "Nichts ist verloren. Bitte versuche es noch einmal.",
+    "retry": "Nochmal versuchen"
+  }
+}

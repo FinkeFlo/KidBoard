@@ -210,7 +210,7 @@ operation, works offline with the last known state.
   6. Split `apps/web` tsconfig: browser code without Node types; a separate
      `tsconfig.node.json` for vite/vitest/playwright configs and e2e.
 
-- [ ] **T-12 i18n** (risk: low, deps: T-11)
+- [x] **T-12 i18n** (risk: low, deps: T-11)
   Acceptance:
   1. i18next + react-i18next, bundled `de` / `en` resources, typed keys.
   2. Language: config `locale` → else browser language → else `de`; `<html lang>` updated;

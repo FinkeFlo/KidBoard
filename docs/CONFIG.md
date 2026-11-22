@@ -30,7 +30,7 @@ The root `.env.example` only lists tooling variables (e.g. `PLAYWRIGHT_CHROMIUM_
 
 | Option                  | Type                          | Default                          | Example                         | Description                                                                                          |
 | ----------------------- | ----------------------------- | -------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `locale`                | `"de"` \| `"en"` \| `"auto"`  | `"auto"`                         | `"de"`                          | UI language. `auto` follows the device language, falling back to `en`.                               |
+| `locale`                | `"de"` \| `"en"` \| `"auto"`  | `"auto"`                         | `"de"`                          | UI language. `auto` follows the browser language, falling back to `de`.                               |
 | `timeZone`              | IANA time zone name           | `"Europe/Berlin"`                | `"America/New_York"`            | Zone for day boundaries, bands and floating times. Must be a valid IANA name.                        |
 | `children`              | array of child                | `[]`                             | see below                       | Children shown on the board. Ids must be unique.                                                     |
 | `children[].id`         | string (slug)                 | required                         | `"mia"`                         | Stable identifier.                                                                                   |
@@ -94,7 +94,7 @@ KV-Cache mindestens `Kalender × 86400 / 500`).
 
 **Nicht geheime Einstellungen** stehen als JSON in `KIDBOARD_CONFIG` (Pflicht; Vorlage:
 `config.example.json`; fehlerhaft → API antwortet `500`, das Log nennt die Fehler). Alle Optionen außer `calendars` haben Standardwerte: `locale`
-(`de`/`en`/`auto`), `timeZone` (IANA, Standard `Europe/Berlin`), `children` (id, name, color,
+(`de`/`en`/`auto`; `auto` = Browsersprache, sonst `de`), `timeZone` (IANA, Standard `Europe/Berlin`), `children` (id, name, color,
 avatar), `calendars` (id, kind `events`/`meals`, optional `childId`, `label`), `bands`
 (Tagesabschnitte, `HH:mm` aufsteigend), `nightMode` (an/aus, Start, Ende), `countdown.emojis`
 (Termine mit diesen Icons bekommen den "Noch x Mal schlafen"-Countdown), `refreshMinutes`,
