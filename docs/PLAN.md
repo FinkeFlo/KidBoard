@@ -107,7 +107,7 @@ operation, works offline with the last known state.
 
 ## M1 – Worker + iCal parsing
 
-- [ ] **T-06 Shared data model & config schema** (risk: medium, deps: M0)
+- [x] **T-06 Shared data model & config schema** (risk: medium, deps: M0)
   Acceptance:
   1. Types + zod schemas for `Child`, `CalendarSource`, `CalendarEvent`, `Meal`,
      `AgendaResponse`, `AppConfig` in `packages/shared` exactly as in ARCHITECTURE.md
