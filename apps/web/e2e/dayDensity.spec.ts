@@ -123,7 +123,7 @@ for (let count = 1; count <= 12; count += 1) {
     for (const tile of await today.getByRole("article").all()) {
       await expect(tile).toBeInViewport({ ratio: 1 });
     }
-    // Today's emoji stay at least 3.5rem, also dense.
+    // Today's emoji: large tiles at least 3.5rem, dense tiles at least 3rem.
     const sizes = await today
       .getByTestId("column-events")
       .getByTestId("event-tile")
@@ -131,15 +131,18 @@ for (let count = 1; count <= 12; count += 1) {
         const rem = parseFloat(
           getComputedStyle(document.documentElement).fontSize,
         );
-        return tiles.map(
-          (tile) =>
+        return tiles.map((tile) => ({
+          dense: tile.getAttribute("data-size") === "dense",
+          rem:
             parseFloat(
               getComputedStyle(tile.querySelector(".font-emoji") as Element)
                 .fontSize,
             ) / rem,
-        );
+        }));
       });
-    for (const size of sizes) expect(size).toBeGreaterThanOrEqual(3.5 - 0.01);
+    for (const size of sizes) {
+      expect(size.rem).toBeGreaterThanOrEqual((size.dense ? 3 : 3.5) - 0.01);
+    }
     // Every plate of every column is on screen.
     for (const plate of await page
       .getByTestId("meal-plates")

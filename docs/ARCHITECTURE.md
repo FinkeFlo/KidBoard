@@ -30,7 +30,7 @@ flowchart LR
   subgraph Tablet["Tablet (Fully Kiosk / installed PWA)"]
     SW["Service worker<br/>(app shell precache)"]
     Q["TanStack Query<br/>+ persisted cache (localStorage)"]
-    V["Day view / Week view<br/>night mode, wake lock,<br/>burn-in shift"]
+    V["Four-day overview / Week view<br/>night mode, wake lock,<br/>burn-in shift"]
   end
 
   K -- HTTPS --> F
@@ -230,6 +230,9 @@ over `--duration-slow` (variables do not animate on their own); under
 forces night/day for testing; it is read once at startup and deliberately **not**
 persisted, neither as a parameter nor as the remembered theme (a forgotten test link must
 not pin a kiosk after the next clean reload).
+`<Emoji>` dims every emoji at night itself (`night:brightness-75 night:saturate-80`, the
+design hand-off's `brightness(0.75) saturate(0.8)`), so no caller handles it; a caller's
+`grayscale` (past events) composes with it.
 `<meta name="theme-color">` is updated at runtime to `--color-surface` in night mode and
 restored to the build-time value (brand accent) by day. The manifest `theme_color` stays
 static, because a manifest cannot change with the time of day; it only applies at
@@ -346,42 +349,97 @@ is refetched regardless of `staleTime` and never persisted (the persister's per-
 persisted cache to be restored before it creates the real query, so a reload on a later
 day (offline) is seeded from the restored agenda.
 
-### Day view (T-17)
+### Overview: day model, columns and states (T-17, T-30b)
 
 `apps/web/src/day/buildDayModel.ts` (pure, `buildDayModel(agenda, config, date, now)`)
-decides what belongs to a date (a date key in the config zone) and where it goes; every
-instant is read in the config zone, never the device zone. **Placement rules:**
+decides what belongs to a date (a date key in the config zone) and in what order; every
+instant is read in the config zone, never the device zone. `buildOverviewModel` calls it
+for today plus three days and places the days into the **4 columns** of the overview
+(today `2fr`, the others `1fr`), so overview, week and countdown agree on what belongs to
+a day. **Placement rules:**
 
-* **All-day events** (also multi-day ones) covering the date go to the top row, in feed
-  order. `end` is exclusive; a zero-length all-day event counts for its start day.
+* **All-day events** (also multi-day ones) covering the date go to the day's all-day
+  banner, in feed order. `end` is exclusive; a zero-length all-day event counts for its
+  start day.
 * **Timed events** belong to every date from the date of their start to the date of
-  their last instant (`end − 1 ms`, so an event ending at midnight does not spill into the
-  next day; a zero-length event stays on its start day).
-* **Band** by start time (`bandOf`, wall clock of the zone; a boundary belongs to the later
-  band): `morning` from `morningStart`, `midday` from `middayStart`, `evening` from
-  `eveningStart`. Before `morningStart` (`night`) the event goes to the morning band (the
-  board has no night band). An event that started on an earlier day (multi-day,
-  crossing midnight) is in the morning band too, with a "continues" hint instead of its
-  original start time. Inside a band: by start, ties by title; above 4 events a band
-  lists them in two columns.
+  their last instant (`end - 1 ms`, so an event ending at midnight does not spill into the
+  next day; a zero-length event stays on its start day). They form one list per column in
+  time order (ties by title); an event that started on an earlier day comes first with a
+  "continues" hint instead of its start time. There are no bands or band headings. Each
+  event carries `timeOfDay` (`bandOf`, wall clock of the zone; a boundary belongs to the
+  later band; before `morningStart` it counts as morning), which only picks the small
+  morning / midday / evening symbol next to the time.
 * **Status** only on today: an event is `past` once its end has passed (zero-length: after
   its start), `current` while running, else `upcoming`; all-day events are always
-  `upcoming`. The band containing `now` is `current`, earlier bands `past`; before
-  `morningStart` nothing is current or past. Past items recede via surface/text tokens
-  (not opacity, WCAG AA).
+  `upcoming`. The model also gives today's `nowIndex` (events already started), `current`
+  and `next` (first event not yet started). Past items recede via surface/text tokens (not
+  opacity, WCAG AA).
 * **Meals** of the date, ordered breakfast, lunch, dinner, unspecified.
 
-**States:** `DayLoading` (skeleton with the view's layout) until config and agenda are
-known; `DayEmpty` ("nothing planned" illustration) inside the board; `DayError` (child-calm
-emoji + sentence, parent-readable reason: `failed`, `offline`, `unauthorized`) only when
-there is no data at all. With data, offline or stale, the board stays and only the
-`DiscreetStatusBanner` in the bottom strip reports it (T-22). **Stale-banner delay:** the
-banner shows `stale` only after it has lasted **5 s** (`STALE_BANNER_DELAY_MS`,
-`useSettled`), because online every midnight is briefly `stale` (the new day is seeded from
-the cache until its fetch lands) and that must not flash on a wall display. `offline`,
-`error` and `unauthorized` show at once. E2E (`e2e/offline.spec.ts`) covers the offline
-reload through the service worker, `stale: true`, 502 with and without data, reconnect,
-offline across midnight and the 401 wipe, with the device in `America/Los_Angeles`.
+**Column layout (space-based, nothing scrolls).** `useContentHeight` (a `ResizeObserver`
+on the `flex-1 min-h-0` event list, first value measured in a layout effect before paint)
+gives the list height and the root font size, so the height is handled in rem. `fitColumn`
+chooses the tile size (`large`/`compact` while every event fits and there are fewer than
+`DENSE_FROM` = 6, else `dense`/`compact-dense`) and the largest `columnLayout` capacity
+whose real height fits: tiles (`TILE_HEIGHT_REM`), the smaller strip and "+N" rows
+(`SUMMARY_ROW_REM`), gaps and the room of the now line. `columnLayout` folds **past events
+first** into the "vorbei" strip (up to 8 icons, then "+N"), only then sums up the latest
+upcoming events in a trailing "+N" tile. A **current event is never hidden or folded**;
+`MIN_SLOTS` (3: one tile, strip and "+N") is the smallest capacity, so a tiny column may
+overflow rather than hide. Strip and "+N" name all their titles for assistive tech, so
+nothing is lost silently.
+
+**Today's markers.** `NowLine` is a named separator between started and upcoming events and
+moves only from tile to tile, never per minute. The current tile keeps its accent ring;
+the next upcoming one gets a ring in `--color-now` (`data-next`).
+
+**All-day banner.** `AllDayBanner` shows at most two entries as flat strips with the
+all-day arc icon in the children's tint, then a named "+N" for the rest.
+
+**Meal plates.** `MealPlates` sits at the bottom of every column: breakfast, lunch, dinner
+in fixed places (an empty place for a missing meal), more meals of a slot side by side,
+`unspecified` meals last. Each emoji is an image named "Lunch: Spaghetti".
+
+**Child tint.** `resolveTileTint(children)`: no child neutral, one child its tint plus a
+4px edge, two a hard-stop split gradient, three or more neutral with up to three badges and
+"+N". A `child-N` token maps to `--color-child-N-tint`; any other colour is mixed 20 % into
+the surface, but only after `isCssColor` accepted it (strict grammar, `CSS.supports` where
+available; CSS keywords, `var()`, `url()` are refused). Unusable config text falls back to
+the neutral fill. The value is only used as a style value, never in class names. Dense
+tiles (today) carry a 3rem emoji in a 3.75rem tile; large tiles keep at least 3.5rem.
+
+**States:**
+
+* **Loading:** `DayLoading` is a static skeleton with the view's layout: header, the four
+  columns (today raised) and the rail in surface tokens, "Der Tag wird geholt ..." in the
+  bottom strip. No spinner, no animation.
+* **Empty:** `DayEmpty` ("nothing planned" illustration) inside today's column; the meals
+  stay visible.
+* **Error:** `ErrorCard` (full screen, 🧸, a calm line for children, one line for parents,
+  a "reload now" button of at least 64px) only when there is no data at all. It shows a
+  short stable `KB-*` code from `components/errorCode.ts` (`KB-NET`, `KB-TIME`, `KB-401`,
+  `KB-502`, `KB-OFF`, `KB-UI`, ...; identifiers, never an error message, URL or body). No
+  red surface and no fixed retry seconds: the data layer's backoff decides. The raw error
+  is only logged, never shown. `AppErrorBoundary` uses the same card for render errors.
+* **401:** the calm variant (`unauthorized`): raised surface with an edge, "open the link
+  again", no retry button, because a parent has to act; the 401 wipe already forgot the
+  token.
+* **Offline / stale with data:** the board stays and only the `DiscreetStatusBanner` pill
+  in the bottom strip reports it ("Offline · as of 14:02", "Maybe not current · as of
+  14:02", without the time where unknown; calm notice colours, polite `status`). **Stale
+  delay:** `stale` shows only after it has lasted **5 s** (`STALE_BANNER_DELAY_MS`,
+  `useSettled`), because online every midnight is briefly `stale` (the new day is seeded
+  from the cache until its fetch lands). `offline`, `error` and `unauthorized` show at
+  once.
+* **`retryNow`** (`data/retryNow.ts`, `useRetryNow`): refetches every active KidBoard query
+  (config and the mounted agenda) at once with `cancelRefetch`, so a running fetch or a
+  pending automatic retry is replaced by a fresh attempt. It does not reject; failures
+  surface through the queries as usual. The disabled agenda placeholder does not fetch
+  until the config is there.
+
+E2E (`e2e/offline.spec.ts`) covers the offline reload through the service worker,
+`stale: true`, 502 with and without data, reconnect, offline across midnight and the 401
+wipe, with the device in `America/Los_Angeles`.
 
 ### Board: four-day overview & week view (T-18, T-30b)
 
@@ -411,14 +469,25 @@ titles for assistive tech, nothing is hidden silently, nothing scrolls).
 
 `apps/web/src/week/buildWeekModel.ts` (pure): 7 columns from today in the config zone
 (`addCalendarDays`), each built with `buildDayModel(agenda, config, date, now)`, so day
-and week agree on what belongs to a day. Meals are part of the columns (no extra
-screen, one glance). **Most important events** (they get the 3 icon slots, the rest
+and week agree on what belongs to a day. Meals are part of the columns (`MealRows`, no
+extra screen, one glance). **Order of the events** (the first ones get tiles, the rest
 becomes "+N"): 0. events already over today rank **last** (the column answers "what is
 still to come?"; ranking instead of dimming keeps WCAG AA contrast), 1. `countdown`
 events, 2. all-day events, 3. timed events by start (a multi-day event continuing from
-an earlier day counts as the earliest), ties by title. An icon of a child's event sits
-in a ring in the (first) child's colour with a small avatar per child (colour is never
-the only cue); events without a child have no ring.
+an earlier day counts as the earliest), ties by title.
+**Space-based "+N":** like the overview, the week measures its columns (`useContentHeight`)
+and `fitWeekColumn` decides: `week` tiles while everything fits and there are fewer than 6
+events, else `week-dense`, with as many tiles as fit and a trailing "+N" row only when
+tiles do not fit (never a fixed count). The "+N" row carries the hidden titles as its
+accessible label. Week tiles are the overview's `EventTile` in a stacked form (emoji above
+time, no visible title; the title is in the accessible name): tinted by the child
+(`resolveTileTint`) with edge and badges per child, so colour is never the only cue;
+events without a child are neutral.
+**Countdown day:** the day the countdown waits for wears the awaited event's child tint
+and edge, and every earlier day shows one 🌙 in its header (the night still to sleep).
+`MealRows` is a three-row list (breakfast, lunch, dinner, each led by its time-of-day
+symbol; an empty row for a missing meal; `unspecified` meals in an extra row only when
+present).
 **One meaning per symbol:** 🌙 only counts sleeps (countdown), ☀️ is the "Today" button;
 tiles and meal plates use 🌅 / 🌞 / 🌆 for the time of day, all-day events an arc icon.
 Weekend = Saturday/Sunday of the date key (zone-independent calendar math).

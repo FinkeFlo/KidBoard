@@ -19,6 +19,8 @@ MVP renders native emoji through one `<Emoji>` component (font stack
 The component has two modes. With a non-empty `label` the emoji is an image for
 assistive tech (`role="img"`, `aria-label`). Without a label (or a blank one) it is
 **decorative**: `aria-hidden="true"`, no role, so screen readers skip it. Use the
-decorative mode whenever visible text next to it already says the same (meal cards, band
-headings, the child legend's avatars next to the names, the countdown visuals inside its
-labelled region), so nothing is announced twice.
+decorative mode whenever visible text next to it already says the same (a tile's emoji next to its title, the child legend's avatars next to the names, the
+countdown visuals inside its labelled region), so nothing is announced twice.
+
+Night dimming also lives inside the `<Emoji>` seam (`night:brightness-75
+night:saturate-80`), so callers never dim emoji themselves.

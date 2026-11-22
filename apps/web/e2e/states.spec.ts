@@ -288,6 +288,7 @@ test("dense tiles: the emoji box stays inside the child edge, the edge is drawn 
       tiles.map((tile) => {
         // `after:inset-ring-4`: the child edge is 4px wide.
         const edge = 4;
+        const margin = 2;
         const outer = tile.getBoundingClientRect();
         const glyph = tile.querySelector(".font-emoji");
         const emoji = glyph?.getBoundingClientRect();
@@ -298,6 +299,12 @@ test("dense tiles: the emoji box stays inside the child edge, the edge is drawn 
             emoji.top >= outer.top + edge - 0.5 &&
             emoji.bottom <= outer.bottom - edge + 0.5 &&
             emoji.left >= outer.left + edge - 0.5,
+          // The visible emoji box clears the edge with a margin on every side.
+          clear:
+            emoji !== undefined &&
+            emoji.top >= outer.top + edge + margin &&
+            emoji.bottom <= outer.bottom - edge - margin &&
+            emoji.left >= outer.left + edge + margin,
           overlay: after.position === "absolute" && after.content !== "none",
           // `leading-none`: the emoji's line box is exactly its font size.
           leadingNone:
@@ -310,6 +317,7 @@ test("dense tiles: the emoji box stays inside the child edge, the edge is drawn 
   expect(report.length).toBeGreaterThan(0);
   for (const tile of report) {
     expect(tile.inside).toBe(true);
+    expect(tile.clear).toBe(true);
     expect(tile.overlay).toBe(true);
     expect(tile.leadingNone).toBe(true);
   }

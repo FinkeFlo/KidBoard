@@ -106,22 +106,25 @@ test.describe("overview (main screen)", () => {
       expect(other.bg).toBe(await tokenColor(page, "--color-surface-sunken"));
     }
 
-    // Today's emoji are at least 3.5rem.
+    // Today's emoji: large tiles at least 3.5rem, dense tiles at least 3rem.
     const emojiSizes = await today
       .getByTestId("column-events")
       .getByTestId("event-tile")
       .evaluateAll((tiles) =>
-        tiles.map((tile) =>
-          parseFloat(
+        tiles.map((tile) => ({
+          dense: tile.getAttribute("data-size") === "dense",
+          px: parseFloat(
             getComputedStyle(tile.querySelector(".font-emoji") as Element)
               .fontSize,
           ),
-        ),
+        })),
       );
     const rem = await px(page, "1rem");
     expect(emojiSizes.length).toBeGreaterThan(0);
     for (const size of emojiSizes) {
-      expect(size).toBeGreaterThanOrEqual(3.5 * rem - 0.5);
+      expect(size.px).toBeGreaterThanOrEqual(
+        (size.dense ? 3 : 3.5) * rem - 0.5,
+      );
     }
 
     // Every timed event is shown, folded into the named strip or summed up: none lost.

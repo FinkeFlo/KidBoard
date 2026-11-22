@@ -22,14 +22,14 @@ export type TileSize =
 /** Tile heights in rem; `large` and `compact` are `--spacing-tile(-compact)`. */
 export const TILE_HEIGHT_REM: Record<TileSize, number> = {
   large: 5,
-  dense: 4,
+  dense: 3.75,
   compact: 4.75,
   "compact-dense": 3.75,
   week: 5.75,
   "week-dense": 4.5,
 };
 
-// Full class names so Tailwind can see them. Today's emoji stay >= 3.5rem in both sizes.
+// Full class names so Tailwind can see them. Today's large emoji stay >= 3.5rem, dense ones are 3rem.
 const SIZES: Record<
   TileSize,
   {
@@ -51,10 +51,10 @@ const SIZES: Record<
     stacked: false,
   },
   dense: {
-    // 4rem leaves exactly the 3.5rem emoji line box (leading-none) inside the 4px edge;
-    // the glyph's slightly taller ink stays below the edge overlay (see `statusClasses`).
-    tile: "h-16 gap-3 ps-3 pe-4",
-    emoji: "text-[3.5rem]",
+    // 3.75rem holds the 3rem emoji line box (leading-none) with 0.25rem to spare inside
+    // the 4px edge; the glyph's slightly taller ink stays below the edge overlay.
+    tile: "h-15 gap-3 ps-3 pe-4",
+    emoji: "text-[3rem]",
     title: "text-tile-compact",
     badge: "size-8",
     badgeText: "text-body",

@@ -228,8 +228,9 @@ describe("EventTile", () => {
     );
   });
 
-  it("keeps today's emoji at 3.5rem in the large and the dense size", () => {
+  it("keeps today's emoji at 3.5rem (large) and 3rem (dense)", () => {
     for (const size of ["large", "dense"] as const) {
+      const emojiClass = size === "large" ? "text-[3.5rem]" : "text-[3rem]";
       const { unmount } = render(
         <EventTile
           event={eventFixture()}
@@ -238,7 +239,7 @@ describe("EventTile", () => {
           size={size}
         />,
       );
-      expect(screen.getByText("🏊")).toHaveClass("text-[3.5rem]");
+      expect(screen.getByText("🏊")).toHaveClass(emojiClass);
       expect(tile()).toHaveAttribute("data-size", size);
       unmount();
     }
@@ -251,10 +252,10 @@ describe("EventTile", () => {
       );
     expect(TILE_HEIGHT_REM.large).toBe(token("--spacing-tile"));
     expect(TILE_HEIGHT_REM.compact).toBe(token("--spacing-tile-compact"));
-    // Dense sizes are shorter, but still hold the 3.5rem emoji line box (today) inside
+    // Dense sizes are shorter, but still hold the 3rem emoji line box (today) inside
     // the 4px edge on both sides (0.25rem each at the 16px baseline).
     expect(TILE_HEIGHT_REM.dense).toBeLessThan(TILE_HEIGHT_REM.large);
-    expect(TILE_HEIGHT_REM.dense).toBeGreaterThanOrEqual(3.5 + 2 * 0.25);
+    expect(TILE_HEIGHT_REM.dense).toBeGreaterThanOrEqual(3 + 2 * 0.25);
     expect(TILE_HEIGHT_REM["compact-dense"]).toBeLessThan(
       TILE_HEIGHT_REM.compact,
     );
