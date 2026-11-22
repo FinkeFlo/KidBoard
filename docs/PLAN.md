@@ -220,7 +220,7 @@ operation, works offline with the last known state.
   5. Lint/test guard against hard-coded UI strings in JSX (e.g. `i18next/no-literal-string`
      or equivalent check) – no exceptions except emoji.
 
-- [ ] **T-13 Data layer** (risk: **high** → Opus, deps: T-10, T-12)
+- [x] **T-13 Data layer** (risk: **high** → Opus, deps: T-10, T-12)
   Acceptance:
   1. Typed API client (`/api/config`, `/api/agenda`) validating responses with shared zod
      schemas; access token read once from `?key=` and stored locally, sent as Bearer header.
