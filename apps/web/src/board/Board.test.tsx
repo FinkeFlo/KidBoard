@@ -352,4 +352,71 @@ describe("Board", () => {
       expect(screen.getAllByTestId("day-band")).toHaveLength(3);
     });
   });
+
+  describe("countdown (T-19)", () => {
+    it("requests 31 days and shows the countdown compact on the day view, full on the week view", async () => {
+      fake.setReplies("/api/agenda", {
+        status: 200,
+        body: agendaFixture({
+          range: { from: "2026-11-22", to: "2026-12-23" },
+          events: [
+            // Beyond the week, 26 nights ahead (not in any week column).
+            eventFixture({
+              id: "xmas",
+              title: "Christmas",
+              icon: "🎄",
+              allDay: true,
+              start: "2026-12-18",
+              end: "2026-12-19",
+              countdown: true,
+            }),
+            // Under way since yesterday: not awaited any more.
+            eventFixture({
+              id: "holiday",
+              title: "Holiday",
+              icon: "🏖️",
+              allDay: true,
+              start: "2026-11-21",
+              end: "2026-11-25",
+              countdown: true,
+            }),
+          ],
+        }),
+      });
+      renderDay();
+      const compact = await screen.findByRole("region", {
+        name: en.countdown.label,
+      });
+      expect(fake.calls.map((c) => c.url)).toContain(
+        "/api/agenda?from=2026-11-22&days=31",
+      );
+      expect(compact).toHaveAttribute("data-variant", "compact");
+      expect(compact).toHaveAttribute("data-nights", "26");
+      expect(compact).toHaveTextContent("26 more sleeps until Christmas");
+      expect(
+        within(compact).getByTestId("countdown-grouped"),
+      ).toHaveTextContent("×26");
+      // The countdown lives in the header, next to the date.
+      expect(compact.closest("header")).not.toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: en.board.week }));
+      const full = screen.getByRole("region", { name: en.countdown.label });
+      expect(full).toHaveAttribute("data-variant", "full");
+      expect(full).toHaveTextContent("26 more sleeps until Christmas");
+    });
+
+    it("shows no countdown without an upcoming countdown event", async () => {
+      fake.setReplies("/api/agenda", {
+        status: 200,
+        body: agendaFixture({
+          events: [eventFixture({ id: "swim", title: "Swimming" })],
+        }),
+      });
+      renderDay();
+      expect(await screen.findAllByTestId("day-band")).toHaveLength(3);
+      expect(
+        screen.queryByRole("region", { name: en.countdown.label }),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

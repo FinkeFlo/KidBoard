@@ -14,8 +14,12 @@ import { useApiClient } from "./apiContext";
 import { refreshIntervalMs } from "./queryClient";
 import { queryKeys } from "./queryKeys";
 
-/** Days the board requests from today on (worker default; covers the week view). */
-export const AGENDA_DAYS = 8;
+/**
+ * Days the board requests from today on: today plus the 30 days the countdown looks
+ * ahead (T-19, worker maximum). Day, week and countdown share this one query, its
+ * connection status and its offline seed.
+ */
+export const AGENDA_DAYS = 31;
 
 /**
  * `/api/config`. Refetched every `refreshMinutes` (60 until known), on focus and

@@ -59,5 +59,13 @@
     "meals": "Meals",
     "moreBadge": "+{{count}}",
     "mealEntry": "{{slot}}: {{title}}"
+  },
+  "countdown": {
+    "label": "How many sleeps?",
+    "nights_one": "{{count}} more sleep until {{titles, list}}",
+    "nights_other": "{{count}} more sleeps until {{titles, list}}",
+    "todayLabel": "Today is the day: {{titles, list}}!",
+    "today": "Today!",
+    "grouped": "×{{count}}"
   }
 }

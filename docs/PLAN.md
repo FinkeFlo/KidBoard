@@ -170,8 +170,8 @@ operation, works offline with the last known state.
 
 - [x] **T-10 Worker API** (risk: **high** → Opus, deps: T-09)
   Acceptance:
-  1. `GET /api/agenda?from=YYYY-MM-DD&days=N` (1 ≤ N ≤ 14, default 8 – raised to 31 in T-19, `from` default today
-     in config zone) returns `AgendaResponse`; input validated → 400 on bad input.
+  1. `GET /api/agenda?from=YYYY-MM-DD&days=N` (1 ≤ N ≤ 31, raised from 14 in T-19; default 8;
+     `from` default today in config zone) returns `AgendaResponse`; input validated → 400 on bad input.
   2. `GET /api/config` returns the public config; `GET /api/health` returns status without
      secrets.
   3. Feeds fetched in parallel with timeout (10 s) and size limit (5 MB); per-source fresh
@@ -303,7 +303,7 @@ operation, works offline with the last known state.
      `date`). Continuing multi-day timed events get a "continues" hint instead of the
      original start time.
 
-- [ ] **T-19 "How many sleeps?" countdown** (risk: medium, deps: T-18, T-16)
+- [x] **T-19 "How many sleeps?" countdown** (risk: medium, deps: T-18, T-16)
   Acceptance:
   1. Picks the nearest upcoming `countdown` event within 30 days.
   2. Nights = calendar-day difference in configured zone (event today → 0 → "today!"

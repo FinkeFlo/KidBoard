@@ -10,7 +10,9 @@ import {
   PERSIST_STORAGE_KEY,
   serializePersistedClient,
   shouldPersistQuery,
+  supersededAgendas,
 } from "./persister";
+import { AGENDA_DAYS } from "./queries";
 import { PERSIST_MAX_AGE_MS } from "./queryClient";
 import { queryKeys } from "./queryKeys";
 import { agendaFixture, configFixture, TODAY } from "./testing.test-utils";
@@ -203,5 +205,117 @@ describe("createPersistOptions", () => {
     await persister.persistClient(client([]));
     expect(await persister.restoreClient()).toBeUndefined();
     expect(window.localStorage.getItem(PERSIST_STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe("superseded agendas (T-19: one 31-day agenda per day would pile up)", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  function agendaQuery(
+    from: string,
+    to: string,
+    fetchedAt: number,
+  ): PersistedClient["clientState"]["queries"][number] {
+    const base = erroredAgendaQuery();
+    const key = queryKeys.agenda({ from, days: AGENDA_DAYS });
+    return {
+      ...base,
+      queryKey: key,
+      queryHash: JSON.stringify(key),
+      state: {
+        ...base.state,
+        data: agendaFixture({ range: { from, to } }),
+        dataUpdatedAt: fetchedAt,
+      },
+    };
+  }
+
+  const writtenFroms = (queries: PersistedClient["clientState"]["queries"]) =>
+    (
+      JSON.parse(serializePersistedClient(client(queries))) as PersistedClient
+    ).clientState.queries.map((q) => q.queryKey[2]);
+
+  it("keeps only the newest of the daily agendas, plus the config", () => {
+    const now = Date.now();
+    const daily = Array.from({ length: 7 }, (_, day) =>
+      agendaQuery(
+        `2026-11-${String(16 + day)}`,
+        `2026-12-${String(17 + day)}`,
+        now - (6 - day) * DAY,
+      ),
+    );
+    const config = {
+      ...daily[0],
+      queryKey: queryKeys.config(),
+      queryHash: JSON.stringify(queryKeys.config()),
+      state: { ...erroredAgendaQuery().state, data: configFixture() },
+    } as PersistedClient["clientState"]["queries"][number];
+    expect(writtenFroms([...daily, config])).toEqual(["2026-11-22", undefined]);
+  });
+
+  it("keeps an older agenda that reaches further than the newer one", () => {
+    const now = Date.now();
+    const longOld = agendaQuery("2026-11-22", "2026-12-23", now - DAY);
+    const shortNew = agendaQuery("2026-11-23", "2026-11-25", now);
+    expect(writtenFroms([longOld, shortNew])).toEqual([
+      "2026-11-22",
+      "2026-11-23",
+    ]);
+    // Same fetch time: neither supersedes the other.
+    const twin = agendaQuery("2026-11-23", "2026-12-24", now - DAY);
+    expect(supersededAgendas([longOld, twin])).toEqual(new Set());
+  });
+
+  it("ignores seeds, expired and invalid data as superseders", () => {
+    const now = Date.now();
+    const real = agendaQuery("2026-11-22", "2026-12-23", now - DAY);
+    const seed = agendaQuery("2026-11-23", "2026-12-23", 0);
+    const expired = agendaQuery("2026-11-23", "2026-12-24", now - 8 * DAY);
+    const broken = {
+      ...agendaQuery("2026-11-23", "2026-12-24", now),
+      queryHash: "broken",
+    };
+    broken.state = { ...broken.state, data: { range: "nope" } };
+    expect(supersededAgendas([real, seed, expired, broken])).toEqual(new Set());
+    expect(writtenFroms([real, seed, expired])).toEqual(["2026-11-22"]);
+  });
+
+  it("stores a busy 31-day agenda well below the localStorage quota", () => {
+    const from = TODAY;
+    const events = Array.from({ length: AGENDA_DAYS * 12 }, (_, i) => {
+      const day = new Date(Date.UTC(2026, 10, 22 + Math.floor(i / 12)))
+        .toISOString()
+        .slice(0, 10);
+      const hour = String(7 + (i % 12)).padStart(2, "0");
+      return {
+        ...agendaFixture().events[0],
+        id: `event-${String(i).padStart(4, "0")}-abcdef0123456789`,
+        title: `Activity with a longer title ${String(i)}`,
+        start: `${day}T${hour}:00:00+01:00`,
+        end: `${day}T${hour}:45:00+01:00`,
+      };
+    }) as ReturnType<typeof agendaFixture>["events"];
+    const meals = Array.from({ length: AGENDA_DAYS * 3 }, (_, i) => ({
+      id: `meal-${String(i).padStart(4, "0")}-abcdef0123456789`,
+      sourceId: "meals",
+      date: new Date(Date.UTC(2026, 10, 22 + Math.floor(i / 3)))
+        .toISOString()
+        .slice(0, 10),
+      slot: "lunch" as const,
+      title: `Meal with a name ${String(i)}`,
+      icon: "🍝",
+      iconIsFallback: false,
+    }));
+    const query = agendaQuery(from, "2026-12-23", Date.now());
+    query.state = {
+      ...query.state,
+      data: agendaFixture({ events, meals, range: { from, to: "2026-12-23" } }),
+    };
+    const raw = serializePersistedClient(client([query]));
+    // 372 events + 93 meals: about 110 KB, a few percent of the ~5 MB quota.
+    expect(raw.length).toBeLessThan(200_000);
+    expect(
+      (JSON.parse(raw) as PersistedClient).clientState.queries,
+    ).toHaveLength(1);
   });
 });

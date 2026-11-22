@@ -61,7 +61,8 @@ export function agenda(
   return {
     generatedAt: NOW,
     timeZone: "Europe/Berlin",
-    range: { from: "2026-11-22", to: "2026-11-30" },
+    // `AGENDA_DAYS` (31): today plus the 30 days the countdown looks ahead.
+    range: { from: "2026-11-22", to: dateOf(31) },
     stale: false,
     sources: [{ id: "family", status: "ok", fetchedAt: NOW }],
     events: events.map((event, index) => {

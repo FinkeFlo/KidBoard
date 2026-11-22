@@ -78,12 +78,55 @@ export function isWithinMaxAge(
   return now - dataUpdatedAt <= PERSIST_MAX_AGE_MS;
 }
 
-/** JSON for storage: KidBoard queries with data younger than 7 d, error state stripped. */
+const AgendaRangeSchema = AgendaResponseSchema.pick({ range: true });
+
+/**
+ * Hashes of agenda queries that a newer persisted agenda supersedes: one whose data was
+ * fetched later and whose range reaches at least as far (`range.to`). The seed picks the
+ * most recently fetched covering agenda (`pickCoveringAgenda`), so an older one could
+ * only ever be picked for days before the newer one's `from`, which the board never asks
+ * for again (its ranges start today). Without this rule a kiosk running for a week would
+ * store one 31-day agenda per day (T-19: payload size).
+ */
+export function supersededAgendas(
+  queries: readonly Pick<DehydratedQuery, "queryKey" | "queryHash" | "state">[],
+): Set<string> {
+  const agendas = queries.flatMap((query) => {
+    const parsed = AgendaRangeSchema.safeParse(query.state.data);
+    return queryKindOf(query.queryKey) === "agenda" &&
+      parsed.success &&
+      isWithinMaxAge(query.state.dataUpdatedAt)
+      ? [
+          {
+            hash: query.queryHash,
+            fetchedAt: query.state.dataUpdatedAt,
+            to: parsed.data.range.to,
+          },
+        ]
+      : [];
+  });
+  return new Set(
+    agendas
+      .filter((older) =>
+        agendas.some(
+          (newer) => newer.fetchedAt > older.fetchedAt && newer.to >= older.to,
+        ),
+      )
+      .map((older) => older.hash),
+  );
+}
+
+/**
+ * JSON for storage: KidBoard queries with data younger than 7 d, error state stripped,
+ * without superseded agendas ({@link supersededAgendas}).
+ */
 export function serializePersistedClient(client: PersistedClient): string {
+  const superseded = supersededAgendas(client.clientState.queries);
   const queries = client.clientState.queries.flatMap((query) =>
     queryKindOf(query.queryKey) !== undefined &&
     query.state.data !== undefined &&
-    isWithinMaxAge(query.state.dataUpdatedAt)
+    isWithinMaxAge(query.state.dataUpdatedAt) &&
+    !superseded.has(query.queryHash)
       ? [
           cleanQuery(
             query,

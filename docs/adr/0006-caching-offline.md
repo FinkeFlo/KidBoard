@@ -65,7 +65,12 @@ fails, and say so discreetly.
     (no error objects); on restore each query is re-validated and dropped if invalid.
     `maxAge` only checks the client timestamp (refreshed by every save), so each query
     is additionally dropped on save and on restore once its `dataUpdatedAt` is older
-    than 7 days (old agenda keys do not pile up).
+    than 7 days (old agenda keys do not pile up). On save an agenda is also dropped
+    when a later-fetched one reaches at least as far (`range.to`): seeding always picks
+    the most recently fetched covering agenda, so the older one could only serve days
+    before the newer one's `from`, which the board never asks for again. With the 31-day
+    range (T-19) a kiosk would otherwise store up to eight overlapping month-long agendas;
+    one busy month (12 events and 3 meals a day) is about 110 KB of JSON.
   * Connection status (`useConnectionStatus`), first match wins: restoring → `loading`;
     a query in use without data: failed → `error`, offline → `offline`, else `loading`;
     offline → `offline`; failed refetch, `AgendaResponse.stale`, any

@@ -16,12 +16,14 @@ export interface BoardFrameProps {
   format: FormatContext;
   view: BoardView;
   onViewChange: (view: BoardView) => void;
+  /** The "How many sleeps?" countdown for the header (T-19), if there is one. */
+  countdown?: React.ReactNode;
   children: React.ReactNode;
 }
 
 /**
- * Shared frame of day and week view: today's date, status banner, child legend and the
- * view toggle on top, the view itself below.
+ * Shared frame of day and week view: today's date, the countdown, status banner, child
+ * legend and the view toggle on top, the view itself below.
  */
 export function BoardFrame({
   today,
@@ -29,12 +31,13 @@ export function BoardFrame({
   format,
   view,
   onViewChange,
+  countdown,
   children,
 }: BoardFrameProps): React.JSX.Element {
   return (
     <main className="bg-surface text-text gap-gutter p-gutter flex h-full flex-col">
       <header className="gap-gutter flex shrink-0 items-center justify-between">
-        <div className="min-w-0">
+        <div className="shrink-0">
           <h1 className="text-display font-extrabold">
             {formatWeekday(today, format)}
           </h1>
@@ -42,6 +45,7 @@ export function BoardFrame({
             {formatLongDate(today, format)}
           </p>
         </div>
+        {countdown}
         <div className="gap-gutter flex min-w-0 flex-wrap items-center justify-end">
           <DiscreetStatusBanner />
           <ChildLegend childList={childList} />
