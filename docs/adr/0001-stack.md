@@ -24,7 +24,7 @@ hobby contributors. Versions were checked on npm and APIs via Context7 on 2026-1
 | Package manager | **pnpm 10 workspaces** | `apps/web`, `apps/worker`, `packages/shared` | ✅ |
 | | npm workspaces | slower, weaker isolation | – |
 | Language | **TypeScript 6.0.x, `strict`** | TS 7 (native) is out, but `typescript-eslint` 8 supports `<6.1` only → pin `~6.0` until supported | ✅ |
-| Tests | **Vitest 5** + Testing Library + `@cloudflare/vitest-pool-workers` for the worker, **Playwright** for E2E/screenshots | | ✅ |
+| Tests | **Vitest 5** + Testing Library + `@cloudflare/vitest-plugin` for the worker, **Playwright** for E2E/screenshots | | ✅ |
 | Fonts | **Fontsource** `@fontsource-variable/nunito` (OFL-1.1, rounded, friendly) | self-hosted, offline-safe | ✅ |
 | UI primitives | none in MVP (Radix/shadcn considered) | the UI has no menus/dialogs; revisit for parent mode (M8) | – |
 
