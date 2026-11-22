@@ -458,7 +458,7 @@ not address. These rules apply to every M5b task:
   to find the secret iCal address, creating separate calendars, sharing caveats), title
   conventions with examples, configuration reference, deploy (Cloudflare), kiosk
   tips (Fully Kiosk settings, PWA install, screen dimming), troubleshooting, privacy note. (M2 follow-up) CONFIG.md EN + DE documents the tablet token flow: open `/?key=` once,
-  token stored + stripped from URL, forgotten after a 401. (M5 follow-up) Kiosk tips explain the hidden
+  token stored + stripped from URL, forgotten after a 401. (M5b follow-up) Describe the four-day overview, rail ("Stand/Updated"), vorbei strip, now line and "+N"; overview and state screenshots with updated captions; `KB-*` error codes in troubleshooting; `children[].emoji`/colour as tile tint and badge; CONFIG.md: `bands` set the time-of-day icon and meal slot. (M5 follow-up) Kiosk tips explain the hidden
   bottom-right fullscreen control (press and hold), wake-lock behaviour and its limits (battery
   saver), Fully Kiosk "keep screen on" as backup; `?night=` / `?burnin=` in a short developer note.
 
@@ -470,6 +470,9 @@ not address. These rules apply to every M5b task:
   merged, triaged and fixed via the builder/reviewer loop; a Sonnet agent then re-checks the
   result; repeat the loop until the re-check reports no blocking findings. Findings, decisions
   and rounds are logged in `docs/PROGRESS.md`.
+  (M5b follow-up) Explicit checks: English title truncation in narrow columns, week past-event
+  ranking for leftover slots, 🌞 vs ☀️ glanceability, faint emoji on light tints, skeleton → board
+  header jump, all states at both sizes light/night with 3 children and 1–12 events.
 
 - [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27a)
   Acceptance: full review by `reviewer-opus`; gitleaks over full history clean;
@@ -493,6 +496,7 @@ not address. These rules apply to every M5b task:
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | M5b review: dense overview tiles may use ~3rem emoji (large tiles stay ≥ 3.5rem, T-30b criterion met); English title truncation, week past-event ranking, 🌞/☀️ pair, skeleton header jump become explicit T-27a checks; T-27 docs scope extended (overview, rail, states, `KB-*` codes, CONFIG `bands` wording) | M5b milestone review by reviewer-opus: 3.5rem emoji in a 4rem dense tile tucked under the child edge |
 | 2026-11-22 | release-please switched to manual dispatch; early 1.0.0 release PR closed by the maintainer, who cuts the release himself | The automatic release PR proposed 1.0.0 too early |
 | 2026-11-22 | T-26 (Vercel) removed from v1.0.0, tracked as issue #3; T-27 no longer depends on it | Maintainer decision: Cloudflare is the only deploy target for v1.0.0 |
 | 2026-11-22 | New T-27a: mandatory UI/UX dummy test loop with three agents (Haiku, Sonnet, Opus) before the release, fix + Sonnet re-check until clean | Maintainer request before v1.0.0 |
