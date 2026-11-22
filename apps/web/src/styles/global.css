@@ -31,6 +31,22 @@
     overscroll-behavior: none;
   }
 
+  /*
+   * Smooth day/night switch (T-21): CSS variables do not animate, so while
+   * `useNightTheme` sets `data-theme-switching` on <html> (about 0.8 s around a switch)
+   * every element fades its colours. Not permanent, so nothing else is affected.
+   */
+  html[data-theme-switching],
+  html[data-theme-switching] *,
+  html[data-theme-switching] *::before,
+  html[data-theme-switching] *::after {
+    transition-property:
+      color, background-color, border-color, outline-color, box-shadow, fill,
+      stroke;
+    transition-duration: var(--duration-slow);
+    transition-timing-function: ease-in-out;
+  }
+
   /* Reduced motion: no transitions or animations anywhere (CLAUDE.md rule 7). */
   @media (prefers-reduced-motion: reduce) {
     *,

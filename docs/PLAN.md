@@ -326,7 +326,7 @@ operation, works offline with the last known state.
   for fullscreen (Fullscreen API); unit tests with mocked APIs. (M3 follow-up) `AppErrorBoundary` auto-resets after a delay with backoff so an unattended
   kiosk recovers without a tap (test that the reset lands in the day view).
 
-- [ ] **T-21 Night mode** (risk: medium, deps: T-11, T-16)
+- [x] **T-21 Night mode** (risk: medium, deps: T-11, T-16)
   Acceptance: automatic switch by `config.nightMode` times (spanning midnight works),
   dimmed warm token set, smooth transition (none under reduced motion), optional manual
   toggle via URL param `?night=1|0` for testing; contrast of night tokens meets AA. (M3 follow-up) Use `useCurrentBand` or remove it and fix its ARCHITECTURE mention. (M4 follow-up) Night-token contrast for weekend columns, countdown surface, band accents and

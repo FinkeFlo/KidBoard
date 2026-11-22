@@ -113,7 +113,7 @@ export function agenda(
  * `Date` subclass (or Playwright's `page.clock` wrapper) hides them, which makes
  * `TZDate#getHours()` read the device zone.
  */
-export async function fixClock(page: Page): Promise<void> {
+export async function fixClock(page: Page, now: string = NOW): Promise<void> {
   await page.addInitScript((fixedMs: number) => {
     const RealDate = Date;
     const offset = fixedMs - RealDate.now();
@@ -132,7 +132,7 @@ export async function fixClock(page: Page): Promise<void> {
           : Reflect.get(target, property, receiver);
       },
     });
-  }, Date.parse(NOW));
+  }, Date.parse(now));
 }
 
 /** Fixes the clock and answers `/api/config` and `/api/agenda`. */
@@ -142,9 +142,11 @@ export async function mockBoard(
     config?: unknown;
     agenda?: unknown;
     agendaStatus?: number;
+    /** ISO instant the clock reads when the page loads (default {@link NOW}). */
+    now?: string;
   } = {},
 ): Promise<void> {
-  await fixClock(page);
+  await fixClock(page, options.now);
   await page.route("**/api/**", (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/config") {

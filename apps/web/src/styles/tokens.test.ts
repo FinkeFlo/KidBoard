@@ -93,6 +93,25 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
     [`--color-band-${band}-accent`, `--color-band-${band}`, TEXT_AA] as const,
   ]),
   ["--color-text-muted", "--color-surface-sunken", TEXT_AA] as const,
+  // Weekend week columns (`bg-band-morning`, label `text-band-morning-accent`) and the
+  // countdown surface (`bg-band-evening`) also carry the muted text and the accent.
+  ["--color-accent", "--color-band-morning", UI_AA] as const,
+  ["--color-accent", "--color-band-evening", UI_AA] as const,
+  ["--color-accent", "--color-surface-sunken", UI_AA] as const,
+  // `ring-accent` (current tile, today's column) against what surrounds it.
+  ["--color-accent", "--color-surface-raised", UI_AA] as const,
+  ["--color-accent", "--color-band-midday", UI_AA] as const,
+  // Band rings (`ring-band-*-accent`) against the page.
+  ...BANDS.map(
+    (band) =>
+      [`--color-band-${band}-accent`, "--color-surface", UI_AA] as const,
+  ),
+  // The band surfaces must stand out from the page (edge between columns).
+  ...BANDS.map(
+    (band) => [`--color-band-${band}`, "--color-surface", 1.05] as const,
+  ),
+  ["--color-on-notice", "--color-surface", TEXT_AA] as const,
+  ["--color-danger", "--color-surface", TEXT_AA] as const,
   ...CHILD_TOKENS.flatMap((child) => [
     ["--color-on-child", child, TEXT_AA] as const,
     [child, "--color-surface", UI_AA] as const,

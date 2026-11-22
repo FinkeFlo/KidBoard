@@ -12,6 +12,7 @@ import { buildDayModel } from "../day/buildDayModel";
 import { DayBoard } from "../day/DayBoard";
 import { DayError, type DayErrorKind, DayLoading } from "../day/DayStates";
 import { useFormatContext } from "../i18n/format";
+import { useNightTheme } from "../theme";
 import { useNow } from "../time";
 import { buildWeekModel } from "../week/buildWeekModel";
 import { WeekBoard } from "../week/WeekBoard";
@@ -45,6 +46,7 @@ export function Board(): React.JSX.Element {
   const config = useConfig().data;
   const { today, agenda } = useTodayAgenda();
   const now = useNow();
+  useNightTheme(config?.nightMode, config?.timeZone);
   const status = useConnectionStatus();
   const apiError = useApiErrorKind();
   const data = agenda.data;

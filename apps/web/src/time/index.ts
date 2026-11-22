@@ -9,7 +9,7 @@ export {
   startOfMinute,
   timeOfDayMinutes,
 } from "./clock";
-export { useCurrentBand, useNow, useToday } from "./hooks";
+export { useNow, useToday } from "./hooks";
 export {
   createMinuteClock,
   type MinuteClock,
