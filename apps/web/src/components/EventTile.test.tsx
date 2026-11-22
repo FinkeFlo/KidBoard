@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { FormatContext } from "../i18n/format";
 import en from "../i18n/locales/en.json";
 import tokensCss from "../styles/tokens.css?raw";
-import { EventTile, TILE_HEIGHT_REM } from "./EventTile";
+import { EventTile, TILE_HEIGHT_REM, tileClasses } from "./EventTile";
 import { BEN, eventFixture, MIA } from "./fixtures.test-utils";
 
 const format: FormatContext = { locale: "en", timeZone: "Europe/Berlin" };
@@ -32,7 +32,18 @@ describe("EventTile", () => {
     // Decorative icon: the title is announced once, via the article name.
     expect(screen.getByText("🏊")).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByText("2:30 PM")).toBeInTheDocument();
-    expect(screen.getByText("Swimming")).toHaveClass("truncate");
+    // Up to two lines, then clamped; the title is plain text.
+    expect(screen.getByTestId("tile-title")).toHaveTextContent("Swimming");
+    expect(screen.getByTestId("tile-title").parentElement).toHaveClass(
+      "line-clamp-2",
+    );
+    // The emoji sits on a light disc (pale glyphs stay visible), the time-of-day icon
+    // is at least 1.5rem.
+    expect(within(tile()).getByTestId("emoji-disc")).toHaveClass(
+      "bg-surface-sunken",
+      "inset-ring-border",
+    );
+    expect(within(tile()).getByText("🌞")).toHaveClass("text-[1.5rem]");
   });
 
   it("uses the zone, not the instant's offset or device zone", () => {
@@ -117,8 +128,7 @@ describe("EventTile", () => {
     expect(badges()).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("reserves room for the corner badges only when there are badges", () => {
-    const title = (): HTMLElement => screen.getByText("Swimming");
+  it("puts the badges inside the tile, floated beside the title's first line only", () => {
     const { unmount } = render(
       <EventTile
         event={eventFixture({ title: "Swimming", childIds: ["mia"] })}
@@ -126,7 +136,14 @@ describe("EventTile", () => {
         format={format}
       />,
     );
-    expect(title()).toHaveClass("truncate", "pe-5");
+    const float = screen.getByTestId("badge-float");
+    expect(float).toHaveClass("float-end");
+    // Inside the tile (no corner overlay any more) and inside the title paragraph.
+    expect(tile()).toContainElement(float);
+    expect(float.parentElement).toContainElement(
+      screen.getByTestId("tile-title"),
+    );
+    expect(float.parentElement?.className).not.toMatch(/\bpe-/u);
     unmount();
     render(
       <EventTile
@@ -135,11 +152,10 @@ describe("EventTile", () => {
         format={format}
       />,
     );
-    expect(title()).toHaveClass("truncate");
-    expect(title()).not.toHaveClass("pe-5");
+    expect(screen.queryByTestId("badge-float")).toBeNull();
   });
 
-  it("two children: split tint, no edge, two overlapping badges", () => {
+  it("two children: neutral fill with a colour stripe per child, side-by-side badges overlapping a quarter", () => {
     render(
       <EventTile
         event={eventFixture({ childIds: ["mia", "ben"] })}
@@ -148,12 +164,43 @@ describe("EventTile", () => {
       />,
     );
     expect(tile()).toHaveAttribute("data-tint", "split");
-    expect(tile().style.background).toContain("linear-gradient");
-    expect(tile().className).not.toMatch(/inset-ring/u);
+    // No half-and-half fill that reads as a progress bar.
+    expect(tile().style.background).toBe("var(--color-surface-raised)");
+    expect(tile()).toHaveClass("after:inset-ring-border");
+    const stripes = within(tile()).getByTestId("tile-stripes");
+    expect(stripes).toHaveAttribute("aria-hidden", "true");
+    expect(stripes.style.background).toContain("linear-gradient(90deg");
+    expect(stripes.style.background).toContain("var(--color-child-1)");
     const shown = [...badges().children];
     expect(shown.map((badge) => badge.textContent)).toEqual(["🦊", "🐻"]);
-    expect(shown[1]).toHaveClass("-ms-3");
+    // size-6.5 (1.625rem) overlapping by 0.375rem: less than a quarter.
+    expect(shown[0]).toHaveClass("size-6.5");
+    expect(shown[1]).toHaveClass("-ms-1.5");
     expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For Mia and Ben");
+  });
+
+  it("badges overlap by at most a quarter at every size, prominent ones included", () => {
+    const sizes = [
+      "large",
+      "medium",
+      "dense",
+      "compact",
+      "compact-dense",
+      "week",
+      "week-dense",
+    ] as const;
+    for (const size of sizes) {
+      for (const prominent of [false, true]) {
+        const { badge, badgeOverlap } = tileClasses(size, prominent);
+        const width = Number(/^size-([\d.]+)$/u.exec(badge)?.[1]);
+        const overlap = Number(/^-ms-([\d.]+)$/u.exec(badgeOverlap)?.[1]);
+        expect(width, `${size} ${badge}`).toBeGreaterThan(0);
+        expect(overlap / width, `${size} ${badgeOverlap}`).toBeGreaterThan(0);
+        expect(overlap / width, `${size} ${badgeOverlap}`).toBeLessThanOrEqual(
+          0.25,
+        );
+      }
+    }
   });
 
   it("three and more children: neutral fill, three badges, then +N; the name lists all", () => {
@@ -213,7 +260,10 @@ describe("EventTile", () => {
         status="current"
       />,
     );
-    expect(tile()).toHaveClass("ring-4", "ring-accent");
+    // Person-neutral "now": the ink ring and a clock cue, never a child-like accent.
+    expect(tile()).toHaveClass("ring-4", "ring-now");
+    expect(tile().className).not.toMatch(/accent/u);
+    expect(within(tile()).getByTestId("now-cue")).toBeInTheDocument();
     expect(tile()).toHaveAccessibleName(
       `Swimming, 2:30 PM, For everyone, ${en.event.status.current}`,
     );
@@ -222,15 +272,20 @@ describe("EventTile", () => {
       <EventTile event={eventFixture()} childList={[]} format={format} next />,
     );
     expect(tile()).toHaveAttribute("data-next", "true");
-    expect(tile()).toHaveClass("ring-now");
+    expect(tile()).toHaveClass("ring-today-ring", "ring-3");
+    expect(within(tile()).queryByTestId("now-cue")).toBeNull();
     expect(tile()).toHaveAccessibleName(
       `Swimming, 2:30 PM, For everyone, ${en.event.status.next}`,
     );
   });
 
-  it("keeps today's emoji at 3.5rem (large) and 3rem (dense)", () => {
-    for (const size of ["large", "dense"] as const) {
-      const emojiClass = size === "large" ? "text-[3.5rem]" : "text-[3rem]";
+  it("keeps today's emoji at 3.5rem (large), 3rem (medium) and 2.75rem (dense)", () => {
+    const expected = {
+      large: "text-[3.5rem]",
+      medium: "text-[3rem]",
+      dense: "text-[2.75rem]",
+    } as const;
+    for (const size of ["large", "medium", "dense"] as const) {
       const { unmount } = render(
         <EventTile
           event={eventFixture()}
@@ -239,10 +294,38 @@ describe("EventTile", () => {
           size={size}
         />,
       );
-      expect(screen.getByText("🏊")).toHaveClass(emojiClass);
+      expect(screen.getByText("🏊")).toHaveClass(expected[size]);
       expect(tile()).toHaveAttribute("data-size", size);
+      expect(tile()).toHaveAttribute("data-prominent", "false");
       unmount();
     }
+  });
+
+  it("a prominent tile in today's column is taller with a larger emoji; elsewhere it is ignored", () => {
+    const { rerender } = render(
+      <EventTile
+        event={eventFixture()}
+        childList={[]}
+        format={format}
+        size="large"
+        prominent
+      />,
+    );
+    expect(tile()).toHaveAttribute("data-prominent", "true");
+    expect(tile()).toHaveClass("h-[6.5rem]");
+    expect(screen.getByText("🏊")).toHaveClass("text-[4.5rem]");
+    rerender(
+      <EventTile
+        event={eventFixture()}
+        childList={[]}
+        format={format}
+        size="compact"
+        prominent
+      />,
+    );
+    expect(tile()).toHaveAttribute("data-prominent", "false");
+    expect(tile()).toHaveClass("h-tile-compact");
+    expect(screen.getByText("🏊")).toHaveClass("text-[2.5rem]");
   });
 
   it("uses the tile height tokens it reports for the column capacity", () => {
@@ -252,10 +335,11 @@ describe("EventTile", () => {
       );
     expect(TILE_HEIGHT_REM.large).toBe(token("--spacing-tile"));
     expect(TILE_HEIGHT_REM.compact).toBe(token("--spacing-tile-compact"));
-    // Dense sizes are shorter, but still hold the 3rem emoji line box (today) inside
-    // the 4px edge on both sides (0.25rem each at the 16px baseline).
-    expect(TILE_HEIGHT_REM.dense).toBeLessThan(TILE_HEIGHT_REM.large);
-    expect(TILE_HEIGHT_REM.dense).toBeGreaterThanOrEqual(3 + 2 * 0.25);
+    // Today shrinks large > medium > dense; dense still holds the 2.75rem emoji line
+    // box inside the 4px edge on both sides (0.25rem each at the 16px baseline).
+    expect(TILE_HEIGHT_REM.medium).toBeLessThan(TILE_HEIGHT_REM.large);
+    expect(TILE_HEIGHT_REM.dense).toBeLessThan(TILE_HEIGHT_REM.medium);
+    expect(TILE_HEIGHT_REM.dense).toBeGreaterThanOrEqual(2.75 + 2 * 0.25);
     expect(TILE_HEIGHT_REM["compact-dense"]).toBeLessThan(
       TILE_HEIGHT_REM.compact,
     );
@@ -276,6 +360,9 @@ describe("EventTile", () => {
     expect(screen.queryByText("Swimming")).toBeNull();
     expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For Mia");
     expect(within(tile()).getByText("🌞")).toBeInTheDocument();
+    // No disc on the narrow week tiles; the badges sit inside the tile's corner.
+    expect(within(tile()).queryByTestId("emoji-disc")).toBeNull();
+    expect(tile()).toContainElement(badges());
     expect(TILE_HEIGHT_REM["week-dense"]).toBeLessThan(TILE_HEIGHT_REM.week);
     // The stacked emoji and time row fit the dense height (emoji 2.25rem + meta 1rem).
     expect(TILE_HEIGHT_REM["week-dense"]).toBeGreaterThanOrEqual(2.25 + 1.3);

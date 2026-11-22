@@ -29,8 +29,9 @@ export function TimeOfDayIcon({
 }
 
 /**
- * Own symbol for all-day events (not the midday sun): the sun's arc over the horizon,
- * from sunrise to sunset. Decorative; the "All day" text next to it says the same.
+ * Own symbol for all-day events (not the midday sun, merge rule 1): a bar that spans the
+ * whole width between two end marks, "from start to end of the day". Decorative; the
+ * visible "All day" label next to it says the same.
  */
 export function AllDayIcon({
   className = "size-5",
@@ -48,10 +49,63 @@ export function AllDayIcon({
       strokeLinecap="round"
       className={`shrink-0 ${className}`}
     >
-      <path d="M2 18h20" />
-      <path d="M5 18a7 7 0 0 1 14 0" strokeDasharray="2 3.2" />
-      <circle cx="5" cy="18" r="1.6" fill="currentColor" />
-      <circle cx="19" cy="18" r="1.6" fill="currentColor" />
+      <path d="M2.5 5v14M21.5 5v14" />
+      <rect
+        x="5.5"
+        y="9"
+        width="13"
+        height="6"
+        rx="3"
+        fill="currentColor"
+        stroke="none"
+      />
+    </svg>
+  );
+}
+
+/** Clock face: the "now" cue on the now line and on the current tile. Decorative. */
+export function ClockIcon({
+  className = "size-4",
+}: {
+  className?: string;
+}): React.JSX.Element {
+  return (
+    <svg
+      aria-hidden="true"
+      data-testid="now-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`shrink-0 ${className}`}
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3.5 2" />
+    </svg>
+  );
+}
+
+/** Check mark on the icons of the "vorbei" strip ("done"). Decorative. */
+export function CheckIcon({
+  className = "size-3",
+}: {
+  className?: string;
+}): React.JSX.Element {
+  return (
+    <svg
+      aria-hidden="true"
+      data-testid="done-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`shrink-0 ${className}`}
+    >
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
     </svg>
   );
 }

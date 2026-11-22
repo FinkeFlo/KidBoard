@@ -65,7 +65,7 @@ export function FullscreenControl(): React.JSX.Element | null {
         // Pointer clicks have detail >= 1 and are handled above; keyboard/AT have 0.
         if (event.detail === 0) void toggle();
       }}
-      className="text-control-quiet min-h-touch min-w-touch focus-visible:outline-accent fixed right-[calc(var(--spacing-gutter)+(var(--spacing-nav)-var(--spacing-touch))/2)] bottom-0 z-10 flex touch-none items-center justify-center select-none focus-visible:outline-4 focus-visible:-outline-offset-4"
+      className="text-control-quiet min-h-touch min-w-touch focus-visible:outline-text fixed right-[calc(var(--spacing-gutter)+(var(--spacing-nav)-var(--spacing-touch))/2)] bottom-0 z-10 flex touch-none items-center justify-center select-none focus-visible:outline-4 focus-visible:-outline-offset-4"
     >
       <svg
         aria-hidden="true"

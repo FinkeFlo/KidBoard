@@ -1,5 +1,5 @@
 import type { CalendarEvent, Meal } from "@kidboard/shared";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TILE_HEIGHT_REM } from "../components/EventTile";
@@ -13,7 +13,9 @@ import type { FormatContext } from "../i18n/format";
 import en from "../i18n/locales/en.json";
 import type { DayModelConfig } from "./buildDayModel";
 import { buildOverviewModel, type OverviewDay } from "./buildOverviewModel";
-import { DayColumn } from "./DayColumn";
+import { COLUMN_GAP_REM, SUMMARY_ROW_REM } from "./columnCapacity";
+import { DayColumn, MORE_ICONS_MAX } from "./DayColumn";
+import { NOW_LINE_REM } from "./NowLine";
 
 const CONFIG: DayModelConfig = {
   timeZone: "Europe/Berlin",
@@ -60,6 +62,11 @@ function day(
 /** Makes the list report `heightRem` (at a 16px root) through a stubbed observer. */
 /** Height of a dense tile in today's column (rem). */
 const DENSE = TILE_HEIGHT_REM.dense;
+const GAP = COLUMN_GAP_REM;
+/** The strip or "+N" row with its gap. */
+const ROW = SUMMARY_ROW_REM + GAP;
+/** The now line with its gap. */
+const NOW_ROW = NOW_LINE_REM + GAP;
 
 function stubListHeight(heightRem: number): void {
   vi.stubGlobal(
@@ -117,7 +124,9 @@ describe("DayColumn", () => {
     expect(
       within(column).getByRole("heading", { level: 2, name: en.day.today }),
     ).toBeVisible();
-    expect(column).toHaveTextContent("Sunday, November 22");
+    // The weekday and date are in the board header; today's column does not repeat them.
+    expect(column).not.toHaveTextContent("Sunday");
+    expect(column).not.toHaveTextContent("November 22");
     const tiles = timedTiles(column);
     // 9:00, 9:50, 10:40 and 11:30 (until 12:00) are over at 12:00.
     expect(tiles.map((tile) => tile.dataset["status"])).toEqual([
@@ -135,6 +144,12 @@ describe("DayColumn", () => {
         Node.DOCUMENT_POSITION_PRECEDING,
     ).toBeTruthy();
     expect(line).not.toHaveAttribute("aria-live");
+    // Clock cue and the word for parents, both decorative inside the named separator.
+    expect(within(line).getByTestId("now-icon")).toBeInTheDocument();
+    expect(within(line).getByText(en.day.now)).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
   });
 
   it("puts the now line above the first event when nothing has started; the first is next", () => {
@@ -152,7 +167,16 @@ describe("DayColumn", () => {
       "false",
     ]);
     expect(column).toHaveAttribute("data-size", "large");
+    // With room to spare the next tile is the prominent one: taller, larger emoji.
+    expect(tiles.map((tile) => tile.dataset["prominent"])).toEqual([
+      "true",
+      "false",
+      "false",
+    ]);
     expect(within(tiles[0] as HTMLElement).getByText("🎨")).toHaveClass(
+      "text-[4.5rem]",
+    );
+    expect(within(tiles[1] as HTMLElement).getByText("🎨")).toHaveClass(
       "text-[3.5rem]",
     );
   });
@@ -178,7 +202,7 @@ describe("DayColumn", () => {
     // 12 events from 6:00 every 50 min: 7 over, 1 current (11:50), 4 upcoming at 12:00.
     const events = hourly(12, 6);
     // Room for the strip, the now line and three dense tiles plus "+N".
-    stubListHeight(2.25 + 1.5 + 3 * DENSE + 2.25 + 5 * 0.5);
+    stubListHeight(ROW + NOW_ROW + 3 * DENSE + 2 * GAP + ROW);
     const column = renderColumn(day(events));
     const strip = within(column).getByRole("group", { name: /Already over/ });
     const folded = Number(strip.dataset["count"]);
@@ -201,6 +225,16 @@ describe("DayColumn", () => {
       "aria-hidden",
       "true",
     );
+    // "+N" shows the hidden events as small icons and is no button-like pill.
+    expect(more.querySelectorAll(".font-emoji")).toHaveLength(
+      Math.min(hidden, MORE_ICONS_MAX),
+    );
+    expect(more.className).not.toMatch(/ring|border|bg-/u);
+    expect(within(column).queryByRole("button")).toBeNull();
+    // Every folded icon carries a check mark ("done").
+    expect(within(strip).getAllByTestId("done-icon")).toHaveLength(
+      Math.min(folded, 8) + 1,
+    );
     // Folded icons recede (grey), no opacity.
     for (const icon of strip.querySelectorAll(".font-emoji")) {
       expect(icon).toHaveClass("grayscale");
@@ -211,7 +245,7 @@ describe("DayColumn", () => {
   it("counts strip icons beyond the drawn ones as +N with an sr-only label", () => {
     // 11 past events, 1 upcoming, little room: all past fold, only 8 get an icon.
     const events = hourly(12, 3);
-    stubListHeight(2.25 + 1.5 + DENSE + 2 * 0.5);
+    stubListHeight(ROW + NOW_ROW + DENSE);
     const column = renderColumn(day(events));
     const strip = within(column).getByTestId("past-strip");
     expect(strip.querySelectorAll(".font-emoji")).toHaveLength(8);
@@ -220,6 +254,51 @@ describe("DayColumn", () => {
     expect(
       within(strip).getByText(`${String(extra)} more already over`),
     ).toHaveClass("sr-only");
+  });
+
+  it("late evening: when the day does not fit, every past event is in the strip, none stays a tile", () => {
+    // 10 events from 9:00 every 50 min, all over at 23:30.
+    const late = Date.parse("2026-11-22T23:30:00+01:00");
+    const model = buildOverviewModel(
+      { events: hourly(10, 9), meals: [] },
+      CONFIG,
+      TODAY,
+      late,
+    ).days[0] as OverviewDay;
+    stubListHeight(ROW + NOW_ROW + 3 * DENSE);
+    const column = renderColumn(model);
+    expect(timedTiles(column)).toHaveLength(0);
+    expect(within(column).getByTestId("past-strip")).toHaveAttribute(
+      "data-count",
+      "10",
+    );
+    // With room for all of them they all stay tiles instead (receded), never a mix.
+    cleanup();
+    stubListHeight(40);
+    const roomy = renderColumn(
+      buildOverviewModel(
+        { events: hourly(4, 9), meals: [] },
+        CONFIG,
+        TODAY,
+        late,
+      ).days[0] as OverviewDay,
+    );
+    expect(timedTiles(roomy).map((tile) => tile.dataset["status"])).toEqual([
+      "past",
+      "past",
+      "past",
+      "past",
+    ]);
+    expect(within(roomy).queryByTestId("past-strip")).toBeNull();
+  });
+
+  it("shrinks today's tiles step by step before summing anything up", () => {
+    // 5 upcoming events at 12:00, room for five dense tiles (plus the now line) only.
+    stubListHeight(NOW_ROW + 5 * DENSE + 4 * GAP);
+    const column = renderColumn(day(hourly(5, 13)));
+    expect(column).toHaveAttribute("data-size", "dense");
+    expect(timedTiles(column)).toHaveLength(5);
+    expect(within(column).queryByTestId("column-more")).toBeNull();
   });
 
   it("other days: weekday heading, compact tiles, no now line", () => {
@@ -255,6 +334,11 @@ describe("DayColumn", () => {
       within(banner).getByRole("article", { name: "Trip, All day, For Mia" }),
     ).toHaveAttribute("data-tint", "single");
     expect(within(banner).getAllByTestId("all-day-icon")).toHaveLength(3);
+    // A visible "All day" label on every entry, not only an icon.
+    expect(within(banner).getAllByTestId("all-day-label")).toHaveLength(2);
+    expect(within(banner).getAllByTestId("all-day-label")[0]).toHaveTextContent(
+      en.event.allDay,
+    );
     const more = within(banner).getByTestId("all-day-more");
     expect(more).toHaveTextContent("+2");
     expect(

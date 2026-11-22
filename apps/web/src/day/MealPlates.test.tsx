@@ -73,7 +73,11 @@ describe("MealPlates", () => {
   it("shows the short names in today's column (decorative, the plate is named)", () => {
     render(<MealPlates meals={[LUNCH]} today />);
     expect(screen.getByText("Pasta")).toHaveAttribute("aria-hidden", "true");
-    expect(screen.getByText("Pasta")).toHaveClass("truncate");
+    // Up to two small lines instead of a one-line cut.
+    expect(screen.getByText("Pasta")).toHaveClass(
+      "line-clamp-2",
+      "text-caption",
+    );
   });
 
   it("renders nothing without meals and titles only as text", () => {

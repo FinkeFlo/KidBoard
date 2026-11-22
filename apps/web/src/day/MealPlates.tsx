@@ -40,7 +40,8 @@ export function platesOf(meals: readonly Meal[]): Plate[] {
 
 /**
  * The day's meals at the bottom of a column: round plates with the meal emoji and a small
- * time-of-day badge (none for `unspecified`); today's column also shows the short name.
+ * time-of-day badge (none for `unspecified`); today's column also shows the name in up to
+ * two small lines (the narrow columns show none).
  * Each plate is an image named "Lunch: Spaghetti". Plates shrink when a day has more
  * meals than the three positions (size container), so they never overflow.
  */
@@ -67,7 +68,7 @@ export function MealPlates({
           className={`${today ? "max-w-24" : "max-w-13"} flex min-w-0 flex-1 flex-col items-center gap-1`}
         >
           <span
-            className={`${meal === null ? "" : today ? "bg-surface-sunken" : "bg-surface-raised"} rounded-pill @container relative flex aspect-square w-full items-center justify-center ${today ? "max-w-15" : "max-w-13"}`}
+            className={`${meal === null ? "" : `${today ? "bg-surface-sunken" : "bg-surface-raised"} inset-ring-border inset-ring-1`} rounded-pill @container relative flex aspect-square w-full items-center justify-center ${today ? "max-w-15" : "max-w-13"}`}
           >
             {meal !== null && (
               <>
@@ -80,7 +81,7 @@ export function MealPlates({
                   className="text-[60cqw]"
                 />
                 {meal.slot !== "unspecified" && (
-                  <span className="absolute -end-0.5 -bottom-0.5 text-[34cqw]">
+                  <span className="absolute -end-1 -bottom-1 text-[40cqw]">
                     <TimeOfDayIcon timeOfDay={SLOT_TIME[meal.slot]} />
                   </span>
                 )}
@@ -90,7 +91,7 @@ export function MealPlates({
           {today && meal !== null && (
             <span
               aria-hidden="true"
-              className="text-caption text-text-muted w-full truncate text-center"
+              className="text-caption text-text-muted line-clamp-2 w-full text-center leading-tight wrap-break-word hyphens-auto"
             >
               {meal.title}
             </span>

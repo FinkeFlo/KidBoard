@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 
-import { columnAccount, expectNoOverflow } from "./layout";
+import { columnAccount, expectNoOverflow, minEmojiRem } from "./layout";
 import { agenda, fixClock, mockBoard, type MockEvent } from "./mockApi";
 
 /** 8 timed events (3 morning, 3 midday, 2 evening) plus an all-day one, and 3 meals. */
@@ -106,13 +106,13 @@ test.describe("overview (main screen)", () => {
       expect(other.bg).toBe(await tokenColor(page, "--color-surface-sunken"));
     }
 
-    // Today's emoji: large tiles at least 3.5rem, dense tiles at least 3rem.
+    // Today's emoji: large tiles at least 3.5rem, medium 3rem, dense 2.75rem.
     const emojiSizes = await today
       .getByTestId("column-events")
       .getByTestId("event-tile")
       .evaluateAll((tiles) =>
         tiles.map((tile) => ({
-          dense: tile.getAttribute("data-size") === "dense",
+          size: tile.getAttribute("data-size") ?? "",
           px: parseFloat(
             getComputedStyle(tile.querySelector(".font-emoji") as Element)
               .fontSize,
@@ -123,7 +123,7 @@ test.describe("overview (main screen)", () => {
     expect(emojiSizes.length).toBeGreaterThan(0);
     for (const size of emojiSizes) {
       expect(size.px).toBeGreaterThanOrEqual(
-        (size.dense ? 3 : 3.5) * rem - 0.5,
+        minEmojiRem(size.size) * rem - 0.5,
       );
     }
 
@@ -268,14 +268,19 @@ test.describe("overview (main screen)", () => {
       });
       await page.goto(night ? "/?night=1" : "/");
       await expect(page.getByTestId("board-ready")).toBeVisible();
-      // Time-of-day symbols on the tiles: the second emoji of each tile.
+      // Time-of-day symbols on the tiles: the emoji outside the disc and the badges.
       const symbols = await page
         .getByTestId("column-events")
         .getByTestId("event-tile")
         .evaluateAll((tiles) =>
           tiles.map(
             (tile) =>
-              tile.querySelectorAll(".font-emoji")[1]?.textContent ?? "",
+              [...tile.querySelectorAll(".font-emoji")].filter(
+                (el) =>
+                  el.closest(
+                    "[data-testid=child-badges], [data-testid=emoji-disc]",
+                  ) === null,
+              )[0]?.textContent ?? "",
           ),
         );
       expect(symbols.length).toBeGreaterThan(0);

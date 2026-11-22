@@ -72,7 +72,7 @@ export function ViewToggle({
               active
                 ? "bg-nav-active text-on-nav-active shadow-card"
                 : "bg-surface-raised text-text inset-ring-border inset-ring-3"
-            } w-nav min-h-touch rounded-nav text-body focus-visible:outline-accent flex h-30 flex-col items-center justify-center gap-2 font-black transition-transform duration-(--duration-fast) focus-visible:outline-4 focus-visible:outline-offset-2 active:scale-[0.97] motion-reduce:transition-none`}
+            } w-nav min-h-touch rounded-nav text-body focus-visible:outline-text flex h-30 flex-col items-center justify-center gap-2 font-black transition-transform duration-(--duration-fast) focus-visible:outline-4 focus-visible:outline-offset-2 active:scale-[0.97] motion-reduce:transition-none`}
           >
             {option === "day" ? (
               <Emoji emoji="☀️" className="text-heading" />

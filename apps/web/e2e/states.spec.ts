@@ -272,7 +272,8 @@ test.describe("empty day", () => {
 test("dense tiles: the emoji box stays inside the child edge, the edge is drawn on top", async ({
   page,
 }) => {
-  const events = Array.from({ length: 8 }, (_, i) => ({
+  // 4 past (folded), 1 current and 9 upcoming at 12:00: more than fit, so dense.
+  const events = Array.from({ length: 14 }, (_, i) => ({
     title: `Football ${String(i)}`,
     icon: "⚽",
     time: `${String(8 + i).padStart(2, "0")}:30`,

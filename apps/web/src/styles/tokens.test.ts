@@ -118,6 +118,13 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   // Overview (T-30b): the now line and its "now" label in today's column, the "next"
   // tile's ring on every child tint, the child edge on its own tint.
   ["--color-now", "--color-surface-raised", TEXT_AA] as const,
+  // "now" pill and clock cue: surface-coloured text/glyph on the "now" ink (T-27a).
+  ["--color-surface", "--color-now", TEXT_AA] as const,
+  ["--color-now", "--color-surface", TEXT_AA] as const,
+  // Ring of the next tile, on its surface-raised offset (T-27a).
+  ["--color-today-ring", "--color-surface-raised", UI_AA] as const,
+  // Check mark on the "vorbei" icons: surface glyph on a muted disc (T-27a).
+  ["--color-surface", "--color-text-muted", UI_AA] as const,
   ...CHILD_TINTS.map((tint) => ["--color-now", tint, UI_AA] as const),
   ...CHILD_TINTS.map(
     (tint) => [tint.replace(/-tint$/, ""), tint, UI_AA] as const,

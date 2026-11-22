@@ -158,11 +158,16 @@ describe("AppErrorBoundary auto reset", () => {
     shouldThrow = false;
     advance(AUTO_RESET_BASE_MS);
     expect(screen.queryByTestId("error-fallback")).not.toBeInTheDocument();
+    // Real timers for `findBy*`, but the clock stays on the fixture day, so the test
+    // does not depend on the real date (it failed after midnight in Berlin).
     vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.parse("2026-11-22T12:00:00+01:00"));
     expect(
       await screen.findByRole("heading", { level: 1, name: "Sunday" }),
     ).toBeInTheDocument();
     expect(await screen.findByText("Swimming")).toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   it("doubles the delay per failed retry and caps it", () => {

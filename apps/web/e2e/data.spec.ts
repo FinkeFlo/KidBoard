@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { agenda } from "./mockApi";
+import { agenda, fixClock } from "./mockApi";
 
 /** Low-entropy synthetic token (gitleaks-friendly). */
 const TOKEN = "TESTONLY-not-a-secret";
@@ -26,6 +26,8 @@ test("takes the token from ?key= once, sends it as Bearer and applies the config
     return route.fulfill({ status: 404, json: { error: "not_found" } });
   });
 
+  // The fixture day, not the real date (the empty-day text is today's).
+  await fixClock(page);
   await page.goto(`/?key=${TOKEN}`);
 
   // Config locale "de" wins over the browser language.

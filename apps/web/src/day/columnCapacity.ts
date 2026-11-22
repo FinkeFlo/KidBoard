@@ -1,5 +1,6 @@
 import {
   type EventStatus,
+  PROMINENT_EXTRA_REM,
   TILE_HEIGHT_REM,
   type TileSize,
 } from "../components/EventTile";
@@ -10,66 +11,107 @@ export const COLUMN_GAP_REM = 0.5;
 /** Height of the "vorbei" strip and of the "+N" row in rem (`h-9`). */
 export const SUMMARY_ROW_REM = 2.25;
 
+/** Tile sizes of today's column, largest first: the steps it shrinks through. */
+export const TODAY_SIZES: readonly TileSize[] = ["large", "medium", "dense"];
+/** Tile sizes of the other overview days, largest first. */
+export const DAY_SIZES: readonly TileSize[] = ["compact", "compact-dense"];
+
 export interface ColumnFit<T> {
   size: TileSize;
+  /** Whether the `prominent` events (now, else next) get their larger tile. */
+  prominent: boolean;
   layout: ColumnLayout<T>;
 }
 
-/** Height in rem that `layout` takes with tiles of `tileRem` (rows plus gaps). */
+/** Height in rem of one tile of `size` (larger when it is a prominent one). */
+export function tileHeightRem(size: TileSize, prominent: boolean): number {
+  return TILE_HEIGHT_REM[size] + (prominent ? PROMINENT_EXTRA_REM[size] : 0);
+}
+
+/**
+ * Height in rem that `layout` takes with tiles of `size` (rows plus gaps); the tiles in
+ * `prominent` are counted at their larger height.
+ */
 export function layoutHeightRem<T>(
   layout: ColumnLayout<T>,
-  tileRem: number,
+  size: TileSize,
+  prominent: readonly T[] = [],
 ): number {
-  const rows =
-    layout.visible.length +
-    (layout.pastStrip.length > 0 ? 1 : 0) +
-    (layout.hiddenLater > 0 ? 1 : 0);
+  const strip = layout.pastStrip.length > 0 ? 1 : 0;
+  const more = layout.hiddenLater > 0 ? 1 : 0;
+  const rows = layout.visible.length + strip + more;
   if (rows === 0) return 0;
-  return (
-    layout.visible.length * tileRem +
-    (layout.pastStrip.length > 0 ? SUMMARY_ROW_REM : 0) +
-    (layout.hiddenLater > 0 ? SUMMARY_ROW_REM : 0) +
-    (rows - 1) * COLUMN_GAP_REM
+  const tiles = layout.visible.reduce(
+    (sum, item) => sum + tileHeightRem(size, prominent.includes(item)),
+    0,
   );
+  return tiles + (strip + more) * SUMMARY_ROW_REM + (rows - 1) * COLUMN_GAP_REM;
 }
 
 /**
  * Tile size and layout of a day column whose list is `heightRem` high (`null`: not
  * measured yet, then everything is shown). `reservedRem` is space other rows take (the
- * now line plus its gap). The large size is used while every event fits at it and there
- * are fewer than `DENSE_FROM`; otherwise the dense size with the largest `columnLayout`
- * capacity whose real height (tiles, the smaller strip and "+N" rows, gaps) fits. Below
- * `MIN_SLOTS` `columnLayout` keeps its minimum, so a tiny column may still overflow.
+ * now line plus its gap); `prominent` are the events that get a larger tile when space
+ * allows (today: the current ones, else the next one). Decided by space alone, in this
+ * order, taking the first that fits:
+ *
+ * 1. every event as a tile at the largest size, prominent ones enlarged (past events
+ *    stay tiles, receded);
+ * 2. otherwise all past events fold into the "vorbei" strip and the rest shrinks step by
+ *    step (`TODAY_SIZES` / `DAY_SIZES`), at each size first with, then without the
+ *    enlarged prominent tiles;
+ * 3. only then the latest upcoming events are summed up in "+N", at the smallest size.
+ *
+ * A column too short even for one tile, the strip and "+N" may still overflow.
  */
 export function fitColumn<T extends { status: EventStatus }>(
   items: readonly T[],
   today: boolean,
   heightRem: number | null,
   reservedRem = 0,
+  prominent: readonly T[] = [],
 ): ColumnFit<T> {
-  const large: TileSize = today ? "large" : "compact";
-  const dense: TileSize = today ? "dense" : "compact-dense";
+  const ladder = today ? TODAY_SIZES : DAY_SIZES;
+  const largest = ladder[0] ?? "large";
+  const smallest = ladder[ladder.length - 1] ?? "dense";
   const count = items.length;
+  const all = columnLayout(items, count);
   if (heightRem === null) {
     return {
-      size: count >= DENSE_FROM ? dense : large,
-      layout: columnLayout(items, count),
+      size: count >= DENSE_FROM ? smallest : largest,
+      prominent: prominent.length > 0,
+      layout: all,
     };
   }
   const available = heightRem - reservedRem + 1e-6;
-  const all = columnLayout(items, count);
-  if (
-    count < DENSE_FROM &&
-    layoutHeightRem(all, TILE_HEIGHT_REM[large]) <= available
-  ) {
-    return { size: large, layout: all };
+  const fits = (
+    layout: ColumnLayout<T>,
+    size: TileSize,
+    enlarged: boolean,
+  ): boolean =>
+    layoutHeightRem(layout, size, enlarged ? prominent : []) <= available;
+
+  // 1. Everything as tiles at the largest size.
+  if (fits(all, largest, true)) {
+    return { size: largest, prominent: prominent.length > 0, layout: all };
   }
-  // Scanning from the most slots down, the first capacity that fits is the largest.
-  for (let capacity = count; capacity > 0; capacity -= 1) {
-    const layout = columnLayout(items, capacity);
-    if (layoutHeightRem(layout, TILE_HEIGHT_REM[dense]) <= available) {
-      return { size: dense, layout };
+  // 2. All past events fold (none if there are none); the rest shrinks step by step.
+  const upcoming = items.filter((item) => item.status !== "past").length;
+  const folded = columnLayout(items, upcoming);
+  for (const size of ladder) {
+    for (const enlarged of [true, false]) {
+      if (enlarged && prominent.length === 0) continue;
+      if (fits(folded, size, enlarged)) {
+        return { size, prominent: enlarged, layout: folded };
+      }
     }
   }
-  return { size: dense, layout: columnLayout(items, 0) };
+  // 3. Sum up the latest: the most tiles whose real height still fits.
+  for (let tiles = upcoming - 1; tiles > 0; tiles -= 1) {
+    const layout = columnLayout(items, tiles);
+    if (fits(layout, smallest, false)) {
+      return { size: smallest, prominent: false, layout };
+    }
+  }
+  return { size: smallest, prominent: false, layout: columnLayout(items, 0) };
 }

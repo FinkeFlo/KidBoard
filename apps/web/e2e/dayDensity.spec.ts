@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { columnAccount, expectNoOverflow, MEALS } from "./layout";
+import { columnAccount, expectNoOverflow, MEALS, minEmojiRem } from "./layout";
 import {
   agenda,
   CHILDREN,
@@ -112,8 +112,8 @@ for (let count = 1; count <= 12; count += 1) {
         account.hiddenText.includes(event.title);
       expect(named, event.title).toBe(true);
     }
-    // Up to four events need no folding at either size.
-    if (count <= 4) expect(account.shown).toHaveLength(count);
+    // Up to four events: nothing upcoming is summed up at either size.
+    if (count <= 4) expect(account.hidden).toBe(0);
     // The current event (12:00) is never folded or summed up.
     if (count >= 6) {
       await expect(
@@ -123,7 +123,7 @@ for (let count = 1; count <= 12; count += 1) {
     for (const tile of await today.getByRole("article").all()) {
       await expect(tile).toBeInViewport({ ratio: 1 });
     }
-    // Today's emoji: large tiles at least 3.5rem, dense tiles at least 3rem.
+    // Today's emoji: large tiles at least 3.5rem, medium 3rem, dense 2.75rem.
     const sizes = await today
       .getByTestId("column-events")
       .getByTestId("event-tile")
@@ -132,7 +132,7 @@ for (let count = 1; count <= 12; count += 1) {
           getComputedStyle(document.documentElement).fontSize,
         );
         return tiles.map((tile) => ({
-          dense: tile.getAttribute("data-size") === "dense",
+          size: tile.getAttribute("data-size") ?? "",
           rem:
             parseFloat(
               getComputedStyle(tile.querySelector(".font-emoji") as Element)
@@ -141,8 +141,11 @@ for (let count = 1; count <= 12; count += 1) {
         }));
       });
     for (const size of sizes) {
-      expect(size.rem).toBeGreaterThanOrEqual((size.dense ? 3 : 3.5) - 0.01);
+      expect(size.rem).toBeGreaterThanOrEqual(minEmojiRem(size.size) - 0.01);
     }
+    // One rule for the past: either every past event is a tile or none is.
+    const pastTiles = await today.locator("article[data-status=past]").count();
+    if (account.folded > 0) expect(pastTiles).toBe(0);
     // Every plate of every column is on screen.
     for (const plate of await page
       .getByTestId("meal-plates")
@@ -183,9 +186,14 @@ test("a crowded day folds the past into the strip first, then sums up the latest
   });
   if (account.hidden > 0) {
     const more = today.getByTestId("column-more");
-    await expect(more.locator("[aria-hidden=true]")).toHaveText(
+    await expect(more.getByTestId("column-more-count")).toHaveText(
       `+${String(account.hidden)}`,
     );
+    // The summed-up events show as small icons; "+N" is no button.
+    await expect(more.locator(".font-emoji")).toHaveCount(
+      Math.min(account.hidden, 4),
+    );
+    await expect(today.getByRole("button")).toHaveCount(0);
     expect(account.hiddenText).toMatch(
       new RegExp(`^${String(account.hidden)} more later: `),
     );

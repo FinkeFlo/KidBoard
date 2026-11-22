@@ -59,7 +59,6 @@
       "allDay": "{{count}} weitere ganztägig: {{titles, list}}"
     },
     "today": "Heute",
-    "todayDate": "{{weekday}}, {{date}}",
     "now": "jetzt",
     "nowLabel": "jetzt, {{time}}",
     "past": {

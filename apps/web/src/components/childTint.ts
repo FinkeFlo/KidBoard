@@ -38,6 +38,11 @@ export interface TileTint {
   background: string;
   /** Inset edge colour (one child only), else `null`. */
   edge: string | null;
+  /**
+   * Shared tiles (two and more children): the children's colours (as many as get a
+   * badge) for the stripes on the tile's start edge; empty otherwise.
+   */
+  stripes: string[];
   /** Children that get a badge, in order (at most `MAX_BADGES`). */
   badges: Child[];
   /** Children beyond `MAX_BADGES`, shown as "+N". */
@@ -45,36 +50,63 @@ export interface TileTint {
 }
 
 /**
- * Tint of a tile for its children: none → neutral; one → its tint and an edge; two → a
- * hard-stop gradient (child 1 left, child 2 right); three or more → neutral with up to
- * three badges and "+N".
+ * Tint of a tile for its children: none → neutral; one → its tint and an edge; two →
+ * neutral with a stripe per child on the start edge (side by side, so it never reads as
+ * a "half done" bar); three or more → the same, with up to three badges and "+N".
  */
 export function resolveTileTint(children: readonly Child[]): TileTint {
   const badges = children.slice(0, MAX_BADGES);
   const overflow = children.length - badges.length;
   const [first, second] = children;
   if (first === undefined) {
-    return { kind: "none", background: NEUTRAL, edge: null, badges, overflow };
+    return {
+      kind: "none",
+      background: NEUTRAL,
+      edge: null,
+      stripes: [],
+      badges,
+      overflow,
+    };
   }
   if (second === undefined) {
     return {
       kind: "single",
       background: resolveChildTint(first),
       edge: resolveChildColor(first.color),
+      stripes: [],
       badges,
       overflow,
     };
   }
-  if (children.length === 2) {
-    return {
-      kind: "split",
-      background: `linear-gradient(90deg, ${resolveChildTint(first)} 50%, ${resolveChildTint(second)} 50%)`,
-      edge: null,
-      badges,
-      overflow,
-    };
-  }
-  return { kind: "neutral", background: NEUTRAL, edge: null, badges, overflow };
+  return {
+    kind: children.length === 2 ? "split" : "neutral",
+    background: NEUTRAL,
+    edge: null,
+    stripes: badges.map((child) => resolveChildColor(child.color)),
+    badges,
+    overflow,
+  };
+}
+
+/** Width of one stripe of a shared tile in rem. */
+export const STRIPE_REM = 0.375;
+
+/**
+ * Inline style of a shared tile's start-edge stripes: hard stops, one equal vertical band
+ * per child, side by side; `undefined` when the tile has none. Style value only (CSP-safe).
+ */
+export function stripeStyle(tint: TileTint): CSSProperties | undefined {
+  const count = tint.stripes.length;
+  if (count === 0) return undefined;
+  const stops = tint.stripes.map((color, index) => {
+    const from = (index * 100) / count;
+    const to = ((index + 1) * 100) / count;
+    return `${color} ${String(from)}% ${String(to)}%`;
+  });
+  return {
+    width: `${String(count * STRIPE_REM)}rem`,
+    background: `linear-gradient(90deg, ${stops.join(", ")})`,
+  };
 }
 
 /** Inline style carrying the tile fill (and the edge as `--child-color`). */

@@ -97,6 +97,16 @@ export async function expectNoOverflow(page: Page): Promise<void> {
   expect(report.problems).toEqual([]);
 }
 
+/**
+ * Smallest emoji size (rem) of today's tile sizes: large 3.5rem, medium 3rem, dense
+ * 2.75rem (the last step before "+N"); prominent tiles are larger still.
+ */
+export function minEmojiRem(size: string): number {
+  if (size === "large") return 3.5;
+  if (size === "medium") return 3;
+  return 2.75;
+}
+
 /** Moon symbols drawn in the countdown. */
 export async function moons(page: Page): Promise<number> {
   return page

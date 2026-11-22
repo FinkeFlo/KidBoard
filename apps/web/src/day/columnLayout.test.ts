@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  columnLayout,
-  DENSE_FROM,
-  MIN_SLOTS,
-  STRIP_ICONS_MAX,
-} from "./columnLayout";
+import { columnLayout, MIN_TILES, STRIP_ICONS_MAX } from "./columnLayout";
 
 type Status = "past" | "current" | "upcoming";
 
@@ -22,76 +17,68 @@ function items(pattern: string): { id: string; status: Status }[] {
   }));
 }
 
-function summary(pattern: string, capacity: number): unknown {
-  const layout = columnLayout(items(pattern), capacity);
+function summary(pattern: string, tiles: number): unknown {
+  const layout = columnLayout(items(pattern), tiles);
   return {
     strip: layout.pastStrip.map((item) => item.id).join(","),
     visible: layout.visible.map((item) => item.id).join(","),
     earlier: layout.hiddenEarlier,
-    later: layout.hiddenLater,
+    later: layout.later.map((item) => item.id).join(","),
   };
 }
 
 describe("columnLayout", () => {
-  it("shows everything when it fits", () => {
+  it("shows everything as tiles when every event gets one (past ones too)", () => {
     expect(summary("ppcuu", 5)).toEqual({
       strip: "",
       visible: "p0,p1,c2,u3,u4",
       earlier: 0,
-      later: 0,
+      later: "",
     });
     expect(summary("", 4)).toEqual({
       strip: "",
       visible: "",
       earlier: 0,
-      later: 0,
+      later: "",
     });
   });
 
-  it("is dense from 6 events", () => {
-    expect(columnLayout(items("uuuuu"), 9).dense).toBe(false);
-    expect(columnLayout(items("uuuuuu"), 9).dense).toBe(true);
-    // Also when folding reduces what is shown.
-    expect(columnLayout(items("ppppppcu"), 3).dense).toBe(true);
-  });
-
-  it("folds the oldest past events into the strip first", () => {
-    // 8 events, 6 slots: strip (1 slot) + 5 tiles.
-    expect(summary("pppcuuuu", 6)).toEqual({
-      strip: "p0,p1,p2",
-      visible: "c3,u4,u5,u6,u7",
-      earlier: 0,
-      later: 0,
-    });
-    // Only as many as needed: 7 events, 6 slots -> fold 2.
+  it("folds all past events at once, never only some of them", () => {
+    // 7 events, 6 tiles: one too many, still every past event folds.
     expect(summary("pppcuuu", 6)).toEqual({
-      strip: "p0,p1",
-      visible: "p2,c3,u4,u5,u6",
+      strip: "p0,p1,p2",
+      visible: "c3,u4,u5,u6",
       earlier: 0,
-      later: 0,
+      later: "",
+    });
+    // Late evening: everything is over and does not fit, so it all folds.
+    expect(summary("pppppppp", 4)).toEqual({
+      strip: "p0,p1,p2,p3,p4,p5,p6,p7",
+      visible: "",
+      earlier: 0,
+      later: "",
     });
   });
 
-  it("sums up the latest events when past ones are not enough", () => {
-    // 2 past, 8 upcoming, 6 slots: strip + 4 tiles + "+N".
-    expect(summary("ppuuuuuuuu", 6)).toEqual({
+  it("sums up the latest upcoming events when folding is not enough", () => {
+    expect(summary("ppuuuuuuuu", 4)).toEqual({
       strip: "p0,p1",
       visible: "u2,u3,u4,u5",
       earlier: 0,
-      later: 4,
+      later: "u6,u7,u8,u9",
     });
-    // Nothing past: no strip, "+N" takes a slot.
-    expect(summary("cuuuuuuu", 4)).toEqual({
+    // Nothing past: no strip, only "+N".
+    expect(summary("cuuuuuuu", 3)).toEqual({
       strip: "",
       visible: "c0,u1,u2",
       earlier: 0,
-      later: 5,
+      later: "u3,u4,u5,u6,u7",
     });
   });
 
   it("keeps every folded event in pastStrip and counts icons beyond the strip's width", () => {
     const pattern = "p".repeat(STRIP_ICONS_MAX + 3) + "cuu";
-    const layout = columnLayout(items(pattern), 3);
+    const layout = columnLayout(items(pattern), 1);
     // All folded titles stay available for the strip's accessible name.
     expect(layout.pastStrip).toHaveLength(STRIP_ICONS_MAX + 3);
     expect(layout.stripIcons).toEqual(
@@ -104,37 +91,35 @@ describe("columnLayout", () => {
     expect(layout.hiddenLater).toBe(2);
   });
 
-  it("treats capacities below MIN_SLOTS as MIN_SLOTS", () => {
-    for (const capacity of [1, 0, -3, Number.NaN, 0.4]) {
-      expect(summary("pcu", capacity)).toEqual(summary("pcu", MIN_SLOTS));
-      // Strip, one tile and "+N" fit exactly.
-      expect(summary("ppcuu", capacity)).toEqual({
-        strip: "p0,p1",
-        visible: "c2",
-        earlier: 0,
-        later: 2,
-      });
+  it("treats tile counts below MIN_TILES (and non-numbers) as MIN_TILES", () => {
+    for (const tiles of [0, -3, Number.NaN, 0.4, Number.POSITIVE_INFINITY]) {
+      expect(summary("ppcuu", tiles)).toEqual(summary("ppcuu", MIN_TILES));
     }
-    expect(summary("ppp", 1)).toEqual({
-      strip: "",
-      visible: "p0,p1,p2",
+    expect(summary("ppcuu", 0)).toEqual({
+      strip: "p0,p1",
+      visible: "c2",
       earlier: 0,
-      later: 0,
+      later: "u3,u4",
+    });
+    // A single past event that fits stays a tile.
+    expect(summary("p", 0)).toEqual({
+      strip: "",
+      visible: "p0",
+      earlier: 0,
+      later: "",
     });
   });
 
   it("never hides or folds a current event", () => {
-    // Several current events: they stay even when that exceeds the capacity.
+    // Several current events: they stay even when that exceeds the tile count.
     const layout = columnLayout(items("pccccuuu"), 3);
-    expect(layout.visible.filter((i) => i.status === "current")).toHaveLength(
-      4,
-    );
+    expect(layout.visible.map((i) => i.id)).toEqual(["c1", "c2", "c3", "c4"]);
     expect(layout.hiddenLater).toBe(3);
     expect(summary("pcu", 3)).toEqual({
       strip: "",
       visible: "p0,c1,u2",
       earlier: 0,
-      later: 0,
+      later: "",
     });
   });
 
@@ -148,41 +133,47 @@ describe("columnLayout", () => {
       }
     }
     for (const pattern of patterns) {
-      for (let capacity = 1; capacity <= 10; capacity += 1) {
+      for (let tiles = 1; tiles <= 14; tiles += 1) {
         const all = items(pattern);
-        const slots = Math.max(MIN_SLOTS, capacity);
-        const layout = columnLayout(all, capacity);
+        const layout = columnLayout(all, tiles);
         const shown = layout.visible.length;
         const stripped = layout.pastStrip.length;
+        const past = all.filter((i) => i.status === "past").length;
         // Nothing is lost, and every folded item is retrievable.
         expect(shown + stripped + layout.hiddenLater).toBe(all.length);
+        expect(layout.later).toHaveLength(layout.hiddenLater);
         expect(layout.stripIcons.length + layout.hiddenEarlier).toBe(stripped);
         expect(layout.stripIcons).toEqual(
           layout.pastStrip.slice(0, STRIP_ICONS_MAX),
         );
-        // Strip and "+N" tile take one slot each; everything fits, for any capacity.
-        const used =
-          shown + (stripped > 0 ? 1 : 0) + (layout.hiddenLater > 0 ? 1 : 0);
-        expect(used).toBeLessThanOrEqual(slots);
-        // Folding and hiding only happen when needed.
-        if (all.length <= slots) {
+        // At most `tiles` tiles (a single current event always fits in one).
+        expect(shown).toBeLessThanOrEqual(tiles);
+        // One rule for the past: all tiles when everything fits, else all folded.
+        if (all.length <= tiles) {
           expect(stripped + layout.hiddenLater).toBe(0);
+        } else {
+          expect(stripped).toBe(past);
+          expect(layout.visible.some((i) => i.status === "past")).toBe(false);
         }
-        // Only past events fold; the current event is always visible.
+        // Only past events fold, only upcoming ones are summed up, the current stays.
         expect(layout.pastStrip.every((i) => i.status === "past")).toBe(true);
+        expect(layout.later.every((i) => i.status === "upcoming")).toBe(true);
         expect(
           layout.visible.filter((i) => i.status === "current"),
         ).toHaveLength(pattern.includes("c") ? 1 : 0);
-        // Past events go before any "+N".
-        if (layout.hiddenLater > 0) {
-          expect(layout.visible.some((i) => i.status === "past")).toBe(false);
+        // "+N" holds the latest: nothing summed up comes before a visible tile.
+        const lastVisible = Math.max(
+          -1,
+          ...layout.visible.map((i) => all.indexOf(i)),
+        );
+        for (const item of layout.later) {
+          expect(all.indexOf(item)).toBeGreaterThan(lastVisible);
         }
         // Time order everywhere.
-        for (const list of [layout.pastStrip, layout.visible]) {
+        for (const list of [layout.pastStrip, layout.visible, layout.later]) {
           const order = list.map((i) => all.indexOf(i));
           expect(order).toEqual([...order].sort((x, y) => x - y));
         }
-        expect(layout.dense).toBe(all.length >= DENSE_FROM);
       }
     }
   });

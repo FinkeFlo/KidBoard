@@ -3,20 +3,31 @@ import { useTranslation } from "react-i18next";
 
 import { ChildBadges } from "../components/ChildBadges";
 import { resolveTileTint, tileTintStyle } from "../components/childTint";
-import { Emoji } from "../components/Emoji";
-import { childrenOf, tileName } from "../components/EventTile";
+import {
+  childrenOf,
+  EmojiDisc,
+  tileName,
+  TileStripes,
+} from "../components/EventTile";
 import { AllDayIcon } from "../components/TimeOfDayIcon";
 import type { DayEvent } from "./buildDayModel";
 
 /** All-day entries a banner shows; more are summed up in a "+N" (never hidden silently). */
 export const ALL_DAY_MAX = 2;
-/** Badge size on a banner entry. */
-const BADGE = { size: "size-8", text: "text-body" } as const;
+/** Badge sizes on a banner entry (today / other days). */
+const BADGE = {
+  large: { size: "size-8", text: "text-body", overlap: "-ms-2" },
+  small: { size: "size-6", text: "text-caption", overlap: "-ms-1.5" },
+} as const;
+
+/** Start margin that moves the emoji off a shared entry's stripes. */
+const STRIPE_ROOM = "ms-2.5";
 
 /**
  * All-day events at the top of a day column (merge rule 1: their own treatment, not a
- * tile with the midday sun): a flat strip per event with the all-day arc icon, in the
- * children's tint. Beyond {@link ALL_DAY_MAX} a "+N" names the rest for assistive tech.
+ * tile with the midday sun): a flat strip per event with the emoji, a visible "All day"
+ * label with the span icon above the title, and the children's tint, stripes and badges
+ * as on the tiles. Beyond {@link ALL_DAY_MAX} a "+N" names the rest for assistive tech.
  */
 export function AllDayBanner({
   items,
@@ -32,6 +43,8 @@ export function AllDayBanner({
   if (items.length === 0) return null;
   const shown = items.slice(0, ALL_DAY_MAX);
   const rest = items.slice(ALL_DAY_MAX);
+  const badge = large ? BADGE.large : BADGE.small;
+  const discSize = large ? "size-11" : "size-10";
   return (
     <ul
       data-testid="all-day"
@@ -50,7 +63,7 @@ export function AllDayBanner({
               }),
         ]);
         return (
-          <li key={event.id} className="relative min-w-0">
+          <li key={event.id} className="min-w-0">
             <article
               aria-label={name}
               data-testid="event-tile"
@@ -59,26 +72,38 @@ export function AllDayBanner({
               style={tileTintStyle(tint)}
               className={`${
                 tint.edge === null
-                  ? tint.kind === "split"
-                    ? ""
-                    : "inset-ring-border inset-ring-2"
+                  ? "inset-ring-border inset-ring-2"
                   : "inset-ring-4 inset-ring-(color:--child-color)"
-              } text-text rounded-tile flex h-12 items-center gap-2 ps-2.5 pe-4`}
+              } text-text rounded-tile relative flex items-center gap-2 overflow-hidden ${large ? "h-14 ps-2.5" : "h-13 ps-2"} pe-2.5`}
             >
-              <AllDayIcon className="text-text-muted size-6" />
-              <Emoji
+              <TileStripes tint={tint} />
+              <EmojiDisc
                 emoji={event.icon}
-                className={large ? "text-heading" : "text-title"}
+                disc={`${discSize} ${tint.stripes.length > 0 ? STRIPE_ROOM : ""}`}
+                className={large ? "text-[2.125rem]" : "text-[1.875rem]"}
               />
-              <p
-                className={`${large ? "text-tile" : "text-tile-compact"} min-w-0 flex-1 truncate pe-6`}
-              >
-                {event.title}
-              </p>
+              <div className="min-w-0 flex-1">
+                <p
+                  aria-hidden="true"
+                  data-testid="all-day-label"
+                  className="text-caption text-text-muted flex items-center gap-1 font-black"
+                >
+                  <AllDayIcon className="size-4" />
+                  <span className="truncate">{t("event.allDay")}</span>
+                </p>
+                <p
+                  className={`${large ? "text-tile" : "text-tile-compact"} truncate`}
+                >
+                  {event.title}
+                </p>
+              </div>
+              <ChildBadges
+                tint={tint}
+                size={badge.size}
+                text={badge.text}
+                overlap={badge.overlap}
+              />
             </article>
-            <span className="pointer-events-none absolute -end-1.5 -top-2">
-              <ChildBadges tint={tint} size={BADGE.size} text={BADGE.text} />
-            </span>
           </li>
         );
       })}
@@ -88,7 +113,7 @@ export function AllDayBanner({
           data-count={rest.length}
           className="text-meta text-text-muted flex items-center gap-1.5 font-black"
         >
-          <AllDayIcon />
+          <AllDayIcon className="size-5" />
           <span aria-hidden="true">
             {t("day.hidden.badge", { count: rest.length })}
           </span>

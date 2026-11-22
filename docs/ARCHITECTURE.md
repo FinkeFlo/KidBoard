@@ -379,34 +379,55 @@ a day. **Placement rules:**
 **Column layout (space-based, nothing scrolls).** `useContentHeight` (a `ResizeObserver`
 on the `flex-1 min-h-0` event list, first value measured in a layout effect before paint)
 gives the list height and the root font size, so the height is handled in rem. `fitColumn`
-chooses the tile size (`large`/`compact` while every event fits and there are fewer than
-`DENSE_FROM` = 6, else `dense`/`compact-dense`) and the largest `columnLayout` capacity
-whose real height fits: tiles (`TILE_HEIGHT_REM`), the smaller strip and "+N" rows
-(`SUMMARY_ROW_REM`), gaps and the room of the now line. `columnLayout` folds **past events
-first** into the "vorbei" strip (up to 8 icons, then "+N"), only then sums up the latest
-upcoming events in a trailing "+N" tile. A **current event is never hidden or folded**;
-`MIN_SLOTS` (3: one tile, strip and "+N") is the smallest capacity, so a tiny column may
-overflow rather than hide. Strip and "+N" name all their titles for assistive tech, so
-nothing is lost silently.
+decides by space alone, taking the first option whose real height fits (tiles
+`TILE_HEIGHT_REM` plus `PROMINENT_EXTRA_REM`, the strip and "+N" rows `SUMMARY_ROW_REM`,
+gaps and the now line): 1. every event as a tile at the largest size, the prominent tile
+enlarged; 2. otherwise **all** past events fold into the "vorbei" strip (one deterministic
+rule: past events are either all tiles or all folded, never a mix) and the rest shrinks step
+by step (`TODAY_SIZES` large → medium → dense, `DAY_SIZES` compact → compact-dense), at each
+size first with, then without the enlarged prominent tile; 3. only then the latest upcoming
+events are summed up in a trailing "+N" row at the smallest size. The strip draws up to 8
+grey icons with a check mark, then counts the rest. "+N" shows the summed-up events as
+small emoji followed by the count, as plain text (no border or fill, it is not a button).
+A **current event is never hidden or folded**; `MIN_TILES` (1) is the smallest tile count,
+so a tiny column may overflow rather than hide. Strip and "+N" name all their titles for
+assistive tech, so nothing is lost silently.
 
 **Today's markers.** `NowLine` is a named separator between started and upcoming events and
-moves only from tile to tile, never per minute. The current tile keeps its accent ring;
-the next upcoming one gets a ring in `--color-now` (`data-next`).
+moves only from tile to tile, never per minute: a clock disc, a thick bar and a "now" pill,
+all in the person-neutral `--color-now` ink. "Now" and "next" never use a child colour (or
+the accent, which is close to child 1): the current tile has a thick `--color-now` ring and
+a clock cue on its emoji, the next upcoming one a ring in `--color-today-ring`
+(`data-next`). The current events (else the next one) are the **prominent** tile: about
+1.3× taller with a larger emoji while space allows (`data-prominent`).
 
-**All-day banner.** `AllDayBanner` shows at most two entries as flat strips with the
-all-day arc icon in the children's tint, then a named "+N" for the rest.
+**All-day banner.** `AllDayBanner` shows at most two entries as flat strips: emoji on its
+disc, a visible "All day" label with the span icon (a bar between two end marks, not the
+sun) above the title, the children's tint, stripes and badges as on the tiles, then a named
+"+N" for the rest.
 
 **Meal plates.** `MealPlates` sits at the bottom of every column: breakfast, lunch, dinner
 in fixed places (an empty place for a missing meal), more meals of a slot side by side,
 `unspecified` meals last. Each emoji is an image named "Lunch: Spaghetti".
 
 **Child tint.** `resolveTileTint(children)`: no child neutral, one child its tint plus a
-4px edge, two a hard-stop split gradient, three or more neutral with up to three badges and
-"+N". A `child-N` token maps to `--color-child-N-tint`; any other colour is mixed 20 % into
-the surface, but only after `isCssColor` accepted it (strict grammar, `CSS.supports` where
-available; CSS keywords, `var()`, `url()` are refused). Unusable config text falls back to
-the neutral fill. The value is only used as a style value, never in class names. Dense
-tiles (today) carry a 3rem emoji in a 3.75rem tile; large tiles keep at least 3.5rem.
+4px edge, two or more neutral with one colour stripe per child (up to three, side by side
+on the tile's start edge, `stripeStyle`; a half-and-half fill read like a "half done" bar)
+and up to three badges plus "+N". A `child-N` token maps to `--color-child-N-tint`; any
+other colour is mixed 20 % into the surface, but only after `isCssColor` accepted it
+(strict grammar, `CSS.supports` where available; CSS keywords, `var()`, `url()` are
+refused). Unusable config text falls back to the neutral fill. The value is only used as a
+style value, never in class names.
+
+**Tile anatomy.** The emoji sits on a light disc with a thin ring (`EmojiDisc`), so pale
+glyphs (🦷, 🥛) stay visible on light tints and at night; week tiles have no disc. Titles
+may wrap to two lines where the tile has the height (large, medium, compact, prominent);
+the badges sit inside the tile, side by side and overlapping by at most a quarter, floated
+at the end of the title's first line only (one line high), so a second line and the time
+run under them. One-line sizes (dense, compact-dense) keep the badges in a row beside the
+title. Today's emoji: large 3.5rem (prominent 4.5rem), medium 3rem, dense 2.75rem in a
+3.5rem tile (the last step before "+N"). Time-of-day icons are at least 1.5rem in the
+overview.
 
 **States:**
 
@@ -456,15 +477,15 @@ rail (its bottom slot), the long-press `FullscreenControl`. View state is local 
 
 `apps/web/src/day/`: `buildOverviewModel` (today + 3 days via `buildDayModel`) feeds four
 `DayColumn`s (today `2fr`, the others `1fr`). A column shows its all-day banner
-(`AllDayBanner`, own arc icon, at most two entries then a named "+N"), its timed events top
+(`AllDayBanner`, "All day" label and span icon, at most two entries then a named "+N"), its timed events top
 to bottom (`EventTile`: child tint/edge/badges via `resolveTileTint`, time-of-day emoji
 🌅 / 🌞 / 🌆, past events on the sunken surface with muted text, never opacity), today's
-`NowLine` (a named separator between started and upcoming events; the current tile keeps
-its accent ring, the next upcoming one a ring in `--color-now`) and `MealPlates` at the
+`NowLine` (a named separator between started and upcoming events; the current tile has
+a `--color-now` ring and clock cue, the next upcoming one a `--color-today-ring` ring) and `MealPlates` at the
 bottom. How many tiles fit is measured: `useContentHeight` (a `ResizeObserver` on the
 `flex-1 min-h-0` list) gives the height in rem, `fitColumn` picks the tile size and the
-largest `columnLayout` capacity whose real height fits (past events fold into the
-"vorbei" strip first, then the latest are summed up in "+N"; strip and "+N" name their
+layout whose real height fits (all past events fold into the "vorbei" strip first, then the
+tiles shrink step by step, then the latest are summed up in "+N"; strip and "+N" name their
 titles for assistive tech, nothing is hidden silently, nothing scrolls).
 
 `apps/web/src/week/buildWeekModel.ts` (pure): 7 columns from today in the config zone
@@ -481,7 +502,7 @@ events, else `week-dense`, with as many tiles as fit and a trailing "+N" row onl
 tiles do not fit (never a fixed count). The "+N" row carries the hidden titles as its
 accessible label. Week tiles are the overview's `EventTile` in a stacked form (emoji above
 time, no visible title; the title is in the accessible name): tinted by the child
-(`resolveTileTint`) with edge and badges per child, so colour is never the only cue;
+(`resolveTileTint`) with edge or stripes and badges per child, so colour is never the only cue;
 events without a child are neutral.
 **Countdown day:** the day the countdown waits for wears the awaited event's child tint
 and edge, and every earlier day shows one 🌙 in its header (the night still to sleep).
@@ -489,7 +510,8 @@ and edge, and every earlier day shows one 🌙 in its header (the night still to
 symbol; an empty row for a missing meal; `unspecified` meals in an extra row only when
 present).
 **One meaning per symbol:** 🌙 only counts sleeps (countdown), ☀️ is the "Today" button;
-tiles and meal plates use 🌅 / 🌞 / 🌆 for the time of day, all-day events an arc icon.
+tiles and meal plates use 🌅 / 🌞 / 🌆 for the time of day, all-day events a span icon
+with the visible "All day" label.
 Weekend = Saturday/Sunday of the date key (zone-independent calendar math).
 The week uses the board's one agenda query (`AGENDA_DAYS` = 31 since T-19).
 

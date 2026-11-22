@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveChildColor } from "./childColor";
 import {
   MAX_BADGES,
   resolveChildTint,
   resolveTileTint,
+  STRIPE_REM,
+  stripeStyle,
   tileTintStyle,
 } from "./childTint";
 import { BEN, MIA } from "./fixtures.test-utils";
@@ -59,9 +62,11 @@ describe("resolveTileTint", () => {
       kind: "none",
       background: "var(--color-surface-raised)",
       edge: null,
+      stripes: [],
       badges: [],
       overflow: 0,
     });
+    expect(stripeStyle(resolveTileTint([]))).toBeUndefined();
   });
 
   it("uses tint, edge and one badge for a single child", () => {
@@ -70,16 +75,26 @@ describe("resolveTileTint", () => {
     expect(tint.background).toBe("var(--color-child-2-tint)");
     expect(tint.edge).toBe("var(--color-child-2)");
     expect(tint.badges).toHaveLength(1);
+    expect(tint.stripes).toEqual([]);
+    expect(stripeStyle(tint)).toBeUndefined();
   });
 
-  it("splits hard at 50 % for two children, child 1 left", () => {
+  it("two children: neutral fill (no half-and-half bar) and a stripe per child, child 1 first", () => {
     const tint = resolveTileTint([MIA, BEN]);
     expect(tint.kind).toBe("split");
     expect(tint.edge).toBeNull();
-    expect(tint.background).toBe(
-      `linear-gradient(90deg, ${resolveChildTint(MIA)} 50%, ${resolveChildTint(BEN)} 50%)`,
-    );
+    expect(tint.background).toBe("var(--color-surface-raised)");
+    expect(tint.background).not.toContain("gradient");
+    expect(tint.stripes).toEqual([
+      resolveChildColor(MIA.color),
+      resolveChildColor(BEN.color),
+    ]);
     expect(tint.badges).toEqual([MIA, BEN]);
+    // Side-by-side vertical bands with hard stops, one stripe width per child.
+    expect(stripeStyle(tint)).toEqual({
+      width: `${String(2 * STRIPE_REM)}rem`,
+      background: `linear-gradient(90deg, ${resolveChildColor(MIA.color)} 0% 50%, ${resolveChildColor(BEN.color)} 50% 100%)`,
+    });
   });
 
   it("is neutral for 3+ children with up to three badges and +N", () => {
@@ -89,6 +104,9 @@ describe("resolveTileTint", () => {
     expect(tint.background).toBe("var(--color-surface-raised)");
     expect(tint.badges).toHaveLength(MAX_BADGES);
     expect(tint.overflow).toBe(1);
+    // Stripes only for the children with a badge.
+    expect(tint.stripes).toHaveLength(MAX_BADGES);
+    expect(stripeStyle(tint)?.width).toBe(`${String(3 * STRIPE_REM)}rem`);
     expect(resolveTileTint(four.slice(0, 3)).overflow).toBe(0);
   });
 

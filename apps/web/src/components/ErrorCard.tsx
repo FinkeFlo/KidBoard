@@ -69,7 +69,7 @@ export function ErrorCard({
           <button
             type="button"
             onClick={onRetry}
-            className="bg-nav-active text-on-nav-active text-title rounded-pill min-h-touch min-w-touch px-page focus-visible:outline-accent font-black focus-visible:outline-4 focus-visible:outline-offset-4"
+            className="bg-nav-active text-on-nav-active text-title rounded-pill min-h-touch min-w-touch px-page focus-visible:outline-text font-black focus-visible:outline-4 focus-visible:outline-offset-4"
           >
             {t("error.retry")}
           </button>
