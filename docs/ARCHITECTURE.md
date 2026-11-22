@@ -153,9 +153,16 @@ Order of operations on the raw `SUMMARY`:
 
 ## Time handling
 
-* All server-side expansion runs in the configured IANA zone (default `Europe/Berlin`).
-  ical.js resolves `TZID`s from the feed's own `VTIMEZONE` blocks (Google includes them);
-  floating times are interpreted in the configured zone.
+* All server-side expansion runs in the configured IANA zone (default `Europe/Berlin`);
+  output offsets and the `[from, to)` window are in that zone (details: ADR-0003).
+* TZIDs that are IANA zones are converted with the runtime tz database (`@date-fns/tz`
+  `tzOffset`), whether or not the feed has a `VTIMEZONE` for them; non-IANA TZIDs use the
+  feed's `VTIMEZONE` via ical.js; floating times and unknown TZIDs use the configured
+  zone. `VTIMEZONE`s are not registered globally in `ICAL.TimezoneService`.
+* DST: non-existent local times (spring-forward gap) use the offset before the gap
+  (02:30 → 03:30), ambiguous ones (fall-back) the first occurrence (RFC 5545 §3.3.5).
+* Recurrences are fast-forwarded where provably equivalent and capped per series and
+  per feed (CPU budget, ADR-0003); a hit cap is reported as `truncated`.
 * Day boundaries, bands (morning/midday/evening) and "nights until" are computed with
   `@date-fns/tz` (`TZDate`) in the configured zone, not the device zone.
 * All-day events use date-only strings with exclusive end, multi-day events appear on

@@ -138,7 +138,7 @@ operation, works offline with the last known state.
   8. empty/whitespace-only titles → localized-neutral placeholder flag, not a crash;
   9. HTML-looking titles (`<img src=x onerror=…>`) are returned verbatim as text.
 
-- [ ] **T-08 iCal parsing & recurrence expansion** (risk: **high** → Opus, deps: T-06)
+- [x] **T-08 iCal parsing & recurrence expansion** (risk: **high** → Opus, deps: T-06)
   Goal: `expandCalendar(icsText, { from, to, timeZone })` → occurrences
   (`uid`, `recurrenceId`, `summary`, `description`, `start`, `end`, `allDay`).
   Acceptance (each with a synthetic fixture in `fixtures/ics/`):
