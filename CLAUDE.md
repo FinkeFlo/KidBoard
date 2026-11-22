@@ -32,7 +32,8 @@ pnpm test:e2e       # Playwright (tablet 1280x800 + 2000x1200)
 pnpm build          # all packages
 ```
 
-Quality gate before every commit: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+Quality gate before every commit: `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build`
+(`pnpm test:e2e` needs `pnpm build` first).
 
 ## Non-negotiable rules
 

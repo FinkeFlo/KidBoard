@@ -15,11 +15,13 @@ One row per completed task. Escalations to Opus are logged with their reason.
 
 | Date | Task | From → To | Reason |
 |---|---|---|---|
+| 2026-11-22 | T-04 | Sonnet → Opus | High-risk task (CI/release pipeline) |
 
 ## Milestone reviews
 
 | Date | Milestone | Reviewer | Verdict | Notes |
 |---|---|---|---|---|
+| 2026-11-22 | M0 | Opus 5.5 (reviewer-opus) | PASS | Fresh clone green, CI run 45013616341 green. Follow-ups folded into T-06/T-08/T-10/T-11. |
 
 ## Open questions for the maintainer
 

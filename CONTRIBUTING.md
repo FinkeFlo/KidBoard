@@ -31,7 +31,7 @@ The gate must be green before every commit and pull request.
 ### Commits
 
 [Conventional Commits](https://www.conventionalcommits.org/), e.g.
-`feat(web): add week view (T-14)`. [lefthook](https://lefthook.dev/) runs checks and
+`feat(web): add week view (T-18)`. [lefthook](https://lefthook.dev/) runs checks and
 commitlint on commit; do not bypass the hooks.
 
 ### Plan and ADR workflow
@@ -69,7 +69,7 @@ Commit und Pull Request grün sein. E2E-Tests: `pnpm test:e2e`, Formatieren: `pn
 ### Commits
 
 [Conventional Commits](https://www.conventionalcommits.org/), z. B.
-`feat(web): add week view (T-14)`. lefthook prüft beim Commit (inkl. commitlint); Hooks nicht
+`feat(web): add week view (T-18)`. lefthook prüft beim Commit (inkl. commitlint); Hooks nicht
 umgehen.
 
 ### Plan- und ADR-Ablauf

@@ -41,7 +41,14 @@
       "Bash(gh repo delete:*)",
       "Read(./.env)",
       "Read(./.env.*)",
-      "Read(./**/.dev.vars)"
+      "Read(./**/.dev.vars)",
+      "Bash(pnpm exec wrangler deploy)",
+      "Bash(pnpm --filter:* wrangler secret:*)",
+      "Bash(pnpm --filter:* deploy:*)",
+      "Bash(wrangler deploy)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(./**/.dev.vars.*)"
     ]
   }
 }

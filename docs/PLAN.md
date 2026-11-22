@@ -24,7 +24,7 @@ operation, works offline with the last known state.
 ## Definition of Done (every task)
 
 * All acceptance criteria demonstrably met; reviewer verdict `PASS`.
-* `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green locally.
+* `pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build` green locally.
 * New/changed behavior covered by meaningful tests. No skipped tests, no disabled lint
   rules, no `any` without a justifying comment.
 * All UI strings via i18n (DE + EN). No secrets anywhere in the repo.
@@ -116,7 +116,8 @@ operation, works offline with the last known state.
      `Intl.supportedValuesOf` or `Intl.DateTimeFormat` probe), `children[]` (≥ 0, unique ids,
      color, avatar), `calendars[]` (unique ids, kind, optional `childId` referencing a child),
      `bands` (`morningStart`, `middayStart`, `eveningStart`, `HH:mm`, ascending),
-     `nightMode` (`enabled`, `start`, `end`), `countdown.emojis`, `refreshMinutes`.
+     `nightMode` (`enabled`, `start`, `end`), `countdown.emojis`, `refreshMinutes`,
+     `autoReturnSeconds` (default 120).
      Sensible defaults for everything except `calendars`.
   3. `parseConfig(json)` returns typed config or a readable error list; unit tests for
      valid/invalid examples; `config.example.json` validates in a test.
@@ -154,7 +155,8 @@ operation, works offline with the last known state.
      rules (test with an unbounded `FREQ=MINUTELY`… capped, no hang);
   7. empty VCALENDAR → `[]`; malformed/non-ICS input → typed `FeedParseError`, no throw
      leaks raw content;
-  8. works inside the Workers runtime (test runs in `@cloudflare/vitest-plugin`).
+  8. works inside the Workers runtime (test runs in `@cloudflare/vitest-plugin`); fixtures are
+     loaded via Vite `?raw` imports (no `fs` in workerd) with an ambient module declaration.
 
 - [ ] **T-09 Normalization** (risk: medium, deps: T-07, T-08)
   Acceptance:
@@ -184,7 +186,8 @@ operation, works offline with the last known state.
   6. CORS only for origins in `KIDBOARD_ALLOWED_ORIGINS` (default none; same-origin works
      without CORS). Security headers on API responses (`X-Content-Type-Options`,
      `Cache-Control` appropriate, `Content-Type: application/json`).
-  7. Integration tests in `@cloudflare/vitest-plugin` with mocked upstream `fetch` serving
+  7. Typed `Env` bindings (`CAL_*_URL`, `KIDBOARD_*`) for the Hono app.
+  8. Integration tests in `@cloudflare/vitest-plugin` with mocked upstream `fetch` serving
      fixtures: happy path, upstream 500 with/without last-good, timeout, invalid config.
 
 **M1 exit:** milestone review (`reviewer-opus`), CI green.
@@ -203,6 +206,8 @@ operation, works offline with the last known state.
   4. Layout scales fluidly between 1280×800 and 2000×1200 without scrolling (root font size
      from viewport); `prefers-reduced-motion` disables transitions.
   5. App-level error boundary with friendly fallback.
+  6. Split `apps/web` tsconfig: browser code without Node types; a separate
+     `tsconfig.node.json` for vite/vitest/playwright configs and e2e.
 
 - [ ] **T-12 i18n** (risk: low, deps: T-11)
   Acceptance:
@@ -362,4 +367,5 @@ operation, works offline with the last known state.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-22 | M0 milestone review follow-ups: `autoReturnSeconds` in T-06, `format:check` in DoD, fixture loading note in T-08, typed `Env` in T-10, tsconfig split in T-11 | Findings of the M0 review by reviewer-opus |
 | 2026-11-22 | Worker test tooling renamed to `@cloudflare/vitest-plugin` (T-03, T-08, T-10) | `@cloudflare/vitest-pool-workers` is deprecated on npm and supports only Vitest 4 |
