@@ -15,6 +15,9 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${String(PORT)}`,
     trace: "retain-on-failure",
+    // `page.route()` does not see requests a service worker handles, so API mocks would be
+    // bypassed. Specs opt in with `test.use({ serviceWorkers: "allow" })` (e2e/pwa.spec.ts).
+    serviceWorkers: "block",
     ...(executablePath ? { launchOptions: { executablePath } } : {}),
   },
   projects: [

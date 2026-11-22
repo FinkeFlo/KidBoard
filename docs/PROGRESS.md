@@ -18,6 +18,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-11 Web shell & design tokens | Sonnet 5.5 | Sonnet 5.5 | 2 | R1: spacing/touch tokens missing. |
 | 2026-11-22 | T-12 i18n | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; reviewer Context7 unreachable (builder verified APIs via Context7) |
 | 2026-11-22 | T-13 Data layer | Opus (builder-opus) | Opus (reviewer-opus) | 2 | PASS round 2; fixed per-query 7d max age, 401 wipe, degraded-source stale |
+| 2026-11-22 | T-14 PWA | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1 |
 
 ## Escalations
 

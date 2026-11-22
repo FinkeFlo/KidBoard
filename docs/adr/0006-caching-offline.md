@@ -71,6 +71,42 @@ fails, and say so discreetly.
     the token lives in memory for the session, the app keeps working online.
 * **Service worker:** vite-plugin-pwa `generateSW`, precache the app shell only, `/api/*`
   is `NetworkOnly` in the SW (TanStack owns API caching → no double caching), auto update.
+* **Service worker details** (T-14, `apps/web/pwa/`, `apps/web/src/pwa/`):
+  * Precache (Workbox `globPatterns`): `html, js, css, woff2, svg, png, ico`, i.e. the
+    app shell, all self-hosted Nunito subsets (~140 KB) and the generated icons. No
+    runtime caches exist; `cleanupOutdatedCaches` drops precaches of older builds.
+  * Navigations are served from the precached `index.html` (`navigateFallback`), except
+    `/api/*` (`navigateFallbackDenylist`), which always reaches the worker. Same-origin
+    `GET /api/*` fetches use `NetworkOnly`.
+  * Access token: the precache only stores the build's own URLs, fetched by the SW at
+    install time without query string, so a `/?key=…` navigation is never written to
+    Cache Storage (it is answered from the cached `index.html`). `consumeAccessToken`
+    still strips `?key=` from the URL before the SW is registered. API requests carry
+    the token as a header and are never cached by the SW. The E2E test checks every
+    Cache Storage URL for `/api/` and `key=`.
+  * Auto update on a kiosk without user interaction: `skipWaiting` + `clientsClaim`
+    (set explicitly, the plugin only forces them with `injectRegister: 'auto'`), and
+    `virtual:pwa-register` reloads the page when an updated worker activates. Browsers
+    look for a new `sw.js` only on navigations (a wall tablet never navigates), so the
+    app probes `sw.js` with `cache: 'no-store'` every hour and calls
+    `registration.update()` (skipped offline or while installing). The reload is
+    harmless: the query cache and the token are persisted.
+  * No SW in `vite dev` (`devOptions` off). E2E specs that mock `/api` block service
+    workers (`page.route` cannot see SW-handled requests); `e2e/pwa.spec.ts` allows
+    them and mocks on the context.
+  * HTTP caching on Workers Static Assets: the defaults (`Cache-Control: public,
+    max-age=0, must-revalidate` + `ETag`) are right for `sw.js`, `manifest.webmanifest`
+    and `index.html`, so no `_headers` file is needed. Browsers also bypass the HTTP cache
+    for the SW script itself (`updateViaCache: 'imports'`). `_headers` would not apply to
+    `/api/*` anyway (`run_worker_first`, the worker sets its own headers).
+* **Manifest and icons:** `theme_color` = `--color-accent`, `background_color` =
+  `--color-surface`, parsed from the light `@theme static` block of `tokens.css` at
+  build time (single source; unit-tested). Icons are generated during `vite build` by
+  `@vite-pwa/assets-generator` (`minimal-2023` preset: 64/192/512 any, 512 maskable,
+  180 Apple, 48 favicon; maskable/Apple padding in the accent colour) from the original
+  artwork `public/kidboard-icon.svg`, whose colours must all be light tokens (unit test).
+  Generated PNGs are build output, not committed. Name/description are static brand text
+  (a manifest cannot follow the runtime locale).
 
 ## Consequences
 * Offline after first successful load; indicator driven by `navigator.onLine`, query

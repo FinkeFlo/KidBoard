@@ -185,6 +185,20 @@ Order of operations on the raw `SUMMARY`:
 The client refetches every `refreshMinutes` (default hourly), on `visibilitychange`/`online`,
 and after midnight (new day = new agenda query key, T-16).
 
+### PWA / service worker (T-14)
+
+`vite-plugin-pwa` (`generateSW`, `registerType: 'autoUpdate'`), options in
+`apps/web/pwa/options.ts`. The Workbox precache holds HTML, JS, CSS, the Nunito `woff2`
+files and the icons; every navigation outside `/api/*` is answered with the precached
+`index.html` (`navigateFallbackDenylist: [/^\/api\//]`), so the shell loads offline after
+the first visit. `/api/*` is `NetworkOnly`: no API response and no request carrying the
+bearer token ever enters Cache Storage. Manifest: `display: fullscreen`, `orientation:
+landscape`, `theme_color` = `--color-accent`, `background_color` = `--color-surface`
+(read from `tokens.css` at build time). Icons (any + maskable + Apple + favicon) are
+generated on every build by `@vite-pwa/assets-generator` from the original artwork
+`apps/web/public/kidboard-icon.svg` (`apps/web/pwa-assets.config.ts`). The app polls for a
+new `sw.js` hourly; a new worker activates at once and the page reloads by itself.
+
 ### Client data layer (T-13)
 
 `apps/web/src/data/`: typed API client (zod-validated, 15 s timeout > worker's ~11 s

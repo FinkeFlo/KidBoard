@@ -3,6 +3,7 @@ import "./styles/global.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { registerSW } from "virtual:pwa-register";
 
 import { App } from "./App";
 import {
@@ -15,6 +16,7 @@ import {
   seedOnlineState,
 } from "./data";
 import { initI18n } from "./i18n";
+import { registerServiceWorker } from "./pwa/registerServiceWorker";
 
 // Browser language until the config arrives; `DataProvider` then applies its locale.
 initI18n();
@@ -45,3 +47,8 @@ createRoot(container).render(
     </DataProvider>
   </StrictMode>,
 );
+
+// Only in production builds: the dev server serves no service worker (ADR-0006).
+if (import.meta.env.PROD) {
+  registerServiceWorker({ registerSW });
+}
