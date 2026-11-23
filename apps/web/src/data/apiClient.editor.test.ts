@@ -268,6 +268,58 @@ describe("ApiClient editor routes (T-43 API, T-45 client)", () => {
   });
 });
 
+describe("ApiClient phone feed (T-46)", () => {
+  const FEED = "/api/feed.ics?token=TESTONLY-not-a-secret-feed-0123456789";
+
+  it("reads the relative feed URL with the session header, uncached", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/parent/feed", {
+      status: 200,
+      body: { feedUrl: FEED },
+    });
+    await expect(
+      createApiClient({ fetch: fake.fetch, token: TEST_TOKEN }).getParentFeed(
+        SESSION,
+      ),
+    ).resolves.toEqual({ feedUrl: FEED });
+    expect(fake.calls[0]?.url).toBe("/api/parent/feed");
+    expect(fake.calls[0]?.init?.cache).toBe("no-store");
+    expect(
+      new Headers(fake.calls[0]?.init?.headers).get(PARENT_SESSION_HEADER),
+    ).toBe(SESSION);
+  });
+
+  it("returns no URL when the feed is off", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/parent/feed", { status: 200, body: {} });
+    await expect(
+      createApiClient({ fetch: fake.fetch }).getParentFeed(SESSION),
+    ).resolves.toEqual({});
+  });
+
+  it("rejects a URL that is not a feed path and maps a locked session", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/parent/feed", {
+      status: 200,
+      body: { feedUrl: "https://evil.example/x" },
+    });
+    expect(
+      await rejection(
+        createApiClient({ fetch: fake.fetch }).getParentFeed(SESSION),
+      ),
+    ).toMatchObject({ kind: "invalid-response" });
+    fake.setReplies("/api/parent/feed", {
+      status: 403,
+      body: { error: "parent_locked", message: "x" },
+    });
+    expect(
+      await rejection(
+        createApiClient({ fetch: fake.fetch }).getParentFeed(SESSION),
+      ),
+    ).toMatchObject({ code: "parent_locked", status: 403 });
+  });
+});
+
 describe("exportFileName", () => {
   it.each([
     [

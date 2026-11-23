@@ -60,6 +60,8 @@ export function renderEditor(
     fakeConfig?: () => PublicConfig;
     google?: FakeEditorOptions["google"];
     maxEntries?: number;
+    /** Relative phone-feed URL of the fake API (default: the feed is off). */
+    feedUrl?: string;
     setup?: (editor: FakeEditor) => void;
     gate?: Partial<ParentGate>;
   } = {},
@@ -70,6 +72,7 @@ export function renderEditor(
     config: options.fakeConfig ?? (() => config),
     isSession: (token) => token !== null && sessions.has(token),
     ...(options.google === undefined ? {} : { google: options.google }),
+    ...(options.feedUrl === undefined ? {} : { feedUrl: options.feedUrl }),
     ...(options.maxEntries === undefined
       ? {}
       : { maxEntries: options.maxEntries }),

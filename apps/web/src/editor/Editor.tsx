@@ -50,6 +50,7 @@ import { dateLabel, dayLabel } from "./labels";
 import { entriesOfBackup, planMealCopy } from "./mealCopy";
 import { MealForm } from "./MealForm";
 import { FailureNotice, Toast } from "./Notice";
+import { PhoneFeed } from "./PhoneFeed";
 import { TemplatesRow } from "./TemplatesRow";
 import { TID } from "./testIds";
 import { ConfirmDialog, EditorButton } from "./ui";
@@ -877,7 +878,9 @@ function EditorBody({
             void exportBackup();
           }}
           onImport={importBackup}
-        />
+        >
+          <PhoneFeed key={token} api={api} token={token} />
+        </DataSection>
       </div>
     );
   }

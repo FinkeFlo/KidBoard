@@ -14,6 +14,8 @@ import {
   type EditorWriteResponse,
   EditorWriteResponseSchema,
   type ImportModeValue,
+  type ParentFeedResponse,
+  ParentFeedResponseSchema,
   type PublicConfig,
   PublicConfigSchema,
 } from "@kidboard/shared";
@@ -203,6 +205,15 @@ export interface ApiClient {
     document: string,
     signal?: AbortSignal,
   ): Promise<EditorImportResponse>;
+  /**
+   * `GET /api/parent/feed`: the relative phone-feed URL (`feedUrl` is absent when the
+   * feed is off). The URL carries a secret token: show it to the parent only, never
+   * log or cache it (no TanStack query, `cache: "no-store"`).
+   */
+  getParentFeed(
+    token: string,
+    signal?: AbortSignal,
+  ): Promise<ParentFeedResponse>;
 }
 
 export interface ApiClientOptions {
@@ -516,6 +527,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     | "deleteEntry"
     | "exportEntries"
     | "importEntries"
+    | "getParentFeed"
   > = {
     listEntries: async (token, range, signal) =>
       (
@@ -586,6 +598,17 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         text,
       };
     },
+    getParentFeed: async (token, signal) =>
+      (
+        await editorRequest(
+          token,
+          "/api/parent/feed",
+          {},
+          {},
+          ParentFeedResponseSchema,
+          signal,
+        )
+      ).body,
     importEntries: async (token, mode, document, signal) =>
       (
         await editorRequest(

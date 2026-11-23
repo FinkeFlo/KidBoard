@@ -72,6 +72,36 @@ function errorOf(response: FakeResponse): unknown {
   return (response.json as { error?: unknown }).error;
 }
 
+describe("fake editor API: phone feed", () => {
+  const FEED = "/api/feed.ics?token=TESTONLY-not-a-secret-feed-0123456789";
+
+  it("answers the relative URL only to a session, and {} when the feed is off", () => {
+    const editor = createFakeEditor({
+      config: () => CONFIG,
+      now: () => NOW,
+      isSession: (token) => token === SESSION,
+      feedUrl: FEED,
+    });
+    expect(call(editor, "GET", "/api/parent/feed").json).toEqual({
+      feedUrl: FEED,
+    });
+    expect(
+      errorOf(call(editor, "GET", "/api/parent/feed", undefined, null)),
+    ).toBe("parent_locked");
+    editor.setFeedUrl(undefined);
+    expect(call(editor, "GET", "/api/parent/feed").json).toEqual({});
+    expect(
+      fake().handle({
+        method: "GET",
+        path: "/api/parent/feed",
+        search: "",
+        body: null,
+        session: SESSION,
+      })?.json,
+    ).toEqual({});
+  });
+});
+
 describe("fake editor API", () => {
   it("serves only editor routes and only with a session (403, never 401)", () => {
     const editor = fake();

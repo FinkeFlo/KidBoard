@@ -1105,3 +1105,146 @@ describe("Editor: the list covers today and 13 more days", () => {
     expect(within(list).queryByText("Later")).toBeNull();
   });
 });
+
+describe("Editor: phone feed (T-46)", () => {
+  const FEED = "/api/feed.ics?token=TESTONLY-not-a-secret-feed-0123456789";
+  const ABSOLUTE = `${window.location.origin}${FEED}`;
+
+  function stubClipboard(writeText: (text: string) => Promise<void>): void {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, "clipboard");
+  });
+
+  it("shows the absolute link in the Data section, requested with the session", async () => {
+    const h = renderEditor({ feedUrl: FEED });
+    await home();
+    const block = await screen.findByTestId("phone-feed");
+    expect(
+      within(screen.getByTestId("data-section")).getByTestId("phone-feed"),
+    ).toBe(block);
+    expect(
+      within(block).getByRole("heading", { name: en.editor.feed.title }),
+    ).toBeInTheDocument();
+    expect(within(block).getByText(en.editor.feed.hint)).toBeInTheDocument();
+    expect(
+      within(block).getByRole("textbox", { name: en.editor.feed.link }),
+    ).toHaveValue(ABSOLUTE);
+    const at = h.requests.indexOf("GET /api/parent/feed");
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(h.headers[at]?.session).toBe(SESSION);
+  });
+
+  it("is hidden when the feed is off", async () => {
+    const h = renderEditor();
+    await home();
+    await waitFor(() => {
+      expect(h.requests).toContain("GET /api/parent/feed");
+    });
+    expect(screen.queryByTestId("phone-feed")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: en.editor.feed.copy }),
+    ).toBeNull();
+  });
+
+  it("is hidden when the request fails", async () => {
+    const h = renderEditor({
+      feedUrl: FEED,
+      setup: (editor) => {
+        editor.failNext(
+          "GET",
+          { status: 500, json: { error: "x" } },
+          "/api/parent/feed",
+        );
+      },
+    });
+    await home();
+    await waitFor(() => {
+      expect(h.requests).toContain("GET /api/parent/feed");
+    });
+    expect(screen.queryByTestId("phone-feed")).toBeNull();
+  });
+
+  it("copies the absolute URL and confirms it in a polite live region", async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    stubClipboard(writeText);
+    renderEditor({ feedUrl: FEED });
+    await home();
+    const status = await screen.findByTestId("feed-status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(status).toBeEmptyDOMElement();
+    await user.click(
+      await screen.findByRole("button", { name: en.editor.feed.copy }),
+    );
+    expect(writeText).toHaveBeenCalledExactlyOnceWith(ABSOLUTE);
+    expect(status).toHaveTextContent(en.editor.feed.copied);
+  });
+
+  it("selects the link when the Clipboard API is unavailable or refuses", async () => {
+    stubClipboard(() =>
+      Promise.reject(new DOMException("no", "NotAllowedError")),
+    );
+    renderEditor({ feedUrl: FEED });
+    await home();
+    await user.click(
+      await screen.findByRole("button", { name: en.editor.feed.copy }),
+    );
+    const field = screen.getByRole("textbox", { name: en.editor.feed.link });
+    expect(screen.getByTestId("feed-status")).toHaveTextContent(
+      en.editor.feed.select,
+    );
+    expect(field).toHaveFocus();
+    expect(window.getSelection()?.toString() ?? "").toBe("");
+    expect((field as HTMLInputElement).selectionEnd).toBe(ABSOLUTE.length);
+    // No clipboard at all: the same fallback.
+    Reflect.deleteProperty(navigator, "clipboard");
+    await user.click(screen.getByRole("button", { name: en.editor.feed.copy }));
+    expect(screen.getByTestId("feed-status")).toHaveTextContent(
+      en.editor.feed.select,
+    );
+  });
+
+  it("never reaches the query cache (and so never the persisted cache)", async () => {
+    const h = renderEditor({ feedUrl: FEED });
+    await home();
+    await screen.findByTestId("phone-feed");
+    const cached = JSON.stringify(
+      h.queryClient
+        .getQueryCache()
+        .getAll()
+        .map((query) => query.state.data),
+    );
+    expect(cached).not.toContain("token=");
+    expect(
+      JSON.stringify(
+        h.queryClient
+          .getQueryCache()
+          .getAll()
+          .map((query) => query.queryKey),
+      ),
+    ).not.toMatch(/feed/iu);
+    expect(h.onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it("has a touch target of at least the parent size and no raw colours", async () => {
+    renderEditor({ feedUrl: FEED });
+    await home();
+    const button = await screen.findByRole("button", {
+      name: en.editor.feed.copy,
+    });
+    expect(button.className).toContain("min-h-touch-parent");
+    expect(
+      screen.getByRole("textbox", { name: en.editor.feed.link }).className,
+    ).toContain("min-h-touch-parent");
+    expect(screen.getByTestId("phone-feed").outerHTML).not.toMatch(
+      /#[0-9a-f]{3,8}\b/iu,
+    );
+  });
+});

@@ -70,6 +70,8 @@ export interface FakeEditorOptions {
   google?: (range: DateRange) => { events: CalendarEvent[]; meals: Meal[] };
   /** Entry limit (worker: 1 000). */
   maxEntries?: number;
+  /** Relative phone-feed URL `/api/parent/feed` answers with; none = the feed is off. */
+  feedUrl?: string;
 }
 
 export interface FakeEditor {
@@ -86,6 +88,8 @@ export interface FakeEditor {
   failNext(method: string, response: FakeResponse, pathPrefix?: string): void;
   /** When true, the list answers like a worker without D1 (`storageUnavailable`). */
   setStorageUnavailable(value: boolean): void;
+  /** Turns the phone feed on (a relative URL) or off (`undefined`). */
+  setFeedUrl(feedUrl: string | undefined): void;
   /** The app entries of `range` as board events and meals (`/api/agenda`). */
   agendaItems(range: DateRange): { events: CalendarEvent[]; meals: Meal[] };
   /** Every write request seen (method, path, query, parsed body). */
@@ -322,6 +326,7 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
   const failures: { method: string; prefix: string; response: FakeResponse }[] =
     [];
   const writes: FakeEditor["writes"] = [];
+  let feedUrl: string | undefined = options.feedUrl;
   let storageUnavailable = false;
 
   const config = (): PublicConfig => options.config();
@@ -633,6 +638,12 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
     }
     if (path === "/api/parent/templates" && method === "GET")
       return templates();
+    if (path === "/api/parent/feed" && method === "GET") {
+      return {
+        status: 200,
+        json: feedUrl === undefined ? {} : { feedUrl },
+      };
+    }
     if (path === "/api/parent/export" && method === "GET") {
       return {
         status: 200,
@@ -656,7 +667,7 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
   return {
     handle(request) {
       const isEditorRoute =
-        /^\/api\/parent\/(entries|templates|export|import)(\/|$)/.test(
+        /^\/api\/parent\/(entries|templates|export|import|feed)(\/|$)/.test(
           request.path,
         );
       if (!isEditorRoute) return null;
@@ -694,6 +705,9 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
         ...(extra.exdates === undefined ? {} : { exdates: extra.exdates }),
         overrides,
       });
+    },
+    setFeedUrl(value) {
+      feedUrl = value;
     },
     failNext(method, response, pathPrefix = "/api/parent/") {
       failures.push({ method, prefix: pathPrefix, response });

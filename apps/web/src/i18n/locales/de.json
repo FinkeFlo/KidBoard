@@ -394,6 +394,14 @@
       "confirmText": "Sie kommen von {{from}} bis {{to}} dazu.",
       "confirmAction": "Kopieren"
     },
+    "feed": {
+      "title": "Kalender auf dem Handy",
+      "hint": "Google Kalender: „Weitere Kalender“ › „Per URL“. iPhone oder Mac: in der Kalender-App „Kalenderabo hinzufügen“. Den Link dort einfügen. Bitte privat halten: Jeder mit dem Link kann die Einträge lesen.",
+      "link": "Link zum Abonnieren",
+      "copy": "Link kopieren",
+      "copied": "Link kopiert",
+      "select": "Der Link ist markiert – jetzt kopieren"
+    },
     "data": {
       "title": "Daten",
       "export": "Sicherung herunterladen",

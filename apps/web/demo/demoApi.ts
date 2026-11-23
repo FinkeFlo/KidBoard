@@ -40,6 +40,10 @@ export interface DemoApi {
   editor: FakeEditor;
 }
 
+/** Synthetic phone-feed URL of the demo (a made-up token, no real data). */
+export const DEMO_FEED_URL =
+  "/api/feed.ics?token=demo-feed-not-a-secret-0123456789";
+
 export function createDemoApi(now: () => number = Date.now): DemoApi {
   const sessions = new Map<string, number>();
   let counter = 0;
@@ -58,6 +62,7 @@ export function createDemoApi(now: () => number = Date.now): DemoApi {
     config: demoEditorConfig,
     now,
     google,
+    feedUrl: DEMO_FEED_URL,
     isSession: (token) => {
       const until = token === null ? undefined : sessions.get(token);
       return until !== undefined && until > now();

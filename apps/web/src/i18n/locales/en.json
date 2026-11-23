@@ -394,6 +394,14 @@
       "confirmText": "They are added from {{from}} to {{to}}.",
       "confirmAction": "Copy"
     },
+    "feed": {
+      "title": "Calendar on your phone",
+      "hint": "Google Calendar: “Other calendars” › “From URL”. iPhone or Mac: “Add subscribed calendar” in Calendar. Paste the link there. Keep it private: everyone with the link can read the entries.",
+      "link": "Link to subscribe to",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "select": "The link is selected – copy it now"
+    },
     "data": {
       "title": "Data",
       "export": "Download backup",

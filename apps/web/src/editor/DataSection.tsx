@@ -1,5 +1,5 @@
 import { ImportModeSchema, type ImportModeValue } from "@kidboard/shared";
-import { useId, useRef, useState } from "react";
+import { type ReactNode, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { EditorFailure } from "./failure";
@@ -46,12 +46,15 @@ export function DataSection({
   failure,
   onExport,
   onImport,
+  children,
 }: {
   busy: boolean;
   failure: EditorFailure | null;
   onExport: () => void;
   /** Resolves `true` once imported. */
   onImport: (backup: ChosenBackup, mode: ImportModeValue) => Promise<boolean>;
+  /** More blocks of the section (the phone feed link), shown after the heading. */
+  children?: ReactNode;
 }): React.JSX.Element {
   const { t } = useTranslation();
   const fileId = useId();
@@ -71,6 +74,7 @@ export function DataSection({
       <h3 id="editor-data" className="text-title">
         {t("editor.data.title")}
       </h3>
+      {children}
       <div className="flex flex-wrap items-center gap-3">
         <EditorButton
           onClick={onExport}

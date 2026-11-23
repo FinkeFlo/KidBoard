@@ -1,7 +1,8 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { demoEditorConfig } from "../demo/demoApi";
 import { demoAgenda, demoConfig } from "../demo/demoData";
-import { at, dateOf, mockBoard, NOW } from "../e2e/mockApi";
+import { at, dateOf, MOCK_PARENT_PIN, mockBoard, NOW } from "../e2e/mockApi";
 import { SCREENSHOT_DIR } from "./paths";
 
 /*
@@ -189,3 +190,109 @@ test("empty day, light", async ({ page }, testInfo) => {
   await expect(page.getByTestId("day-empty")).toBeVisible();
   await shoot(page, "day-empty", size);
 });
+
+/*
+ * Parent editor (T-46): the PIN pad, the list with the "Again" row and the Data section,
+ * and the new-entry form (weekly swimming for Mia), light and night. Same pinned clock
+ * (Sunday 12:00 Berlin, night look forced with `?night=1`), the synthetic demo data plus
+ * three entries made "in the app", the mock parent lock with its synthetic PIN.
+ */
+const HOLD_MS = 2000;
+
+async function openPinPad(page: Page, theme: Theme): Promise<Locator> {
+  const api = await mockBoard(page, {
+    config: demoEditorConfig(),
+    agenda: demoAgenda(dateOf(0), NOW),
+  });
+  api.editor.seed({
+    kind: "event",
+    childIds: ["mia"],
+    icon: "🏊",
+    title: "Swimming",
+    allDay: false,
+    date: dateOf(0),
+    startTime: "15:00",
+    endTime: "16:00",
+    repeat: { weekly: { weekdays: [7], interval: 1 } },
+  });
+  api.editor.seed({
+    kind: "event",
+    childIds: ["ben"],
+    icon: "🦷",
+    title: "Dentist",
+    allDay: false,
+    date: dateOf(1),
+    startTime: "09:30",
+    endTime: "10:00",
+  });
+  api.editor.seed({
+    kind: "meal",
+    icon: "🍝",
+    title: "Spaghetti",
+    allDay: true,
+    date: dateOf(1),
+    slot: "dinner",
+  });
+  await page.goto(`/?burnin=0&night=${theme === "night" ? "1" : "0"}`);
+  await expect(page.getByTestId("board-ready")).toBeVisible();
+  const entry = page.getByRole("button", { name: /parent area/i });
+  const box = await entry.boundingBox();
+  if (box === null) throw new Error("entry has no box");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  const pad = page.getByRole("dialog", { name: "Parent area" });
+  await expect(pad).toBeVisible({ timeout: HOLD_MS + 2000 });
+  await page.mouse.up();
+  return pad;
+}
+
+for (const theme of ["light", "night"] as const) {
+  test(`editor: PIN pad, ${theme}`, async ({ page }, testInfo) => {
+    const size = testInfo.project.name.replace("tablet-", "");
+    const pad = await openPinPad(page, theme);
+    // Three digits typed: the dots show the progress, never the digits.
+    for (const digit of MOCK_PARENT_PIN.slice(0, 3)) {
+      await pad.getByRole("button", { name: digit, exact: true }).click();
+    }
+    await page.mouse.move(0, 0);
+    await shoot(page, `editor-pin-${theme}`, size);
+  });
+
+  test(`editor: list and new entry, ${theme}`, async ({ page }, testInfo) => {
+    const size = testInfo.project.name.replace("tablet-", "");
+    const pad = await openPinPad(page, theme);
+    for (const digit of MOCK_PARENT_PIN) {
+      await pad.getByRole("button", { name: digit, exact: true }).click();
+    }
+    await pad.getByRole("button", { name: "OK" }).click();
+    await expect(page.getByTestId("entry-list")).toBeVisible();
+    await expect(page.getByTestId("template").first()).toBeVisible();
+    // Scroll to the app's own entries (series mark, change controls) below the Google rows.
+    const own = page.locator('[data-testid="editor-item"][data-origin="app"]');
+    await expect(own.first()).toBeVisible();
+    await own.first().evaluate((element) => {
+      element.scrollIntoView({ block: "center" });
+    });
+    await expect(
+      own.first().getByRole("img", { name: "Repeats every week" }),
+    ).toBeVisible();
+    await page.mouse.move(0, 0);
+    await shoot(page, `editor-list-${theme}`, size);
+
+    // The Data section with the phone feed block.
+    await expect(page.getByTestId("phone-feed")).toBeVisible();
+    await page.getByTestId("data-section").evaluate((element) => {
+      element.scrollIntoView({ block: "end" });
+    });
+    await page.mouse.move(0, 0);
+    await shoot(page, `editor-data-${theme}`, size);
+
+    await page.getByTestId("quick-swimmingWeekly").click();
+    const form = page.getByTestId("event-form");
+    await expect(form).toBeVisible();
+    await form.getByRole("checkbox", { name: "Mia" }).check({ force: true });
+    await expect(page.getByTestId("entry-preview")).toContainText("Swimming");
+    await page.mouse.move(0, 0);
+    await shoot(page, `editor-new-${theme}`, size);
+  });
+}

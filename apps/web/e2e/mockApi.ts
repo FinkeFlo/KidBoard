@@ -295,6 +295,7 @@ export async function mockBoard(
       config: () => PublicConfigSchema.parse(api.config),
       now: mockNow,
       isSession: (token) => token === MOCK_PARENT_SESSION,
+      feedUrl: MOCK_FEED_URL,
       google: (range) => {
         const parsed = AgendaResponseSchema.safeParse(api.agenda);
         if (!parsed.success) return { events: [], meals: [] };
@@ -353,6 +354,10 @@ function withAppEntries(api: MockApi): unknown {
     meals: [...body.meals, ...app.meals],
   };
 }
+
+/** Synthetic phone-feed URL of the mock (`/api/parent/feed`; a made-up token). */
+export const MOCK_FEED_URL =
+  "/api/feed.ics?token=TESTONLY-not-a-secret-feed-0123456789";
 
 /** Synthetic parent PIN of the mock (ADR-0013: 6-12 digits). */
 export const MOCK_PARENT_PIN = "246810";

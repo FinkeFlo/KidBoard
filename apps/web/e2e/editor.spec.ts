@@ -1,9 +1,16 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import {
+  expect,
+  type Locator,
+  type Page,
+  type Route,
+  test,
+} from "@playwright/test";
 
 import {
   agenda,
   config,
   dateOf,
+  MOCK_FEED_URL,
   MOCK_PARENT_PIN,
   type MockApi,
   mockBoard,
@@ -437,6 +444,113 @@ test.describe("parent editor (T-45)", () => {
     ]);
     await expect(page.getByTestId("entry-list")).toContainText("Circus");
     await expect(page.getByTestId("entry-list")).not.toContainText("Painting");
+  });
+
+  test("an entry from the Again row is a template; offline keeps the form until the connection is back", async ({
+    page,
+  }) => {
+    const api = await openEditor(page, {
+      seed: (mock) => {
+        mock.editor.seed({
+          kind: "event",
+          childIds: ["ben"],
+          icon: "🥋",
+          title: "Judo",
+          allDay: false,
+          date: dateOf(2),
+          startTime: "17:00",
+          endTime: "18:00",
+        });
+      },
+    });
+    await page
+      .getByTestId("templates-list")
+      .getByTestId("template")
+      .filter({ hasText: "Judo" })
+      .click();
+    const form = page.getByTestId("event-form");
+    await expect(form.getByLabel("Name on the tile")).toHaveValue("Judo");
+    await expect(form.getByRole("checkbox", { name: "Ben" })).toBeChecked();
+    await expect(form.getByLabel("Starts at")).toHaveValue("17:00");
+
+    // The mock answers on the page, below the network: an offline tablet is a
+    // handler registered later (it wins) that fails the writes like a lost connection.
+    const offline = (route: Route): Promise<void> =>
+      route.abort("internetdisconnected");
+    await page.route("**/api/parent/entries", offline);
+    await page.getByTestId("editor-save").click();
+    await expect(page.getByTestId("editor-failure")).toContainText("KB-NET");
+    await expect(form.getByLabel("Name on the tile")).toHaveValue("Judo");
+    expect(api.editor.entries()).toHaveLength(1);
+
+    await page.unroute("**/api/parent/entries", offline);
+    await page.getByTestId("editor-save").click();
+    await expect(page.getByTestId("editor-toast")).toContainText("Saved");
+    expect(api.editor.entries()).toHaveLength(2);
+  });
+
+  test("phone feed: the absolute link is shown, copied and confirmed", async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await openEditor(page);
+    const block = page.getByTestId("phone-feed");
+    await expect(block).toBeVisible();
+    const absolute = new URL(MOCK_FEED_URL, page.url()).href;
+    await expect(block.getByRole("textbox")).toHaveValue(absolute);
+    await expect(block).toContainText("Google Calendar");
+    await expectTouchTargets(block);
+    await expectNoOverflow(page);
+
+    const status = page.getByTestId("feed-status");
+    await expect(status).toHaveAttribute("aria-live", "polite");
+    await block.getByRole("button", { name: "Copy link" }).click();
+    await expect(status).toHaveText("Link copied");
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      absolute,
+    );
+    // The token reaches neither the persisted query cache nor any other storage.
+    const stored = await page.evaluate(() =>
+      [window.localStorage, window.sessionStorage]
+        .flatMap((storage) =>
+          Object.keys(storage).map(
+            (key) => `${key}=${storage.getItem(key) ?? ""}`,
+          ),
+        )
+        .join("\n"),
+    );
+    expect(stored).not.toContain("token=");
+    // The confirmation goes away again.
+    await expect(status).toBeEmpty({ timeout: 8000 });
+  });
+
+  test("phone feed: without Clipboard access the link is selected", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        value: undefined,
+        configurable: true,
+      });
+    });
+    await openEditor(page);
+    const field = page.getByTestId("feed-url");
+    await page.getByRole("button", { name: "Copy link" }).click();
+    await expect(page.getByTestId("feed-status")).toHaveText(
+      "The link is selected – copy it now",
+    );
+    await expect(field).toBeFocused();
+  });
+
+  test("phone feed: hidden when the feed is off", async ({ page }) => {
+    await openEditor(page, {
+      seed: (mock) => {
+        mock.editor.setFeedUrl(undefined);
+      },
+    });
+    await expect(page.getByTestId("data-section")).toBeVisible();
+    await expect(page.getByTestId("phone-feed")).toHaveCount(0);
   });
 
   test("an XSS-looking title stays text", async ({ page }) => {
