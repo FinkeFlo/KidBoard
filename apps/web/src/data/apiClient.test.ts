@@ -43,7 +43,26 @@ describe("createApiClient", () => {
 
     expect(config.refreshMinutes).toBe(60);
     expect(config.locale).toBe("auto");
+    expect(config.editor).toBe(false);
     expect(fake.calls[0]?.url).toBe("/api/config");
+  });
+
+  it("reads the editor flag and ignores unknown top-level config keys", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/config", {
+      status: 200,
+      body: {
+        calendars: [{ id: "family", kind: "events" }],
+        editor: true,
+        laterFeature: { on: true },
+      },
+    });
+    const api = createApiClient({ fetch: fake.fetch });
+
+    const config = await api.getConfig();
+
+    expect(config.editor).toBe(true);
+    expect(config).not.toHaveProperty("laterFeature");
   });
 
   it("requests /api/agenda with from and days and returns the parsed body", async () => {

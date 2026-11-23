@@ -19,6 +19,7 @@ import { cacheBackend, kvBackend, SourceStore } from "./feeds/sourceStore";
 import { accessToken } from "./http/auth";
 import { parseCalendarDate } from "./ical/zonedTime";
 import { logError, logWarn } from "./log";
+import { editorEnabled } from "./parent/pin";
 
 /** Default `days` of `/api/agenda`. */
 export const DEFAULT_DAYS = 8;
@@ -191,7 +192,9 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
         500,
       );
     }
-    return c.json(toPublicConfig(loaded.config));
+    return c.json(
+      toPublicConfig(loaded.config, { editor: editorEnabled(c.env) }),
+    );
   });
 
   app.get(

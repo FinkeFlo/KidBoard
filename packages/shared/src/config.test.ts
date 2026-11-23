@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import exampleConfig from "../../../config.example.json";
-import { calendarSecretName, parseConfig, toPublicConfig } from "./config";
+import {
+  AppConfigSchema,
+  calendarSecretName,
+  parseConfig,
+  PublicConfigSchema,
+  toPublicConfig,
+} from "./config";
 
 const minimal = { calendars: [{ id: "kinder", kind: "events" }] };
 
@@ -258,6 +264,7 @@ describe("toPublicConfig", () => {
     }
     const dto = toPublicConfig(parsed.config);
     expect(dto).toEqual(parsed.config);
+    expect(dto).not.toHaveProperty("editor");
 
     const keys: string[] = [];
     const walk = (value: unknown): void => {
@@ -286,5 +293,69 @@ describe("toPublicConfig", () => {
     const dto = toPublicConfig(parsed.config);
     expect(dto.bands).not.toBe(parsed.config.bands);
     expect(dto.calendars).not.toBe(parsed.config.calendars);
+  });
+
+  it("sends the editor flag only when it is true (old strict clients)", () => {
+    const parsed = parseConfig(minimal);
+    if (!parsed.ok) {
+      throw new Error("invalid");
+    }
+    expect(toPublicConfig(parsed.config)).not.toHaveProperty("editor");
+    expect(toPublicConfig(parsed.config, { editor: false })).not.toHaveProperty(
+      "editor",
+    );
+    expect(toPublicConfig(parsed.config, { editor: true }).editor).toBe(true);
+    // The DTO without the flag is still exactly what the strict config schema accepts.
+    expect(
+      AppConfigSchema.safeParse(toPublicConfig(parsed.config)).success,
+    ).toBe(true);
+  });
+});
+
+describe("PublicConfigSchema", () => {
+  const parsedMinimal = (): ReturnType<typeof toPublicConfig> => {
+    const parsed = parseConfig(minimal);
+    if (!parsed.ok) {
+      throw new Error("invalid");
+    }
+    return toPublicConfig(parsed.config, { editor: true });
+  };
+
+  it("round-trips the DTO of toPublicConfig", () => {
+    const dto = parsedMinimal();
+    expect(PublicConfigSchema.parse(JSON.parse(JSON.stringify(dto)))).toEqual(
+      dto,
+    );
+  });
+
+  it("defaults editor to false when an older worker omits it", () => {
+    const withoutEditor: Record<string, unknown> = { ...parsedMinimal() };
+    delete withoutEditor.editor;
+    expect(PublicConfigSchema.parse(withoutEditor).editor).toBe(false);
+  });
+
+  it("ignores unknown top-level keys of a newer worker", () => {
+    const parsed = PublicConfigSchema.parse({
+      ...parsedMinimal(),
+      futureFlag: { anything: 1 },
+    });
+    expect(parsed).not.toHaveProperty("futureFlag");
+    expect(parsed.editor).toBe(true);
+  });
+
+  it("rejects a non-boolean editor flag and keeps the config rules", () => {
+    expect(
+      PublicConfigSchema.safeParse({ ...parsedMinimal(), editor: "yes" })
+        .success,
+    ).toBe(false);
+    expect(
+      PublicConfigSchema.safeParse({
+        ...parsedMinimal(),
+        calendars: [
+          { id: "kinder", kind: "events" },
+          { id: "kinder", kind: "meals" },
+        ],
+      }).success,
+    ).toBe(false);
   });
 });

@@ -19,6 +19,11 @@ CAL_ESSEN_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPL
 # contains REPLACE_ME is rejected (the API answers 500), so the template cannot go live.
 KIDBOARD_ACCESS_TOKEN="REPLACE_ME"
 
+# Parent PIN for the editor (ADR-0013): 6 to 12 digits of your choice. Unset, shorter,
+# non-digit or still REPLACE_ME = the editor stays off and KidBoard is the read-only board.
+# The editor also needs the D1 database KIDBOARD_DATA, which Wrangler creates on deploy.
+KIDBOARD_PARENT_PIN="REPLACE_ME"
+
 # Required: non-secret settings as one JSON document on a single line (shape:
 # config.example.json, options: docs/CONFIG.md). Its calendars match CAL_KINDER_URL and
 # CAL_ESSEN_URL above.

@@ -16,6 +16,10 @@
   // Source cache (ADR-0006). No id on purpose: Wrangler provisions the namespace on the
   // first deploy (also for dashboard/Git deploys); `wrangler dev` uses a local one.
   "kv_namespaces": [{ "binding": "KIDBOARD_CACHE" }],
+  // App entries of the parent editor (ADR-0014). No id on purpose, like the KV namespace:
+  // Wrangler provisions the database on the first deploy; `wrangler dev` and the vitest
+  // plugin use a local one. The worker creates its tables on first use (no migrations).
+  "d1_databases": [{ "binding": "KIDBOARD_DATA" }],
   // No `vars` here: settings are secrets/variables set per deployment (docs/CONFIG.md).
   // Keep variables set in the dashboard instead of deleting them on every deploy.
   "keep_vars": true,

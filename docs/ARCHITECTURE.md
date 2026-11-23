@@ -300,6 +300,29 @@ containing its child but not others. Otherwise the result is `move: true` with
 its own (`instance_cannot_move`), an unknown or read-only current calendar is
 `source_not_writable`, no fitting calendar is `no_writable_calendar`.
 
+### Entry store (T-40, ADR-0014)
+
+App entries live in the D1 database `KIDBOARD_DATA` (id-less binding, auto-provisioned).
+`apps/worker/src/entries/schema.ts` creates the tables on first use: `kb_schema` (one
+version row) plus forward-only, idempotent steps applied in one batch, so concurrent first
+requests are safe; a `SchemaGate` remembers success per isolate. `EntryStore`
+(`entryStore.ts`) is the only access path: `list(from?, to?)` (date pre-filter via stored
+`first_date`/`last_date`), `get`, `create`, `update(id, revision, input)`,
+`remove(id, revision)`, `addException(id, revision, date)` (EXDATE) and
+`setOverride(id, revision, date, input)` (RECURRENCE-ID, a single replacement that may
+move), `exportAll()` / `importAll(doc, "replace" | "merge")`. One row per entry: `id`
+(`crypto.randomUUID()`), `revision` (optimistic concurrency, `UPDATE … WHERE revision = ?`
+→ `conflict`), `kind`, `data` (`EditorEntryInput` JSON), `exdates`, `overrides` (keyed by
+the original occurrence date), timestamps. Inputs go through `parseEditorEntryInput`;
+exception/override days must be occurrences of the series (weekday, `INTERVAL=2` week
+parity, `until`); a series edit keeps only those that still are. Limits: 1 000 entries
+(count check inside the `INSERT`; imports end with a guard insert into `kb_guard` whose
+`CHECK` rolls the batch back; their base revision is read inside the same batch via `kb_meta`) and 8 KB per entry → `limit_reached`. Rows are re-validated
+on read; a corrupt row is skipped and logged by failure type only. `/api/config` reports
+`editor: true` only with the binding and a valid `KIDBOARD_PARENT_PIN`
+(`apps/worker/src/parent/pin.ts`); the key is omitted when false (older web bundles parse the config strictly) and `PublicConfigSchema` defaults it to `false` and strips
+unknown top-level keys.
+
 ## Caching & offline (summary – details in [ADR-0006](adr/0006-caching-offline.md))
 
 | Layer | What | Lifetime |

@@ -1,7 +1,7 @@
 import {
   AgendaResponseSchema,
-  AppConfigSchema,
   findFallbackIcon,
+  PublicConfigSchema,
 } from "@kidboard/shared";
 import { describe, expect, it } from "vitest";
 
@@ -20,7 +20,7 @@ const NOW = "2026-11-22T12:00:00+01:00";
 describe("demo data", () => {
   it("is a valid config with Mia and Ben and no secrets", () => {
     const config = demoConfig();
-    expect(AppConfigSchema.safeParse(config).success).toBe(true);
+    expect(PublicConfigSchema.safeParse(config).success).toBe(true);
     expect(config.children.map((child) => child.avatar)).toEqual(["🦊", "🐻"]);
     expect(JSON.stringify(config)).not.toMatch(/https?:|CAL_|key|token/i);
   });

@@ -1,8 +1,8 @@
 import {
   type AgendaResponse,
   AgendaResponseSchema,
-  AppConfigSchema,
   type PublicConfig,
+  PublicConfigSchema,
 } from "@kidboard/shared";
 import type { z } from "zod";
 
@@ -171,7 +171,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   }
 
   return {
-    getConfig: (signal) => getJson("/api/config", "", AppConfigSchema, signal),
+    getConfig: (signal) =>
+      getJson("/api/config", "", PublicConfigSchema, signal),
     getAgenda: async (range, signal) => {
       const params = new URLSearchParams({
         from: range.from,

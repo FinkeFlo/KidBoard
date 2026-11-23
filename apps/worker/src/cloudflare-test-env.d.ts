@@ -2,5 +2,6 @@
 declare namespace Cloudflare {
   interface Env {
     KIDBOARD_CACHE: KVNamespace;
+    KIDBOARD_DATA: D1Database;
   }
 }

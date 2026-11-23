@@ -1,6 +1,7 @@
 import {
   AgendaResponseSchema,
   type AppConfigInput,
+  AppConfigSchema,
   parseConfig,
   toPublicConfig,
 } from "@kidboard/shared";
@@ -983,6 +984,77 @@ describe("GET /api/config", () => {
       throw new Error("fixture config must be valid");
     }
     expect(await response.json()).toEqual(toPublicConfig(parsed.config));
+    expect(
+      await harness()
+        .call("/api/config")
+        .then((r) => r.json()),
+    ).not.toHaveProperty("editor");
+  });
+
+  const PIN = "246813";
+
+  it.each<[string, Partial<Env>, boolean]>([
+    ["no D1 binding and no PIN", {}, false],
+    ["a valid PIN but no D1 binding", { KIDBOARD_PARENT_PIN: PIN }, false],
+    [
+      "the D1 binding but no PIN",
+      { KIDBOARD_DATA: testEnv.KIDBOARD_DATA },
+      false,
+    ],
+    [
+      "the D1 binding and the template PIN",
+      {
+        KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
+        KIDBOARD_PARENT_PIN: "REPLACE_ME",
+      },
+      false,
+    ],
+    [
+      "the D1 binding and a 5-digit PIN",
+      { KIDBOARD_DATA: testEnv.KIDBOARD_DATA, KIDBOARD_PARENT_PIN: "13579" },
+      false,
+    ],
+    [
+      "the D1 binding and a valid PIN",
+      { KIDBOARD_DATA: testEnv.KIDBOARD_DATA, KIDBOARD_PARENT_PIN: PIN },
+      true,
+    ],
+  ])("reports editor with %s → %s", async (_, overrides, expected) => {
+    const h = harness();
+    const response = await h.call("/api/config", undefined, baseEnv(overrides));
+    expect(response.status).toBe(200);
+    const body = await response.json<Record<string, unknown>>();
+    if (expected) {
+      expect(body.editor).toBe(true);
+    } else {
+      // Omitted, so web bundles that parse the config strictly keep working.
+      expect(body).not.toHaveProperty("editor");
+      expect(AppConfigSchema.safeParse(body).success).toBe(true);
+    }
+    expect([...seenResponses, ...consoleOutput].join("\n")).not.toContain(PIN);
+  });
+});
+
+describe("editor flag and the board", () => {
+  it("leaves /api/agenda unchanged with or without the D1 binding and PIN", async () => {
+    serveIcs(KINDER_URL, eventsIcs);
+    serveIcs(ESSEN_URL, mealsIcs);
+    const without = await agenda(harness(), "?days=8");
+    const withEditor = await agenda(
+      harness(),
+      "?days=8",
+      baseEnv({
+        KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
+        KIDBOARD_PARENT_PIN: "246813",
+      }),
+    );
+    expect(without.status).toBe(200);
+    expect(without.body.events.length).toBeGreaterThan(0);
+    expect(withEditor).toEqual(without);
+    expect(withEditor.body.sources.map((s) => s.id)).toEqual([
+      "kinder",
+      "essen",
+    ]);
   });
 });
 

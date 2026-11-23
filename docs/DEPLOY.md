@@ -42,6 +42,8 @@ The worker reads exactly these names (`apps/worker/src/env.ts`):
 | `KIDBOARD_ALLOWED_ORIGINS` | variable            | no       | Only for cross-origin API use; the board itself is same-origin.                                  |
 | `KIDBOARD_CACHE_TTL`       | variable            | no       | Seconds a feed counts as fresh, default 3600.                                                    |
 | `KIDBOARD_CACHE`           | KV namespace binding | automatic | Declared without an id in `wrangler.jsonc`; Wrangler creates it on the first deploy.            |
+| `KIDBOARD_PARENT_PIN`      | secret              | no       | 6 to 12 digits; turns on the parent editor (with `KIDBOARD_DATA`). Unset, invalid or `REPLACE_ME` = editor off. |
+| `KIDBOARD_DATA`            | D1 database binding | automatic | Entries made in the editor (ADR-0014). Declared without an id in `wrangler.jsonc`; Wrangler creates it on the first deploy, the worker creates its tables. |
 
 Plain-text variables set in the dashboard survive later deploys (`keep_vars: true`);
 secrets always do. The template for all of them is [`.dev.vars.example`](../.dev.vars.example).
@@ -56,8 +58,9 @@ secrets always do. The template for all of them is [`.dev.vars.example`](../.dev
 3. Keep or change the **Worker name** (default `kidboard`, it becomes part of the URL) and
    keep the suggested **KV namespace** for `KIDBOARD_CACHE`.
 4. Fill in the secrets the page asks for (taken from `.dev.vars.example`):
-   `CAL_KINDER_URL`, `CAL_ESSEN_URL`, `KIDBOARD_ACCESS_TOKEN`, `KIDBOARD_CONFIG`. **Replace
-   every `REPLACE_ME`.** If your calendars have other ids, enter the ones you have here and
+   `CAL_KINDER_URL`, `CAL_ESSEN_URL`, `KIDBOARD_ACCESS_TOKEN`, `KIDBOARD_PARENT_PIN`,
+   `KIDBOARD_CONFIG`. **Replace every `REPLACE_ME`** (only `KIDBOARD_PARENT_PIN` may keep
+   it: the parent editor then stays off). If your calendars have other ids, enter the ones you have here and
    add the remaining `CAL_<ID>_URL` secrets afterwards (step 7).
 5. Check the build settings. The repository is a pnpm monorepo, so the build must run in
    the repository root:

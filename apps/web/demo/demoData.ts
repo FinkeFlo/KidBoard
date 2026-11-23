@@ -52,6 +52,7 @@ export function demoConfig(): PublicConfig {
     countdown: { emojis: ["🎂", "🎉", "🎁", "🎄", "🐣", "✈️", "🏖️"] },
     refreshMinutes: 60,
     autoReturnSeconds: 120,
+    editor: false,
   };
 }
 

@@ -44,6 +44,8 @@ Der Worker liest genau diese Namen (`apps/worker/src/env.ts`):
 | `KIDBOARD_ALLOWED_ORIGINS` | Variable             | nein     | Nur für API-Zugriffe von anderen Origins; das Board selbst ist same-origin.                       |
 | `KIDBOARD_CACHE_TTL`       | Variable             | nein     | Sekunden, die ein Feed als frisch gilt, Standard 3600.                                            |
 | `KIDBOARD_CACHE`           | KV-Namespace-Binding | automatisch | Ohne ID in `wrangler.jsonc` deklariert; Wrangler legt ihn beim ersten Deploy an.               |
+| `KIDBOARD_PARENT_PIN`      | Secret               | nein     | 6 bis 12 Ziffern; schaltet den Eltern-Editor ein (mit `KIDBOARD_DATA`). Nicht gesetzt, ungültig oder `REPLACE_ME` = Editor aus. |
+| `KIDBOARD_DATA`            | D1-Datenbank-Binding | automatisch | Im Editor angelegte Einträge (ADR-0014). Ohne ID in `wrangler.jsonc` deklariert; Wrangler legt sie beim ersten Deploy an, der Worker seine Tabellen. |
 
 Im Dashboard gesetzte Klartext-Variablen bleiben bei späteren Deploys erhalten
 (`keep_vars: true`), Secrets sowieso. Die Vorlage für alle ist
@@ -59,8 +61,9 @@ Im Dashboard gesetzte Klartext-Variablen bleiben bei späteren Deploys erhalten
 3. **Worker-Namen** behalten oder ändern (Standard `kidboard`, er wird Teil der Adresse)
    und den vorgeschlagenen **KV-Namespace** für `KIDBOARD_CACHE` übernehmen.
 4. Die abgefragten Secrets ausfüllen (aus `.dev.vars.example`): `CAL_KINDER_URL`,
-   `CAL_ESSEN_URL`, `KIDBOARD_ACCESS_TOKEN`, `KIDBOARD_CONFIG`. **Jedes `REPLACE_ME`
-   ersetzen.** Haben deine Kalender andere IDs, trage hier die vorhandenen ein und lege die
+   `CAL_ESSEN_URL`, `KIDBOARD_ACCESS_TOKEN`, `KIDBOARD_PARENT_PIN`, `KIDBOARD_CONFIG`.
+   **Jedes `REPLACE_ME` ersetzen** (nur `KIDBOARD_PARENT_PIN` darf es behalten: dann bleibt
+   der Eltern-Editor aus). Haben deine Kalender andere IDs, trage hier die vorhandenen ein und lege die
    übrigen `CAL_<ID>_URL`-Secrets danach an (Schritt 7).
 5. Build-Einstellungen prüfen. Das Repository ist ein pnpm-Monorepo, gebaut wird im Root:
    - Root-Verzeichnis: leer (Repository-Root)

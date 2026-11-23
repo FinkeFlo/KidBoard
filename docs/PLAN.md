@@ -638,7 +638,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
   6. `pickTargetCalendar(entry, writableSources, config)` implements the ADR-0012 rule;
      table tests. (Criteria 5–6 prepare the optional Google sync of ADR-0012.) ARCHITECTURE gets an "Editor" section (model, conventions, target rule).
 
-- [ ] **T-40 Worker: entry store in D1** (risk: **high** → Opus, deps: T-39)
+- [x] **T-40 Worker: entry store in D1** (risk: **high** → Opus, deps: T-39)
   Goal: app entries are stored durably in the family's own deployment, with no setup step.
   Acceptance:
   1. `KIDBOARD_DATA` D1 binding without an id in `wrangler.jsonc` (auto-provisioning and

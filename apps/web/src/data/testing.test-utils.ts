@@ -2,8 +2,8 @@
 import {
   type AgendaResponse,
   type AppConfigInput,
-  AppConfigSchema,
   type PublicConfig,
+  PublicConfigSchema,
 } from "@kidboard/shared";
 import type { QueryClient } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
@@ -21,7 +21,7 @@ export const TODAY = "2026-11-22";
 export function configFixture(
   overrides: Partial<AppConfigInput> = {},
 ): PublicConfig {
-  return AppConfigSchema.parse({
+  return PublicConfigSchema.parse({
     locale: "en",
     timeZone: "Europe/Berlin",
     calendars: [{ id: "family", kind: "events" }],
