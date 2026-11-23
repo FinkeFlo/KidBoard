@@ -792,7 +792,7 @@ the worker, place from `KIDBOARD_CONFIG`, clothing rules in `packages/shared`). 
 1–6 of M5b apply. M9 touches the board, i18n and config files that M11 also touches: rebase
 often, never force-push.
 
-- [ ] **T-47 Weather config, forecast model and clothing rules** (risk: medium, deps: M10)
+- [x] **T-47 Weather config, forecast model and clothing rules** (risk: medium, deps: M10)
   Goal: everything pure and runtime-agnostic in `packages/shared`.
   Acceptance:
   1. Optional `weather` block in `AppConfigSchema` (strict): either `place` (1–80 chars,

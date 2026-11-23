@@ -1,4 +1,4 @@
-import type { AppConfig, Locale } from "../config";
+import type { CoreConfig, Locale } from "../config";
 import type { CalendarSource, MealSlot } from "../model";
 import {
   type ParsedTitle,
@@ -106,7 +106,7 @@ function sameSet(a: readonly string[], b: readonly string[]): boolean {
 }
 
 function findSource(
-  config: AppConfig,
+  config: CoreConfig,
   sourceId: string | undefined,
 ): CalendarSource | undefined {
   if (sourceId === undefined) {
@@ -141,7 +141,7 @@ function findSource(
  */
 export function composeTitle(
   entry: TitleParts & { sourceId?: string | undefined },
-  config: AppConfig,
+  config: CoreConfig,
   options: ComposeTitleOptions = {},
 ): string {
   const locale = resolveWriteLocale(config.locale, options.locale);

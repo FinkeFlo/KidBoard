@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { CalendarSourceSchema, ChildSchema } from "./model";
 import { EmojiSchema, TimeOfDaySchema, TimeZoneSchema } from "./primitives";
+import { TemperatureUnitSchema } from "./weather/schema";
 
 export const LocaleSchema = z.enum(["de", "en", "auto"]);
 export type Locale = z.infer<typeof LocaleSchema>;
@@ -84,6 +85,54 @@ const CountdownSchema = z.strictObject({
   emojis: z.array(EmojiSchema).default(DEFAULT_COUNTDOWN_EMOJIS),
 });
 
+/**
+ * Optional weather block: a `place` (name, optionally narrowed by an ISO 3166-1 alpha-2
+ * `country`) or `latitude` + `longitude`, never both. Server-side only, never public.
+ */
+const WeatherConfigSchema = z
+  .strictObject({
+    place: z.string().trim().min(1).max(80).optional(),
+    country: z
+      .string()
+      .regex(
+        /^[A-Z]{2}$/,
+        "country must be an ISO 3166-1 alpha-2 code, e.g. DE",
+      )
+      .optional(),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    unit: TemperatureUnitSchema.default("celsius"),
+  })
+  .superRefine((w, ctx) => {
+    const hasPlace = w.place !== undefined;
+    const hasLat = w.latitude !== undefined;
+    const hasLon = w.longitude !== undefined;
+    if (hasPlace && (hasLat || hasLon)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Use either place or latitude/longitude, not both",
+      });
+    } else if (!hasPlace && !hasLat && !hasLon) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Set either place or latitude and longitude",
+      });
+    } else if (!hasPlace && hasLat !== hasLon) {
+      ctx.addIssue({
+        code: "custom",
+        message: "latitude and longitude must be set together",
+      });
+    }
+    if (!hasPlace && w.country !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["country"],
+        message: "country only applies together with place",
+      });
+    }
+  });
+export type WeatherConfig = z.infer<typeof WeatherConfigSchema>;
+
 const appConfigShape = {
   locale: LocaleSchema.default("auto"),
   timeZone: TimeZoneSchema.default("Europe/Berlin"),
@@ -98,8 +147,14 @@ const appConfigShape = {
   autoReturnSeconds: z.number().int().min(10).max(3600).default(120),
 };
 
-const AppConfigObjectSchema = z.strictObject(appConfigShape);
-type AppConfigFields = z.output<typeof AppConfigObjectSchema>;
+const AppConfigObjectSchema = z.strictObject({
+  ...appConfigShape,
+  weather: WeatherConfigSchema.optional(),
+});
+type AppConfigFields = Pick<
+  z.output<typeof AppConfigObjectSchema>,
+  "children" | "calendars"
+>;
 
 /** Cross-field rules (unique ids/names, secret names, known child ids). */
 function refineConfig(config: AppConfigFields, ctx: z.RefinementCtx): void {
@@ -211,6 +266,8 @@ export const PublicConfigSchema = z
      * valid `KIDBOARD_PARENT_PIN`). Absent (older worker) → `false`.
      */
     editor: z.boolean().default(false),
+    /** Weather is configured (the place and coordinates are never sent to the client). */
+    weather: z.boolean().default(false),
   })
   .superRefine(refineConfig);
 export type PublicConfig = z.infer<typeof PublicConfigSchema>;
@@ -218,7 +275,24 @@ export type PublicConfig = z.infer<typeof PublicConfigSchema>;
  * The `/api/config` body as sent: `editor` only when true, because web bundles built
  * before the flag existed parse the config strictly and would reject the key.
  */
-export type PublicConfigDto = Omit<PublicConfig, "editor"> & { editor?: true };
+export type PublicConfigDto = Omit<PublicConfig, "editor" | "weather"> & {
+  editor?: true;
+  weather?: true;
+};
+
+/**
+ * The config parts the editor rules need (everything but the server-only weather block),
+ * so both an {@link AppConfig} and a {@link PublicConfig} fit.
+ */
+export type CoreConfig = Omit<AppConfig, "weather">;
+
+/**
+ * Input of {@link toPublicConfig}: a validated {@link AppConfig}, or an already public
+ * config (where `weather` is the boolean flag).
+ */
+export type PublicConfigSource = CoreConfig & {
+  weather?: WeatherConfig | boolean | undefined;
+};
 
 export interface PublicConfigOptions {
   /** See {@link PublicConfig.editor}; default `false`. */
@@ -227,11 +301,11 @@ export interface PublicConfigOptions {
 
 /**
  * Builds the public config DTO. Fields are copied explicitly so that any future
- * internal-only field must be opted in deliberately. `editor` is omitted when false
+ * internal-only field must be opted in deliberately. `editor` and `weather` are omitted when false
  * (see {@link PublicConfigDto}); {@link PublicConfigSchema} reads that as `false`.
  */
 export function toPublicConfig(
-  config: AppConfig,
+  config: PublicConfigSource,
   options: PublicConfigOptions = {},
 ): PublicConfigDto {
   return {
@@ -255,5 +329,8 @@ export function toPublicConfig(
     refreshMinutes: config.refreshMinutes,
     autoReturnSeconds: config.autoReturnSeconds,
     ...(options.editor === true ? { editor: true as const } : {}),
+    ...(config.weather === undefined || config.weather === false
+      ? {}
+      : { weather: true as const }),
   };
 }

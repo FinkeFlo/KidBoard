@@ -53,6 +53,7 @@ export function demoConfig(): PublicConfig {
     refreshMinutes: 60,
     autoReturnSeconds: 120,
     editor: false,
+    weather: false,
   };
 }
 

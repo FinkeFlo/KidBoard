@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { AppConfig } from "../config";
+import type { CoreConfig } from "../config";
 import { addCalendarDays, calendarDaysBetween, isDateKey } from "../dates";
 import type { CalendarSource } from "../model";
 import { DateStringSchema, isValidTimeZone } from "../primitives";
@@ -131,7 +131,7 @@ function localStart(
   return { date: wall.date, startTime: wall.time, allDay: false };
 }
 
-function isCountdownIcon(icon: string, config: AppConfig): boolean {
+function isCountdownIcon(icon: string, config: CoreConfig): boolean {
   const strip = (value: string): string => value.replace(/\uFE0F/gu, "");
   return config.countdown.emojis.some((emoji) => strip(emoji) === strip(icon));
 }
@@ -159,7 +159,7 @@ function isCountdownIcon(icon: string, config: AppConfig): boolean {
  */
 export function toGoogleEvent(
   input: EditorEntryInput,
-  config: AppConfig,
+  config: CoreConfig,
   options: ToGoogleEventOptions,
 ): GoogleEventWrite {
   const timeZone = config.timeZone;
@@ -249,7 +249,7 @@ export interface FromGoogleEventOptions {
 export function fromGoogleEvent(
   event: GoogleEvent,
   source: CalendarSource,
-  config: AppConfig,
+  config: CoreConfig,
   options: FromGoogleEventOptions = {},
 ): EditorEntry | null {
   const timeZone = config.timeZone;

@@ -1,4 +1,4 @@
-import type { AppConfig } from "../config";
+import type { CoreConfig } from "../config";
 import type { CalendarSource } from "../model";
 import { canExpressChildren } from "./composeTitle";
 import type { EditorKind } from "./entry";
@@ -63,7 +63,7 @@ export function canHoldEntry(
 export function pickTargetCalendar(
   entry: TargetEntry,
   writableSources: readonly Pick<CalendarSource, "id">[],
-  config: AppConfig,
+  config: CoreConfig,
 ): TargetCalendar {
   const writable = new Set(writableSources.map((source) => source.id));
   const candidates = config.calendars.filter((source) =>

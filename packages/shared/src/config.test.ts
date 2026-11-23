@@ -348,9 +348,10 @@ describe("PublicConfigSchema", () => {
 
   it("round-trips the DTO of toPublicConfig", () => {
     const dto = parsedMinimal();
-    expect(PublicConfigSchema.parse(JSON.parse(JSON.stringify(dto)))).toEqual(
-      dto,
-    );
+    expect(PublicConfigSchema.parse(JSON.parse(JSON.stringify(dto)))).toEqual({
+      ...dto,
+      weather: false,
+    });
   });
 
   it("defaults editor to false when an older worker omits it", () => {
@@ -381,6 +382,114 @@ describe("PublicConfigSchema", () => {
           { id: "kinder", kind: "meals" },
         ],
       }).success,
+    ).toBe(false);
+  });
+});
+
+describe("weather config", () => {
+  const withWeather = (weather: unknown): unknown => ({ ...minimal, weather });
+
+  it("is off without a block and defaults the unit to celsius", () => {
+    const off = parseConfig(minimal);
+    expect(off.ok && off.config.weather).toBeUndefined();
+    const on = parseConfig(withWeather({ place: "Berlin" }));
+    expect(on.ok && on.config.weather).toEqual({
+      place: "Berlin",
+      unit: "celsius",
+    });
+  });
+
+  it("accepts place with country, and coordinates incl. bounds", () => {
+    expect(
+      parseConfig(withWeather({ place: "Springfield", country: "US" })).ok,
+    ).toBe(true);
+    expect(
+      parseConfig(
+        withWeather({ latitude: -90, longitude: 180, unit: "fahrenheit" }),
+      ).ok,
+    ).toBe(true);
+    expect(parseConfig(withWeather({ latitude: 90, longitude: -180 })).ok).toBe(
+      true,
+    );
+    expect(parseConfig(withWeather({ place: "x".repeat(80) })).ok).toBe(true);
+  });
+
+  it.each([
+    ["empty block", {}],
+    ["place and coordinates", { place: "Berlin", latitude: 1, longitude: 2 }],
+    ["place and latitude only", { place: "Berlin", latitude: 1 }],
+    ["only latitude", { latitude: 1 }],
+    ["only longitude", { longitude: 1 }],
+    ["empty place", { place: "" }],
+    ["blank place", { place: "   " }],
+    ["place too long", { place: "x".repeat(81) }],
+    ["lowercase country", { place: "Berlin", country: "de" }],
+    ["three-letter country", { place: "Berlin", country: "DEU" }],
+    ["country with coordinates", { latitude: 1, longitude: 2, country: "DE" }],
+    ["latitude too high", { latitude: 90.1, longitude: 0 }],
+    ["latitude too low", { latitude: -90.1, longitude: 0 }],
+    ["longitude too high", { latitude: 0, longitude: 180.1 }],
+    ["longitude too low", { latitude: 0, longitude: -180.1 }],
+    ["unknown unit", { place: "Berlin", unit: "kelvin" }],
+    ["unknown key", { place: "Berlin", extra: true }],
+    ["non-numeric latitude", { latitude: "1", longitude: 2 }],
+  ])("rejects %s", (_name, weather) => {
+    const errors = errorsOf(withWeather(weather));
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toMatch(/^weather/);
+  });
+
+  it("gives a clear message for place plus coordinates", () => {
+    expect(
+      errorsOf(withWeather({ place: "Berlin", latitude: 1, longitude: 2 })),
+    ).toEqual(["weather: Use either place or latitude/longitude, not both"]);
+  });
+
+  it("exposes only a flag in the public config, never place or coordinates", () => {
+    const parsed = parseConfig(
+      withWeather({ place: "TESTONLY-Weatherplace", country: "DE" }),
+    );
+    if (!parsed.ok) {
+      throw new Error("invalid");
+    }
+    const dto = toPublicConfig(parsed.config);
+    expect(dto.weather).toBe(true);
+    expect(JSON.stringify(dto)).not.toContain("TESTONLY-Weatherplace");
+    expect(JSON.stringify(dto)).not.toContain("celsius");
+
+    const coords = parseConfig(
+      withWeather({ latitude: 12.34, longitude: 56.78 }),
+    );
+    if (!coords.ok) {
+      throw new Error("invalid");
+    }
+    const coordsJson = JSON.stringify(toPublicConfig(coords.config));
+    expect(coordsJson).not.toContain("12.34");
+    expect(coordsJson).not.toContain("56.78");
+
+    const off = parseConfig(minimal);
+    if (!off.ok) {
+      throw new Error("invalid");
+    }
+    expect(toPublicConfig(off.config)).not.toHaveProperty("weather");
+  });
+
+  it("PublicConfigSchema defaults weather to false and round-trips true", () => {
+    const off = parseConfig(minimal);
+    const on = parseConfig(withWeather({ place: "Berlin" }));
+    if (!off.ok || !on.ok) {
+      throw new Error("invalid");
+    }
+    expect(PublicConfigSchema.parse(toPublicConfig(off.config)).weather).toBe(
+      false,
+    );
+    const dto = toPublicConfig(on.config);
+    expect(PublicConfigSchema.parse(JSON.parse(JSON.stringify(dto)))).toEqual({
+      ...dto,
+      editor: false,
+    });
+    expect(
+      PublicConfigSchema.safeParse({ ...dto, weather: "yes" }).success,
     ).toBe(false);
   });
 });

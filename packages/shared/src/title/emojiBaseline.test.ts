@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_COUNTDOWN_EMOJIS } from "../config";
 import { isEmojiGrapheme } from "../primitives";
+import { CLOTHING_MAX_ITEMS, clothingFor } from "../weather/clothingFor";
+import { WEATHER_CODE_TABLE } from "../weather/weatherIcon";
 import {
   DEFAULT_EVENT_ICON,
   DEFAULT_MEAL_ICON,
@@ -67,6 +69,30 @@ describe("emoji baseline (ADR-0011)", () => {
     expect(tooNew(DEFAULT_MEAL_ICON)).toEqual([]);
     expect(DEFAULT_COUNTDOWN_EMOJIS.length).toBeGreaterThan(0);
     expect(tooNew(DEFAULT_COUNTDOWN_EMOJIS.join(" "))).toEqual([]);
+  });
+
+  it("weather icons and clothing emoji are Emoji 13.0 or older", () => {
+    const icons = WEATHER_CODE_TABLE.map((entry) => entry.icon);
+    expect(icons.length).toBeGreaterThan(5);
+    expect(tooNew(icons.join(" "))).toEqual([]);
+    // Every clothing emoji, reached through the real rules (all items on, uncapped by
+    // listing the groups separately).
+    const clothing = [
+      { code: 0, feelsMin: -3, feelsMax: 25, rain: true, snow: true, uvMax: 8 },
+      {
+        code: 0,
+        feelsMin: 10,
+        feelsMax: 25,
+        rain: false,
+        snow: false,
+        uvMax: 8,
+      },
+    ].flatMap((day) => clothingFor(day, "celsius").map((item) => item.emoji));
+    expect(new Set(clothing).size).toBe(CLOTHING_MAX_ITEMS + 4);
+    expect(tooNew(clothing.join(" "))).toEqual([]);
+    for (const icon of [...icons, ...clothing]) {
+      expect(isEmojiGrapheme(icon)).toBe(true);
+    }
   });
 
   it("no keyword maps to the bring bag 🎒", () => {

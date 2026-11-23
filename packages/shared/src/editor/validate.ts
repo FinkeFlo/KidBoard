@@ -1,4 +1,4 @@
-import type { AppConfig } from "../config";
+import type { CoreConfig } from "../config";
 import {
   composeTitle,
   EditorCompositionError,
@@ -76,7 +76,7 @@ function strip(value: string): string {
  */
 export function parseEditorEntryInput(
   value: unknown,
-  config: AppConfig,
+  config: CoreConfig,
   options: ParseEditorEntryOptions = {},
 ): ParseEditorEntryResult {
   const result = EditorEntryInputSchema.safeParse(value);
