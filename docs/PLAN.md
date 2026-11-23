@@ -753,12 +753,19 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
      tests for every control, a11y (labels, roles, focus order, AA contrast in light and
      night), XSS-looking titles render as text.
 
-- [ ] **T-46 Phone feed, e2e, screenshots and docs** (risk: medium, deps: T-45)
+- [ ] **T-46a Worker: phone feed** (risk: **high** → Opus, deps: T-41, T-42)
+  Acceptance: optional secret feed of the app entries: `GET /api/feed.ics?token=<KIDBOARD_FEED_TOKEN>`
+  (only when that secret is set, 32–256 chars `[A-Za-z0-9_-]`, not the template; 404 on
+  every miss; constant-time compare; no access token needed for exactly GET/HEAD of this
+  path so calendar apps can subscribe; `Cache-Control: no-store`; token never logged), the
+  same iCalendar as T-41 plus a VTIMEZONE (RFC 5545), and `GET /api/parent/feed` (behind
+  the parent session) returning the relative subscribe URL; tests.
+
+- [ ] **T-46 Phone feed link, e2e, screenshots and docs** (risk: medium, deps: T-45, T-46a)
   Acceptance:
-  1. Optional secret feed of the app entries: `GET /api/feed/<KIDBOARD_FEED_TOKEN>.ics`
-     (only when that secret is set, ≥ 32 chars, constant-time compare, no access token
-     needed so calendar apps can subscribe, `Cache-Control: no-store`), same iCalendar as
-     T-41; the parent area shows the subscribe link with a copy button; tests.
+  1. The parent area shows the subscribe link (absolute URL from `/api/parent/feed`) with a
+     copy button and an `aria-live` "copied" confirmation, hidden when the feed is off;
+     never logged or cached; i18n DE + EN; component tests.
   2. Playwright e2e at 1280×800 and 2000×1200 against the mock API (create once, create
      weekly, edit one vs series, delete, meal, template, export/import, lockout,
      auto-lock, offline); screenshots `docs/screenshots/editor-*` (light/night).
@@ -835,6 +842,7 @@ stored in D1 instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-23 | T-46 split: T-46a (worker phone feed) and T-46 (link in the parent area, e2e, docs); the feed token moves from a path segment to the query (`/api/feed.ics?token=`) | Workers Logs redact query strings (`redact_query_string`) but not path segments; the worker part could be built in parallel to T-45 |
 | 2026-11-23 | T-43: Google template suggestions use the cached feed window (today − 1 to today + 28) instead of 8 weeks back | Looking 8 weeks back would need a second feed expansion per request, outside the Workers CPU budget (ADR-0003); app entries still count 8 weeks back |
 | 2026-11-23 | T-42/T-43: PIN errors answer 403 (`wrong_pin`, `parent_locked`), 401 stays reserved for the access token; unlock attempts are reserved before the PIN compare (a success deletes its reservation) | The board client wipes its access token on any 401; reserving first closes the parallel-request bypass of the lockout (T-42 review) |
 | 2026-11-23 | M11 reworked after the maintainer's storage decision: app entries stored by KidBoard in the family's D1 (ADR-0014) instead of writing to Google; tasks now T-39–T-46 (entry store, board merge, parent lock, editor API, gate, screens, phone feed/docs); ADR-0012 deferred to an optional later Google sync | Per-family Google Cloud setup judged too complicated; central Google sign-in needs verification and a central service |
