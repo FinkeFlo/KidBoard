@@ -661,7 +661,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
      overrides, limits, export → import round trip, table creation from an empty database,
      binding absent → editor off and `/api/agenda` unchanged.
 
-- [ ] **T-41 Worker: app entries on the board** (risk: **high** → Opus, deps: T-40)
+- [x] **T-41 Worker: app entries on the board** (risk: **high** → Opus, deps: T-40)
   Goal: entries from the app appear on the board exactly like Google events.
   Acceptance:
   1. Entries rendered as an in-memory iCalendar with ical.js (`composeTitle`,

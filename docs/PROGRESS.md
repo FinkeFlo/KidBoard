@@ -44,6 +44,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-23 | T-35 Bring chips on tiles | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; narrow tiles grow by a chip row (BRING_EXTRA_REM), today's tiles keep height; night chip contrast for M10 exit review |
 | 2026-11-23 | T-39 Editor model: compose and parse entries | Opus (builder-opus) | Opus (reviewer-opus) | 2 | PASS round 2; DST-gap time ranges (default end +60 real min, explicit gap end rejected), countdown marker kept when it sat on a bring line, shared tests run under TZ=Pacific/Kiritimati; Context7 unreachable for subagents (installed sources checked) |
 | 2026-11-23 | T-40 Worker: entry store in D1 | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; nits fixed before commit: `editor` omitted from `/api/config` when false (old strict PWA bundles), replace-import revisions taken inside the batch (`kb_meta`); `addException`/`setOverride` take a revision (409 on conflict); web parses config with `PublicConfigSchema`; gitleaks not installed locally (CI runs it) |
+| 2026-11-23 | T-41 Worker: app entries on the board | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; entries rendered with ical.js and expanded like Google feeds (`app-events`/`app-meals`), D1 change stamp so a write shows in every isolate, reserved calendar ids; nits for T-43: D1 timeout in the agenda path, KV cost per write; Context7 unreachable for subagents |
 | 2026-11-23 | T-36 Evening-before 🎒 "tomorrow bring" area | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; resumed from interrupted partial work; night chip token --color-chip; nit: two-digit +N width for T-37 e2e |
 | 2026-11-23 | T-38 School docs | Sonnet (builder) | Sonnet (reviewer, together with T-37) | 1 | PASS round 1; README/README.de bring-list section, subject icons, emoji baseline note, CONFIG window rows, troubleshooting |
 | 2026-11-23 | T-37 Fixtures, demo data, e2e and screenshots | Sonnet (builder) | Sonnet (reviewer, together with T-38) | 1 | PASS round 1; e2e found a two-digit +N clip in the bag area, reservation raised to 2rem with a fit fix |
@@ -70,6 +71,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-23 | T-36 | Sonnet → Opus | High-risk task (time zones/DST, midnight rollover offline, Today column space budget) |
 | 2026-11-23 | T-39 | Sonnet → Opus | High-risk task (recurrence/DST, editor architecture) |
 | 2026-11-23 | T-40 | Sonnet → Opus | High-risk task (data storage, concurrency, PIN handling) |
+| 2026-11-23 | T-41 | Sonnet → Opus | High-risk task (iCal rendering/recurrence, caching) |
 
 ## Milestone reviews
 
