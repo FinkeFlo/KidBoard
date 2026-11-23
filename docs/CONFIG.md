@@ -91,6 +91,37 @@ the description (not the title); feed and cache delay changes by up to
 `KIDBOARD_CACHE_TTL`. The final schema is defined in T-06 (`packages/shared`); if this document and the
 schema ever disagree, the schema wins and this page must be fixed.
 
+## Weather
+
+Optional (ADR-0015). Without a `weather` block the board shows no weather. With it, every
+overview day shows a weather icon with a temperature (today: now; other days: the high),
+the week view the icon and high in each day header inside the 7-day forecast, and today's
+card a row of clothing pictures: for today until `bands.eveningStart`, from then until
+midnight for tomorrow.
+
+```json
+"weather": { "place": "Hamburg", "country": "DE" }
+```
+
+| Key         | Type                             | Default     | Description                                                                                     |
+| ----------- | -------------------------------- | ----------- | ----------------------------------------------------------------------------------------------- |
+| `place`     | string, 1-80 chars               | -           | Town name, looked up once with the Open-Meteo geocoding API (first match). Not found: no weather, the rest of the board works. |
+| `country`   | ISO 3166-1 alpha-2 code          | unset       | Narrows the lookup of `place` (`"DE"`, `"AT"`, `"US"`, ...).                                     |
+| `latitude`, `longitude` | number (−90…90, −180…180) | -     | Instead of `place` (never both): `"weather": { "latitude": 53.55, "longitude": 9.99 }`.          |
+| `unit`      | `"celsius"` \| `"fahrenheit"`    | `"celsius"` | Temperature unit of the chips (the board shows just `°`).                                        |
+
+- **Privacy:** the place and coordinates stay on the server; the tablet only learns that
+  weather is on. The server sends them to Open-Meteo only (forecast and geocoding) and
+  caches the forecast for 30 minutes (the last good one up to 24 hours).
+- **Terms:** Open-Meteo is free for non-commercial use without an account or API key; its
+  data is licensed under CC BY 4.0, so the board shows "Weather: Open-Meteo.com" in the
+  rail while weather is on. Commercial use needs an Open-Meteo plan.
+- **Clothing pictures** (feels-like temperature 07:00-19:00, in °C; °F is converted): 🧥
+  below 12°, 🧣 below 5°, 🧤 below 0° or with snow; 👕 from 22°, 🩳 from 24° (warmest
+  hour); ☔ + 👢 with rain, 🧤 + 👢 with snow; 🧢 when sunny with UV ≥ 3 from 15°, 🧴 from
+  UV 5. At most five, protection first.
+- A forecast older than 24 hours, or any weather error, simply hides the weather.
+
 ## API behavior
 
 | Endpoint                                | Notes                                                                                                                                                                                                                  |
@@ -98,6 +129,7 @@ schema ever disagree, the schema wins and this page must be fixed.
 | `GET /api/health`                       | Always `{ "ok": true }`; public, does not read the config or the feeds.                                                                                                                                               |
 | `GET /api/config`                       | Public part of `KIDBOARD_CONFIG` with defaults applied.                                                                                                                                                                |
 | `GET /api/agenda?from=YYYY-MM-DD&days=N` | `days` 1-14 (default 8), `from` default today in `timeZone`. `[from, from + days)` must lie within yesterday ... today + 31 days (the cached window `[today − 1, today + 32)`), else `400`. `200` if any calendar has data (`ok` or `stale`), `502` otherwise. |
+| `GET /api/weather`                      | The condensed forecast ([Weather](#weather)), never the place. `404 weather_off` without a `weather` block, `503` when the place is unknown or Open-Meteo fails without a last good forecast. |
 
 Feeds are fetched with a 10 s timeout and a 5 MB limit. Each calendar's normalized data
 for the window is stored once per refresh: it is fresh for `KIDBOARD_CACHE_TTL` and kept
@@ -156,6 +188,30 @@ gelten `timeZone` und die Bänder. Zeigt sich nichts: die Zeile muss für sich s
 `Mitbringen:` oder `Bring:` samt Doppelpunkt beginnen, mindestens ein Emoji enthalten und in
 der Beschreibung (nicht im Titel) stehen; Feed- und Cache-Verzögerung bis zu
 `KIDBOARD_CACHE_TTL`.
+
+### Wetter
+
+Optional (ADR-0015): ohne `weather`-Block kein Wetter. Mit ihm zeigt jeder Tag der Übersicht
+ein Wetter-Icon mit Temperatur (heute: jetzt, sonst: Höchstwert), die Wochenansicht Icon und
+Höchstwert im Kopf jedes Tages der 7-Tage-Vorhersage und die heutige Karte eine Reihe
+Kleidungsbilder: für heute bis `bands.eveningStart`, ab dann bis Mitternacht für morgen.
+Beispiel: `"weather": { "place": "Hamburg", "country": "DE" }`. `place` (1-80 Zeichen) wird
+einmal über die Geocoding-API von Open-Meteo gesucht (erster Treffer, `country` als
+ISO-3166-1-Alpha-2-Code grenzt ein; kein Treffer: kein Wetter, das Board läuft weiter);
+alternativ `latitude` und `longitude` (nie beides). `unit`: `celsius` (Standard) oder
+`fahrenheit`.
+
+- **Datenschutz:** Ort und Koordinaten bleiben auf dem Server; das Tablet erfährt nur, dass
+  Wetter an ist. Der Server schickt sie nur an Open-Meteo und speichert die Vorhersage 30
+  Minuten (die letzte gute bis 24 Stunden).
+- **Bedingungen:** Open-Meteo ist für nicht kommerzielle Nutzung kostenlos, ohne Konto und
+  API-Schlüssel; die Daten stehen unter CC BY 4.0, daher zeigt die Leiste "Wetter:
+  Open-Meteo.com", solange Wetter an ist. Kommerzielle Nutzung braucht einen Open-Meteo-Tarif.
+- **Kleidungsbilder** (gefühlte Temperatur 07:00-19:00 in °C, °F wird umgerechnet): 🧥 unter
+  12°, 🧣 unter 5°, 🧤 unter 0° oder bei Schnee; 👕 ab 22°, 🩳 ab 24° (wärmste Stunde); ☔ + 👢
+  bei Regen, 🧤 + 👢 bei Schnee; 🧢 bei Sonne mit UV ≥ 3 ab 15°, 🧴 ab UV 5. Höchstens fünf,
+  Schutz zuerst.
+- Eine Vorhersage älter als 24 Stunden oder ein Wetterfehler blendet das Wetter einfach aus.
 
 **API:** `/api/agenda?from=JJJJ-MM-TT&days=N` liefert 1-14 Tage (Standard 8 ab heute) innerhalb
 von gestern bis heute + 31 Tage. Kalender werden mit 10 s Timeout und 5 MB Limit geladen und pro

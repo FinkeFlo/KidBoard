@@ -129,10 +129,18 @@ export function isAgendaIncomplete(
   return parsed.data.range.to < addCalendarDays(from, days);
 }
 
-/** Health of a cached query, `undefined` if it is not a KidBoard query in use. */
+/**
+ * Health of a cached query, `undefined` if it is not a KidBoard query in use. The weather
+ * (T-49) never counts: it is optional, and its failures only hide the weather, so it
+ * never turns the board `stale`/`error` nor sets {@link useApiErrorKind}.
+ */
 export function queryHealth(query: Query): QueryHealth | undefined {
   const kind = queryKindOf(query.queryKey);
-  if (kind === undefined || query.getObserversCount() === 0) {
+  if (
+    kind === undefined ||
+    kind === "weather" ||
+    query.getObserversCount() === 0
+  ) {
     return undefined;
   }
   return {

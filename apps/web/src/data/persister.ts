@@ -1,4 +1,8 @@
-import { AgendaResponseSchema, PublicConfigSchema } from "@kidboard/shared";
+import {
+  AgendaResponseSchema,
+  PublicConfigSchema,
+  WeatherResponseSchema,
+} from "@kidboard/shared";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import type { DehydratedState, Query } from "@tanstack/react-query";
 import {
@@ -178,7 +182,9 @@ export function deserializePersistedClient(raw: string): PersistedClient {
         ? PublicConfigSchema.safeParse(query.state.data)
         : kind === "agenda"
           ? AgendaResponseSchema.safeParse(query.state.data)
-          : undefined;
+          : kind === "weather"
+            ? WeatherResponseSchema.safeParse(query.state.data)
+            : undefined;
     return parsed?.success === true && isWithinMaxAge(query.state.dataUpdatedAt)
       ? [
           cleanQuery(

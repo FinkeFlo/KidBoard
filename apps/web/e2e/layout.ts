@@ -157,3 +157,68 @@ export async function columnAccount(column: Locator): Promise<ColumnAccount> {
       hidden > 0 ? ((await more.locator(".sr-only").textContent()) ?? "") : "",
   };
 }
+
+export interface ClothingPlacement {
+  /** Overlaps, cut icons, parts outside today's column, icons below 1.75rem. */
+  problems: string[];
+  /** The clothing pill sits on the heading row (beside the chip), not wrapped below it. */
+  sameLine: boolean;
+}
+
+/**
+ * Where today's clothing pill (T-49) sits: in the heading row before the weather chip, or
+ * wrapped below it; never over the heading, the chip or the event list, whole icons only.
+ */
+export async function clothingPlacement(
+  page: Page,
+): Promise<ClothingPlacement> {
+  return page
+    .locator("[data-testid=day-column][data-today=true]")
+    .evaluate((column) => {
+      const problems: string[] = [];
+      const row = column.querySelector("[data-testid=clothing-row]");
+      const chip = column.querySelector("[data-testid=weather-chip]");
+      const heading = column.querySelector("h2");
+      const list = column.querySelector("[data-testid=column-events]");
+      if (row === null || chip === null || heading === null || list === null) {
+        return { problems: ["missing part"], sameLine: false };
+      }
+      const inside = (rect: DOMRect, outer: DOMRect): boolean =>
+        rect.left >= outer.left - 0.5 &&
+        rect.right <= outer.right + 0.5 &&
+        rect.top >= outer.top - 0.5 &&
+        rect.bottom <= outer.bottom + 0.5;
+      const overlap = (a: DOMRect, b: DOMRect): boolean =>
+        a.left < b.right - 0.5 &&
+        b.left < a.right - 0.5 &&
+        a.top < b.bottom - 0.5 &&
+        b.top < a.bottom - 0.5;
+      const box = row.getBoundingClientRect();
+      const chipBox = chip.getBoundingClientRect();
+      const columnBox = column.getBoundingClientRect();
+      if (!inside(box, columnBox)) problems.push("row out");
+      if (!inside(chipBox, columnBox)) problems.push("chip out");
+      if (overlap(box, chipBox)) problems.push("row over the chip");
+      if (overlap(box, heading.getBoundingClientRect()))
+        problems.push("row over the heading");
+      if (box.bottom > list.getBoundingClientRect().top + 0.5)
+        problems.push("row over the events");
+      for (const item of row.querySelectorAll("[data-testid=clothing-item]")) {
+        if (!inside(item.getBoundingClientRect(), box)) {
+          problems.push(`cut item ${item.textContent}`);
+        }
+      }
+      const rem = parseFloat(
+        getComputedStyle(document.documentElement).fontSize,
+      );
+      for (const emoji of row.querySelectorAll(".font-emoji")) {
+        const size = parseFloat(getComputedStyle(emoji).fontSize) / rem;
+        if (size < 1.75 - 0.01) problems.push(`small icon ${String(size)}`);
+      }
+      const middle = (box.top + box.bottom) / 2;
+      return {
+        problems,
+        sameLine: middle > chipBox.top && middle < chipBox.bottom,
+      };
+    });
+}

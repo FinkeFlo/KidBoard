@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { demoEditorConfig } from "../demo/demoApi";
-import { demoAgenda, demoConfig } from "../demo/demoData";
+import { demoAgenda, demoConfig, demoWeather } from "../demo/demoData";
 import { at, dateOf, MOCK_PARENT_PIN, mockBoard, NOW } from "../e2e/mockApi";
 import { SCREENSHOT_DIR } from "./paths";
 
@@ -32,10 +32,14 @@ const PLAIN_NIGHT_NOW = at("16:45");
 async function openBoard(
   page: Page,
   theme: Theme,
-  options: { countdownDays?: number; now?: string } = {},
+  options: { countdownDays?: number; now?: string; weather?: boolean } = {},
 ): Promise<void> {
   const now = options.now ?? (theme === "light" ? NOW : NIGHT_NOW);
   await mockBoard(page, {
+    // Without `weather` the API answers 404 `weather_off`: no weather on the board.
+    ...(options.weather === true
+      ? { weather: demoWeather(dateOf(0), now) }
+      : {}),
     config: demoConfig(),
     agenda: demoAgenda(
       dateOf(0),
@@ -110,6 +114,28 @@ for (const theme of ["light", "night"] as const) {
     await expect(area).toBeVisible();
     await expect(area.getByTestId("bring-group")).toHaveCount(2);
     await shoot(page, `day-bring-evening-${theme}`, size);
+  });
+}
+
+/*
+ * Weather (T-49): the evening overview with the weather chips, tomorrow's clothing row
+ * (cold and rainy) and the 🎒 area, light at 18:30 and night at 20:00.
+ */
+for (const theme of ["light", "night"] as const) {
+  test(`day with weather, ${theme}`, async ({ page }, testInfo) => {
+    const size = testInfo.project.name.replace("tablet-", "");
+    await openBoard(page, theme, {
+      now: theme === "light" ? EVENING_NOW : NIGHT_NOW,
+      weather: true,
+    });
+    await expect(page.getByTestId("weather-chip")).toHaveCount(4);
+    await expect(page.getByTestId("clothing-row")).toHaveAttribute(
+      "data-when",
+      "tomorrow",
+    );
+    await expect(page.getByTestId("bring-area")).toBeVisible();
+    await expect(page.getByTestId("weather-attribution")).toBeVisible();
+    await shoot(page, `day-weather-${theme}`, size);
   });
 }
 

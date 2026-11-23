@@ -1,6 +1,7 @@
 import type { Child } from "@kidboard/shared";
 
 import type { FormatContext } from "../i18n/format";
+import type { BoardWeather } from "../weather/buildBoardWeather";
 import type { BringReminder } from "./buildBringReminder";
 import type { OverviewModel } from "./buildOverviewModel";
 import { DayColumn } from "./DayColumn";
@@ -13,6 +14,8 @@ export interface OverviewBoardProps {
   nowTime: string;
   /** The 🎒 area for today's column (T-36); not shown in the other columns. */
   bring?: BringReminder | undefined;
+  /** Weather chips per day and today's clothing row (T-49); absent when weather is off. */
+  weather?: BoardWeather | undefined;
 }
 
 /**
@@ -26,6 +29,7 @@ export function OverviewBoard({
   format,
   nowTime,
   bring,
+  weather,
 }: OverviewBoardProps): React.JSX.Element {
   return (
     <div
@@ -40,6 +44,8 @@ export function OverviewBoard({
           format={format}
           nowTime={nowTime}
           reminder={day.isToday ? bring : undefined}
+          weather={weather?.days.get(day.date)}
+          clothing={day.isToday ? weather?.clothing : undefined}
         />
       ))}
     </div>

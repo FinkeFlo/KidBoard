@@ -18,6 +18,8 @@ import {
   ParentFeedResponseSchema,
   type PublicConfig,
   PublicConfigSchema,
+  type WeatherResponse,
+  WeatherResponseSchema,
 } from "@kidboard/shared";
 import { z } from "zod";
 
@@ -147,6 +149,11 @@ export const DEFAULT_EXPORT_FILE_NAME = "kidboard-entries.json";
 export interface ApiClient {
   getConfig(signal?: AbortSignal): Promise<PublicConfig>;
   getAgenda(range: AgendaRange, signal?: AbortSignal): Promise<AgendaResponse>;
+  /**
+   * `/api/weather` (T-49). Errors are thrown as {@link ApiError} like every query (a 404
+   * `weather_off` or 503 is `http`); the board hides the weather on any of them.
+   */
+  getWeather(signal?: AbortSignal): Promise<WeatherResponse>;
   /**
    * Exchanges the parent PIN for a session token (ADR-0013). Not a TanStack query, so
    * no answer of it (not even a 401) runs the board's "forget the access token" path.
@@ -331,7 +338,10 @@ interface SendInit {
   headers?: Record<string, string>;
 }
 
-/** Creates the typed client for `/api/config`, `/api/agenda` and `/api/parent/*`. */
+/**
+ * Creates the typed client for `/api/config`, `/api/agenda`, `/api/weather` and
+ * `/api/parent/*`.
+ */
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = options.baseUrl ?? "";
   const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
@@ -646,6 +656,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       }
       return agenda;
     },
+    getWeather: (signal) =>
+      getJson("/api/weather", "", WeatherResponseSchema, signal),
     unlockParent,
     getParentSession,
   };

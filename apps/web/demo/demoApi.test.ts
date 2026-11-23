@@ -2,6 +2,7 @@ import {
   AgendaResponseSchema,
   EditorListResponseSchema,
   PublicConfigSchema,
+  WeatherResponseSchema,
 } from "@kidboard/shared";
 import { describe, expect, it } from "vitest";
 
@@ -28,6 +29,23 @@ describe("demo API", () => {
       answer(api.handle(request({ path: "/api/config" }))).json,
     );
     expect(config.editor).toBe(true);
+    expect(config.weather).toBe(true);
+  });
+
+  it("serves a forecast from today (config zone) fetched now", () => {
+    const api = createDemoApi(() => NOW);
+    const response = answer(api.handle(request({ path: "/api/weather" })));
+    expect(response.status).toBe(200);
+    const weather = WeatherResponseSchema.parse(response.json);
+    expect(Date.parse(weather.fetchedAt)).toBe(NOW);
+    expect(weather.days[0]?.date).toBe("2026-11-22");
+    expect(weather.days).toHaveLength(7);
+    // Relative dates: a day later, the forecast starts a day later.
+    const later = createDemoApi(() => NOW + 24 * 60 * 60_000);
+    const next = WeatherResponseSchema.parse(
+      answer(later.handle(request({ path: "/api/weather" }))).json,
+    );
+    expect(next.days[0]?.date).toBe("2026-11-23");
   });
 
   it("unlocks only with the demo PIN and then serves the editor", () => {

@@ -13,11 +13,13 @@ export interface NavRailProps {
   format: FormatContext;
   /** Show the hidden parent entry (`config.editor`, ADR-0013); default `false`. */
   editor?: boolean;
+  /** Show the weather data attribution (Open-Meteo, CC BY 4.0) while weather is shown. */
+  weatherAttribution?: boolean;
 }
 
 /**
  * Navigation rail on the right: the two view buttons on top, "Stand 15:18" at the bottom
- * and, when the editor is available, the quiet press-and-hold parent entry below it.
+ * (below it the weather attribution while weather is shown) and, when the editor is available, the quiet press-and-hold parent entry below it.
  * The "Stand" line is plain text, not a live region (it changes with every refetch and
  * must not chatter). The rail's bottom slot below it belongs to the long-press
  * fullscreen control (merge rule 6), which is a fixed overlay in the reserved bottom
@@ -29,6 +31,7 @@ export function NavRail({
   updatedAt,
   format,
   editor = false,
+  weatherAttribution = false,
 }: NavRailProps): React.JSX.Element {
   const { t } = useTranslation();
   const time = formatUpdatedTime(updatedAt, format);
@@ -48,6 +51,20 @@ export function NavRail({
             className="text-caption text-text-muted text-center text-balance"
           >
             {t("board.updated", { time })}
+          </p>
+        )}
+        {weatherAttribution && (
+          // Required attribution of the forecast data (ADR-0015); small and quiet.
+          // The source name never breaks inside ("Open-" / "Meteo.com"); the label wraps
+          // before it. A size below `text-caption` so the name fits the rail.
+          <p
+            data-testid="weather-attribution"
+            className="text-caption text-text-muted mt-1 text-center"
+          >
+            {t("weather.attribution")}{" "}
+            <span className="text-[0.75rem] whitespace-nowrap">
+              {t("weather.source")}
+            </span>
           </p>
         )}
         {editor && <ParentEntry />}

@@ -1,4 +1,8 @@
-import type { AgendaResponse, PublicConfig } from "@kidboard/shared";
+import type {
+  AgendaResponse,
+  PublicConfig,
+  WeatherResponse,
+} from "@kidboard/shared";
 import {
   skipToken,
   useIsRestoring,
@@ -106,4 +110,24 @@ export function useTodayAgenda(days: number = AGENDA_DAYS): TodayAgenda {
     today === undefined ? undefined : { from: today, days },
   );
   return { timeZone, today, agenda };
+}
+
+/** The worker keeps a forecast fresh for 30 minutes (ADR-0015); the board asks as often. */
+export const WEATHER_REFRESH_MS = 30 * 60_000;
+
+/**
+ * `/api/weather` (T-49), only while `enabled` (`config.weather`); refetched every 30
+ * minutes, on focus and reconnect, and persisted for offline like the agenda (it is a
+ * KidBoard query). It never counts for the connection status (`queryHealth`), so a
+ * failure (404 `weather_off`, 503, network) shows no banner and no error card; the board
+ * hides the weather then (`buildBoardWeather`). A 401 wipes it with everything else.
+ */
+export function useWeather(enabled: boolean): UseQueryResult<WeatherResponse> {
+  const api = useApiClient();
+  return useQuery({
+    queryKey: queryKeys.weather(),
+    queryFn: ({ signal }) => api.getWeather(signal),
+    enabled,
+    refetchInterval: WEATHER_REFRESH_MS,
+  });
 }

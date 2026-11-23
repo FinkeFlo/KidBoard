@@ -1,7 +1,11 @@
 import {
   AgendaResponseSchema,
+  clothingFor,
   findFallbackIcon,
   PublicConfigSchema,
+  WEATHER_MAX_DAYS,
+  weatherIcon,
+  WeatherResponseSchema,
 } from "@kidboard/shared";
 import { describe, expect, it } from "vitest";
 
@@ -11,6 +15,7 @@ import {
   demoAgenda,
   demoAgendaStart,
   demoConfig,
+  demoWeather,
   isoInZone,
 } from "./demoData.ts";
 
@@ -174,5 +179,39 @@ describe("isoInZone", () => {
     expect(demoAgendaStart("", now)).toBe("2026-11-23");
     expect(demoAgendaStart("from=2026-13-40", now)).toBe("2026-11-23");
     expect(demoAgendaStart("from=tomorrow", now)).toBe("2026-11-23");
+  });
+
+  it("has weather on and a valid forecast of relative days from today", () => {
+    expect(demoConfig().weather).toBe(true);
+    const weather = demoWeather(TODAY, NOW);
+    const parsed = WeatherResponseSchema.parse(weather);
+    expect(parsed.days.map((day) => day.date)).toEqual([
+      "2026-11-22",
+      "2026-11-23",
+      "2026-11-24",
+      "2026-11-25",
+      "2026-11-26",
+      "2026-11-27",
+      "2026-11-28",
+    ]);
+    expect(parsed.days).toHaveLength(WEATHER_MAX_DAYS);
+    expect(parsed.fetchedAt).toBe(NOW);
+    // Never a moon for the weather (rule 1), and no place or coordinates in the DTO.
+    for (const day of parsed.days) expect(weatherIcon(day.code)).not.toBe("🌙");
+    expect(JSON.stringify(weather)).not.toMatch(/place|latitude|longitude/i);
+  });
+
+  it("is mild today and cold and rainy tomorrow (the evening row shows rain gear)", () => {
+    const [today, tomorrow] = demoWeather(TODAY, NOW).days;
+    if (today === undefined || tomorrow === undefined) throw new Error("days");
+    expect(weatherIcon(today.code)).toBe("🌤️");
+    expect(clothingFor(today).map((item) => item.emoji)).toEqual(["🧥"]);
+    expect(weatherIcon(tomorrow.code)).toBe("🌧️");
+    expect(clothingFor(tomorrow).map((item) => item.emoji)).toEqual([
+      "☔",
+      "👢",
+      "🧥",
+      "🧣",
+    ]);
   });
 });

@@ -1083,6 +1083,23 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
   `503 weather_unavailable` (with last good → `200`, `stale: true`). Place, coordinates
   and upstream URLs appear in no key, response, error or log line.
 
+### Weather on the board (T-49)
+
+- **Query:** `useWeather` (`apps/web/src/data/queries.ts`, key `["kidboard","weather"]`) runs
+  only with `config.weather`; refetch every 30 min, on focus and reconnect; persisted like
+  the agenda (re-validated with `WeatherResponseSchema` on restore). It is excluded from
+  `queryHealth`, so it never changes the connection status, the banner or the error card;
+  a 401 still wipes it with every other query.
+- **Hiding rules** (`apps/web/src/weather/buildBoardWeather.ts`, pure, config zone): any
+  query error, a `fetchedAt` more than 24 h from now, or days before today hide the
+  weather; today's "now" temperature only while at most 2 h old (else the day's high). The
+  clothing row (`clothingFor`) is for today until `bands.eveningStart`, then for tomorrow.
+- **Where it renders:** overview column headers (`WeatherChip`, one `role="img"` with the
+  full name; today in the heading row with the `ClothingRow` pill before it, which wraps
+  below the chip when both do not fit; other days on the date line), a decorative weather
+  line in every week header (the heading carries the name via `aria-label`), and the
+  Open-Meteo attribution under "Updated" in the rail while a forecast is shown.
+
 ### Deploy & static headers (T-25)
 
 - **Config:** one `wrangler.jsonc` at the repository root (Deploy to Cloudflare and

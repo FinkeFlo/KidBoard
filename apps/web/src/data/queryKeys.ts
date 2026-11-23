@@ -27,9 +27,11 @@ export const queryKeys = {
     "agenda",
     "pending",
   ],
+  /** `/api/weather` (T-49): one forecast per board, no parameters (the place stays on the worker). */
+  weather: (): readonly ["kidboard", "weather"] => [QUERY_ROOT, "weather"],
 };
 
-export type QueryKind = "config" | "agenda" | "agendaPending";
+export type QueryKind = "config" | "agenda" | "agendaPending" | "weather";
 
 /** Which KidBoard query a key belongs to, `undefined` for foreign keys. */
 export function queryKindOf(
@@ -55,6 +57,9 @@ export function queryKindOf(
     queryKey[2] === "pending"
   ) {
     return "agendaPending";
+  }
+  if (queryKey[1] === "weather" && queryKey.length === 2) {
+    return "weather";
   }
   return undefined;
 }

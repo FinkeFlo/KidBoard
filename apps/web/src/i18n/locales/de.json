@@ -446,5 +446,41 @@
       "list": "Termine",
       "data": "Sicherung & Handy"
     }
+  },
+  "weather": {
+    "attribution": "Wetter:",
+    "source": "Open-Meteo.com",
+    "temperature": "{{value}}°",
+    "degrees_one": "{{count}} Grad",
+    "degrees_other": "{{count}} Grad",
+    "nowAndHigh": "{{kind}}, jetzt {{now}}, bis {{high}}",
+    "high": "{{kind}}, bis {{high}}",
+    "heading": "{{day}}, {{weather}}",
+    "kind": {
+      "clear": "Sonnig",
+      "mostlyClear": "Meist sonnig",
+      "partlyCloudy": "Teils bewölkt",
+      "cloudy": "Bewölkt",
+      "fog": "Nebel",
+      "drizzle": "Nieselregen",
+      "rain": "Regen",
+      "snow": "Schnee",
+      "thunder": "Gewitter"
+    },
+    "wear": {
+      "today": "Heute anziehen: {{items, list}}",
+      "tomorrow": "Morgen anziehen: {{items, list}}"
+    },
+    "clothing": {
+      "umbrella": "Regenschirm",
+      "boots": "Stiefel",
+      "jacket": "Jacke",
+      "scarf": "Schal",
+      "gloves": "Handschuhe",
+      "tshirt": "T-Shirt",
+      "shorts": "kurze Hose",
+      "cap": "Kappe",
+      "sunscreen": "Sonnencreme"
+    }
   }
 }

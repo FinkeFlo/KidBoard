@@ -244,6 +244,12 @@ export interface MockApi {
   configStatus: number;
   agenda: unknown;
   agendaStatus: number;
+  /**
+   * `/api/weather` answer (T-49); `undefined` answers 404 `weather_off` (as the worker
+   * without a weather block).
+   */
+  weather: unknown;
+  weatherStatus: number;
   /** Paths of every API request seen, in order (`/api/config`, `/api/agenda`, …). */
   requests: string[];
   /** The parent lock (`/api/parent/*`); answered only when `config.editor` is true. */
@@ -261,6 +267,9 @@ export interface MockBoardOptions {
   configStatus?: number;
   agenda?: unknown;
   agendaStatus?: number;
+  /** `/api/weather` answer; default none (404 `weather_off`). */
+  weather?: unknown;
+  weatherStatus?: number;
   /** ISO instant the clock reads when the page loads (default {@link NOW}). */
   now?: string;
   /**
@@ -271,7 +280,10 @@ export interface MockBoardOptions {
   via?: "page" | "context";
 }
 
-/** Fixes the clock and answers `/api/config` and `/api/agenda` from a mutable {@link MockApi}. */
+/**
+ * Fixes the clock and answers `/api/config`, `/api/agenda` and `/api/weather` from a
+ * mutable {@link MockApi}.
+ */
 export async function mockBoard(
   page: Page,
   options: MockBoardOptions = {},
@@ -284,6 +296,8 @@ export async function mockBoard(
     configStatus: options.configStatus ?? 200,
     agenda: options.agenda ?? agenda([], []),
     agendaStatus: options.agendaStatus ?? 200,
+    weather: options.weather,
+    weatherStatus: options.weatherStatus ?? 200,
     requests: [],
     parent: {
       pin: MOCK_PARENT_PIN,
@@ -324,6 +338,11 @@ export async function mockBoard(
         status: api.agendaStatus,
         json: withAppEntries(api),
       });
+    }
+    if (path === "/api/weather") {
+      return api.weather === undefined
+        ? route.fulfill({ status: 404, json: { error: "weather_off" } })
+        : route.fulfill({ status: api.weatherStatus, json: api.weather });
     }
     if (path.startsWith("/api/parent/")) {
       return route.fulfill(answerParent(api, path, route.request()));

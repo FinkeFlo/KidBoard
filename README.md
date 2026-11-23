@@ -21,6 +21,10 @@ server side and shows a calm overview and week view.
   shows small emoji chips; from the evening before a 🎒 area on today's card tells each child
   what to pack, until the event starts. School subjects get an icon without any emoji in
   the title.
+- **Weather and what to wear:** optional; a weather icon with the temperature on every day,
+  and on today's card clothing pictures (jacket, umbrella, ...) for today, from the evening
+  on for tomorrow. Forecast by [Open-Meteo.com](https://open-meteo.com/) (no account, no
+  key), fetched by the server; see [`weather` in docs/CONFIG.md](docs/CONFIG.md#weather).
 - **Emoji icons:** the emoji in an event title is the picture; titles without one get a
   keyword fallback (German + English).
 - **One or several children:** each child has an emoji and a colour, used as tile tint and

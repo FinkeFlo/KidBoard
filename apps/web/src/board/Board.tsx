@@ -7,6 +7,7 @@ import {
   useConfig,
   useConnectionStatus,
   useTodayAgenda,
+  useWeather,
 } from "../data";
 import { buildBringReminder } from "../day/buildBringReminder";
 import { buildOverviewModel } from "../day/buildOverviewModel";
@@ -16,6 +17,7 @@ import { formatTime, useFormatContext } from "../i18n/format";
 import { useLockWhenEditorOff, useParentGateOpen } from "../parent";
 import { useNightTheme } from "../theme";
 import { useNow } from "../time";
+import { buildBoardWeather } from "../weather/buildBoardWeather";
 import { buildWeekModel } from "../week/buildWeekModel";
 import { WeekBoard } from "../week/WeekBoard";
 import { BoardFrame } from "./BoardFrame";
@@ -46,6 +48,9 @@ const DEFAULT_AUTO_RETURN_SECONDS = 120;
  * compact badge on the overview; it is built from the same agenda query (31 days), whose
  * `dataUpdatedAt` is the rail's "Stand" time. The evening-before 🎒 area (T-36) comes from
  * the same agenda (it always covers today and tomorrow) and only shows on the overview.
+ * With `config.weather` the weather query (T-49) adds chips to both views, today's
+ * clothing row and the attribution in the rail; without a usable forecast none of them
+ * shows.
  */
 export function Board(): React.JSX.Element {
   const config = useConfig().data;
@@ -55,6 +60,13 @@ export function Board(): React.JSX.Element {
   const status = useConnectionStatus();
   const apiError = useApiErrorKind();
   const data = agenda.data;
+  const weatherQuery = useWeather(config?.weather === true);
+  // Any weather failure hides the weather (never an error on the board); so does a
+  // forecast older than 24 h (see `buildBoardWeather`).
+  const forecast =
+    config?.weather === true && !weatherQuery.isError
+      ? weatherQuery.data
+      : undefined;
   const timeZone = config?.timeZone ?? "UTC";
   const format = useFormatContext(timeZone);
   const [view, setView] = useState<BoardView>("day");
@@ -80,9 +92,14 @@ export function Board(): React.JSX.Element {
             // From the minute clock: it switches at eveningStart, at midnight and at
             // every event start, also offline on persisted data.
             bring: buildBringReminder(data, config, now),
+            weather: buildBoardWeather(forecast, config, now),
           },
-    [config, today, data, now],
+    [config, today, data, now, forecast],
   );
+  const weatherShown =
+    models !== undefined &&
+    models.weather !== undefined &&
+    models.weather.days.size > 0;
 
   if (config === undefined || today === undefined || models === undefined) {
     const kind = errorKindOf(status, apiError);
@@ -101,6 +118,7 @@ export function Board(): React.JSX.Element {
       onViewChange={setView}
       updatedAt={agenda.dataUpdatedAt}
       editor={config.editor}
+      weatherAttribution={weatherShown}
       countdown={
         models.countdown === undefined ? undefined : (
           <CountdownBadge
@@ -117,6 +135,7 @@ export function Board(): React.JSX.Element {
           format={format}
           nowTime={formatTime(now, format)}
           bring={models.bring}
+          weather={models.weather}
         />
       ) : (
         <WeekBoard
@@ -124,6 +143,7 @@ export function Board(): React.JSX.Element {
           childList={config.children}
           format={format}
           countdown={models.countdown}
+          weather={models.weather}
         />
       )}
     </BoardFrame>

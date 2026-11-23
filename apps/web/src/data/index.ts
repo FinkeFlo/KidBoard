@@ -21,6 +21,8 @@ export {
   useAgenda,
   useConfig,
   useTodayAgenda,
+  useWeather,
+  WEATHER_REFRESH_MS,
 } from "./queries";
 export { createQueryClient, seedOnlineState } from "./queryClient";
 export { retryNow, useRetryNow } from "./retryNow";

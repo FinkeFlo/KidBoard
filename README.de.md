@@ -21,6 +21,10 @@ iCal-Adressen serverseitig und zeigt eine ruhige Übersicht und Wochenansicht.
   die Kachel zeigt kleine Emoji-Chips; ab dem Vorabend sagt ein 🎒-Bereich auf der heutigen
   Karte jedem Kind, was einzupacken ist, bis der Termin beginnt. Schulfächer bekommen ein
   Icon, ganz ohne Emoji im Titel.
+- **Wetter und was anziehen:** optional; ein Wetter-Icon mit Temperatur an jedem Tag und auf
+  der heutigen Karte Kleidungsbilder (Jacke, Regenschirm, ...) für heute, ab dem Abend für
+  morgen. Vorhersage von [Open-Meteo.com](https://open-meteo.com/) (ohne Konto und
+  Schlüssel), vom Server abgerufen; siehe [`weather` in docs/CONFIG.md](docs/CONFIG.md#wetter).
 - **Emoji-Icons:** das Emoji im Termintitel ist das Bild; Titel ohne Emoji bekommen ein
   Stichwort-Icon (Deutsch + Englisch).
 - **Ein oder mehrere Kinder:** jedes Kind hat ein Emoji und eine Farbe, genutzt als

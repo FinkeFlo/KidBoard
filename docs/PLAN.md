@@ -856,7 +856,7 @@ often, never force-push.
   5. Worker tests with mocked upstreams (forecast fixture modelled on the documented
      response, geocoding hit/miss, timeout, 400 error object, oversize body).
 
-- [ ] **T-49 Weather and clothing on the board** (risk: medium, deps: T-47, T-48)
+- [x] **T-49 Weather and clothing on the board** (risk: medium, deps: T-47, T-48)
   Acceptance:
   1. Client query `weather` (only when `config.weather`), refetch every 30 min, persisted
      for offline like the agenda; a forecast older than 24 h or for a past date is not

@@ -4,6 +4,8 @@ import {
   type AppConfigInput,
   type PublicConfig,
   PublicConfigSchema,
+  type WeatherDay,
+  type WeatherResponse,
 } from "@kidboard/shared";
 import type { QueryClient } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
@@ -60,6 +62,55 @@ export function agendaFixture(
   };
 }
 
+/** One forecast day (°C): mild and dry unless overridden. */
+export function weatherDayFixture(
+  date: string,
+  overrides: Partial<WeatherDay> = {},
+): WeatherDay {
+  return {
+    date,
+    code: 1,
+    tempMax: 12,
+    tempMin: 4,
+    feelsMin: 9,
+    feelsMax: 11,
+    rain: false,
+    snow: false,
+    uvMax: 2,
+    ...overrides,
+  };
+}
+
+/**
+ * A `/api/weather` answer fetched 2026-11-22 08:00 Berlin: today mild (🧥), tomorrow cold
+ * and rainy (☔ 👢 🧥 🧣), then five dry days.
+ */
+export function weatherFixture(
+  overrides: Partial<WeatherResponse> = {},
+): WeatherResponse {
+  return {
+    fetchedAt: "2026-11-22T08:00:00+01:00",
+    unit: "celsius",
+    current: { temperature: 8, code: 1 },
+    days: [
+      weatherDayFixture("2026-11-22"),
+      weatherDayFixture("2026-11-23", {
+        code: 63,
+        tempMax: 7,
+        tempMin: 2,
+        feelsMin: 1,
+        feelsMax: 4,
+        rain: true,
+      }),
+      ...[24, 25, 26, 27, 28].map((day) =>
+        weatherDayFixture(`2026-11-${String(day)}`, { code: 3, tempMax: 9 }),
+      ),
+    ],
+    stale: false,
+    ...overrides,
+  };
+}
+
 /** The 502 body the worker sends when every source failed. */
 export function allFailedAgenda(): AgendaResponse {
   return agendaFixture({
@@ -79,7 +130,8 @@ export interface FakeFetch {
   fetch: typeof fetch;
   calls: { url: string; init: RequestInit | undefined }[];
   setReplies(
-    path: "/api/config" | "/api/agenda" | `/api/parent/${string}`,
+    path:
+      "/api/config" | "/api/agenda" | "/api/weather" | `/api/parent/${string}`,
     ...replies: Reply[]
   ): void;
   count(path: string): number;

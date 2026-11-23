@@ -446,5 +446,41 @@
       "list": "Entries",
       "data": "Backup & phone"
     }
+  },
+  "weather": {
+    "attribution": "Weather:",
+    "source": "Open-Meteo.com",
+    "temperature": "{{value}}°",
+    "degrees_one": "{{count}} degree",
+    "degrees_other": "{{count}} degrees",
+    "nowAndHigh": "{{kind}}, now {{now}}, high {{high}}",
+    "high": "{{kind}}, high {{high}}",
+    "heading": "{{day}}, {{weather}}",
+    "kind": {
+      "clear": "Sunny",
+      "mostlyClear": "Mostly sunny",
+      "partlyCloudy": "Partly cloudy",
+      "cloudy": "Cloudy",
+      "fog": "Fog",
+      "drizzle": "Drizzle",
+      "rain": "Rain",
+      "snow": "Snow",
+      "thunder": "Thunderstorm"
+    },
+    "wear": {
+      "today": "Wear today: {{items, list}}",
+      "tomorrow": "Wear tomorrow: {{items, list}}"
+    },
+    "clothing": {
+      "umbrella": "umbrella",
+      "boots": "boots",
+      "jacket": "jacket",
+      "scarf": "scarf",
+      "gloves": "gloves",
+      "tshirt": "T-shirt",
+      "shorts": "shorts",
+      "cap": "cap",
+      "sunscreen": "sunscreen"
+    }
   }
 }

@@ -17,6 +17,8 @@ import {
   formatDayMonthShort,
   formatWeekday,
 } from "../i18n/format";
+import type { BoardWeather, DayWeather } from "../weather/buildBoardWeather";
+import { WeatherChip, weatherName } from "../weather/WeatherChip";
 import { chronological, type WeekDay } from "./buildWeekModel";
 import { MealRows } from "./MealRows";
 import { fitWeekColumn } from "./weekCapacity";
@@ -37,12 +39,18 @@ function WeekColumn({
   childList,
   format,
   countdown,
+  weather,
+  weatherRow,
 }: {
   day: WeekDay;
   childList: readonly Child[];
   format: FormatContext;
   countdown: WeekCountdown | undefined;
+  weather: DayWeather | undefined;
+  /** The board shows weather: every column keeps the weather line. */
+  weatherRow: boolean;
 }): React.JSX.Element {
+  const { t } = useTranslation();
   const headingId = useId();
   const listRef = useRef<HTMLUListElement>(null);
   const measured = useContentHeight(listRef);
@@ -101,8 +109,17 @@ function WeekColumn({
       className={`${surface} ${ring} rounded-column flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden p-3`}
     >
       <div className="shrink-0">
+        {/* With weather the heading's name adds it (the chip below is decorative). */}
         <h2
           id={headingId}
+          aria-label={
+            weather === undefined
+              ? undefined
+              : t("weather.heading", {
+                  day: formatWeekday(day.date, format),
+                  weather: weatherName(t, weather),
+                })
+          }
           className={`${label} text-tile font-extrabold break-words hyphens-auto`}
         >
           {formatWeekday(day.date, format)}
@@ -139,6 +156,16 @@ function WeekColumn({
             )}
           </span>
         </div>
+        {/* A line of its own (the date row has no room left in seven columns); kept in
+            every column while the board shows weather, so the lists start level.
+            Decorative: the heading names the weather. */}
+        {weatherRow && (
+          <div data-testid="week-weather" className="flex h-7 items-center">
+            {weather !== undefined && (
+              <WeatherChip day={weather} size="week" decorative />
+            )}
+          </div>
+        )}
       </div>
       <ul
         ref={listRef}
@@ -187,6 +214,8 @@ export interface WeekBoardProps {
   format: FormatContext;
   /** The awaited countdown: marks its day and puts a moon in the earlier headers. */
   countdown?: WeekCountdown | undefined;
+  /** Weather chips per day (T-49), for the days inside the forecast. */
+  weather?: BoardWeather | undefined;
 }
 
 /**
@@ -201,6 +230,7 @@ export function WeekBoard({
   childList,
   format,
   countdown,
+  weather,
 }: WeekBoardProps): React.JSX.Element {
   const { t } = useTranslation();
   return (
@@ -217,6 +247,8 @@ export function WeekBoard({
           childList={childList}
           format={format}
           countdown={countdown}
+          weather={weather?.days.get(day.date)}
+          weatherRow={weather !== undefined && weather.days.size > 0}
         />
       ))}
     </div>

@@ -23,6 +23,8 @@ export interface BoardFrameProps {
   updatedAt: number;
   /** Show the hidden parent entry in the rail (`config.editor`, ADR-0013). */
   editor?: boolean;
+  /** Weather is shown: the rail carries the Open-Meteo attribution (T-49). */
+  weatherAttribution?: boolean;
   /** The "How many sleeps?" countdown for the header (T-19), if there is one. */
   countdown?: React.ReactNode;
   children: React.ReactNode;
@@ -41,6 +43,7 @@ export function BoardFrame({
   onViewChange,
   updatedAt,
   editor = false,
+  weatherAttribution = false,
   countdown,
   children,
 }: BoardFrameProps): React.JSX.Element {
@@ -87,6 +90,7 @@ export function BoardFrame({
           updatedAt={updatedAt}
           format={format}
           editor={editor}
+          weatherAttribution={weatherAttribution}
         />
       </div>
       {/* The banner has a fixed slot of its own in the reserved bottom strip, left of the

@@ -34,8 +34,8 @@ function readBody(request: IncomingMessage): Promise<string | null> {
 }
 
 /**
- * Dev-only Vite plugin (`pnpm dev:demo`): answers `/api/config`, `/api/agenda` and the
- * parent routes (`/api/parent/*`: unlock with the demo PIN, session, the editor API)
+ * Dev-only Vite plugin (`pnpm dev:demo`): answers `/api/config`, `/api/agenda`,
+ * `/api/weather` and the parent routes (`/api/parent/*`: unlock with the demo PIN, session, the editor API)
  * from the synthetic demo data and an in-memory editor store (`demoApi.ts`), so board
  * and editor can be tried without a worker, secrets, D1 or a calendar. It only exists
  * in the dev server (`apply: "serve"`), never in a build.

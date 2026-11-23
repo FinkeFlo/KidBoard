@@ -213,12 +213,19 @@ function groupName(group: BringGroup, everyone: string): string {
   return `${group.child?.name ?? everyone} ${group.icons.join(" ")}`;
 }
 
-/** "→" before the day the bag is packed for. Decorative, `currentColor`. */
-function TowardsArrow(): React.JSX.Element {
+/**
+ * "→" before the day the bag is packed for (also before the day of the clothing row,
+ * T-49). Decorative, `currentColor`.
+ */
+export function TowardsArrow({
+  testId = "bring-arrow",
+}: {
+  testId?: string;
+}): React.JSX.Element {
   return (
     <svg
       aria-hidden="true"
-      data-testid="bring-arrow"
+      data-testid={testId}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -231,6 +238,10 @@ function TowardsArrow(): React.JSX.Element {
     </svg>
   );
 }
+
+/** The short weekday pill of a day cue (🎒 area and clothing row). */
+export const DAY_PILL =
+  "rounded-pill bg-surface-raised inset-ring-border text-meta text-text px-1.5 leading-tight font-black inset-ring-1";
 
 /** One group: a pill with the child's badge (none for everyone) and whole chips. */
 function GroupPill({
@@ -349,10 +360,7 @@ export function BringArea({
         {tomorrow && (
           <span className="flex h-6 items-center gap-0.5">
             <TowardsArrow />
-            <span
-              data-testid="bring-day"
-              className="rounded-pill bg-surface-raised inset-ring-border text-meta text-text px-1.5 leading-tight font-black inset-ring-1"
-            >
+            <span data-testid="bring-day" className={DAY_PILL}>
               {formatWeekdayShort(reminder.date, format)}
             </span>
           </span>

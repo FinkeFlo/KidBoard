@@ -8,6 +8,8 @@ import {
   type MealSlot,
   type PublicConfig,
   todayInZone,
+  type WeatherDay,
+  type WeatherResponse,
 } from "@kidboard/shared";
 
 /*
@@ -53,7 +55,7 @@ export function demoConfig(): PublicConfig {
     refreshMinutes: 60,
     autoReturnSeconds: 120,
     editor: false,
-    weather: false,
+    weather: true,
   };
 }
 
@@ -396,5 +398,107 @@ export function demoAgenda(
     ],
     events,
     meals,
+  };
+}
+
+/** A forecast day without its date, as in {@link DEMO_WEATHER_DAYS}. */
+type DemoWeatherDay = Omit<WeatherDay, "date">;
+
+/**
+ * Seven synthetic forecast days from today (°C): a mild, mostly sunny today (a jacket),
+ * a cold rainy tomorrow (so the evening clothing row shows ☔ 👢 🧥 🧣), then cloud, snow,
+ * sun, fog and showers, so every overview and week column has a chip.
+ */
+export const DEMO_WEATHER_DAYS: readonly DemoWeatherDay[] = [
+  {
+    code: 1,
+    tempMax: 12,
+    tempMin: 4,
+    feelsMin: 9,
+    feelsMax: 11,
+    rain: false,
+    snow: false,
+    uvMax: 2,
+  },
+  {
+    code: 63,
+    tempMax: 7,
+    tempMin: 2,
+    feelsMin: 1,
+    feelsMax: 4,
+    rain: true,
+    snow: false,
+    uvMax: 1,
+  },
+  {
+    code: 3,
+    tempMax: 9,
+    tempMin: 3,
+    feelsMin: 5,
+    feelsMax: 7,
+    rain: false,
+    snow: false,
+    uvMax: 1,
+  },
+  {
+    code: 71,
+    tempMax: 1,
+    tempMin: -3,
+    feelsMin: -5,
+    feelsMax: -1,
+    rain: false,
+    snow: true,
+    uvMax: 1,
+  },
+  {
+    code: 2,
+    tempMax: 10,
+    tempMin: 2,
+    feelsMin: 4,
+    feelsMax: 8,
+    rain: false,
+    snow: false,
+    uvMax: 2,
+  },
+  {
+    code: 45,
+    tempMax: 8,
+    tempMin: 3,
+    feelsMin: 4,
+    feelsMax: 6,
+    rain: false,
+    snow: false,
+    uvMax: 1,
+  },
+  {
+    code: 80,
+    tempMax: 9,
+    tempMin: 4,
+    feelsMin: 6,
+    feelsMax: 7,
+    rain: true,
+    snow: false,
+    uvMax: 1,
+  },
+];
+
+/** The current temperature of the demo (today, °C). */
+export const DEMO_CURRENT_TEMPERATURE = 8;
+
+/**
+ * The demo `/api/weather` answer for `today` (`YYYY-MM-DD` in {@link DEMO_TIME_ZONE}),
+ * fetched at `fetchedAt` (ISO instant): {@link DEMO_WEATHER_DAYS} from today on. Valid
+ * against `WeatherResponseSchema`; no place and no coordinates (as the worker's).
+ */
+export function demoWeather(today: string, fetchedAt: string): WeatherResponse {
+  return {
+    fetchedAt,
+    unit: "celsius",
+    current: { temperature: DEMO_CURRENT_TEMPERATURE, code: 1 },
+    days: DEMO_WEATHER_DAYS.map((day, offset) => ({
+      date: addCalendarDays(today, offset),
+      ...day,
+    })),
+    stale: false,
   };
 }

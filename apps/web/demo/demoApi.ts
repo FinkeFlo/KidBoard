@@ -4,7 +4,13 @@ import {
   type PublicConfig,
 } from "@kidboard/shared";
 
-import { demoAgenda, demoAgendaStart, demoConfig, demoToday } from "./demoData";
+import {
+  demoAgenda,
+  demoAgendaStart,
+  demoConfig,
+  demoToday,
+  demoWeather,
+} from "./demoData";
 import {
   createFakeEditor,
   type DateRange,
@@ -14,8 +20,8 @@ import {
 } from "./fakeEditorApi";
 
 /*
- * The whole API of the demo server (`pnpm dev:demo`): the synthetic board data of
- * `demoData.ts` plus the parent editor against the in-memory fake (`fakeEditorApi.ts`),
+ * The whole API of the demo server (`pnpm dev:demo`): the synthetic board data and
+ * weather of `demoData.ts` plus the parent editor against the in-memory fake (`fakeEditorApi.ts`),
  * so the editor can be tried without a worker, D1 or a calendar. The PIN is
  * {@link DEMO_PARENT_PIN}, shown on the PIN pad in demo mode only. Entries live in the
  * dev server's memory until it restarts and appear on the board like the worker's app
@@ -152,6 +158,12 @@ export function createDemoApi(now: () => number = Date.now): DemoApi {
       }
       if (path === "/api/agenda") {
         return { status: 200, json: agenda(request.search) };
+      }
+      if (path === "/api/weather" && method === "GET") {
+        return {
+          status: 200,
+          json: demoWeather(demoToday(now()), new Date(now()).toISOString()),
+        };
       }
       if (path === "/api/parent/unlock" && method === "POST") {
         let pin: unknown;
