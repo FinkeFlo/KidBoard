@@ -63,6 +63,9 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-32 | Sonnet → Opus | Error boundary × kiosk recovery, offline/401 states (caching/offline) |
 | 2026-11-22 | M2 date-only fix | Sonnet → Opus | Time-zone fix from the M2 milestone review |
 | 2026-11-23 | T-27a | Sonnet → Opus | High-risk parts (tile capacity layout, caching/refetch on reload in B5); Batch B reviewed by reviewer-opus |
+| 2026-11-23 | T-33 | Sonnet → Opus | High-risk task (untrusted description parsing, privacy, worker cache versioning) |
+| 2026-11-23 | T-35 | Sonnet → Opus | Tile capacity layout (space budget of chips in overview and week) |
+| 2026-11-23 | T-36 | Sonnet → Opus | High-risk task (time zones/DST, midnight rollover offline, Today column space budget) |
 
 ## Milestone reviews
 
@@ -75,10 +78,6 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | M2 | Opus 5.5 (reviewer-opus) | PASS (round 2) | Round 1 found date-only keys formatted a day early west of UTC (fixed in 815815d). Context7 unreachable for reviewers; APIs checked against installed sources. Follow-ups folded into T-15/16/17/21/23/25/27. |
 | 2026-11-22 | M1 | Opus 5.5 (reviewer-opus) | PASS | Fresh clone + wrangler dev sanity green; CI green after gitleaks false-positive fix (missed for 3 commits → orchestrator now checks CI after each push). |
 | 2026-11-22 | M0 | Opus 5.5 (reviewer-opus) | PASS | Fresh clone green, CI run 45013616341 green. Follow-ups folded into T-06/T-08/T-10/T-11. |
-
-## Paused state (2026-11-23)
-
-Paused at the maintainer's request after T-35. M10 next steps: T-36 (evening-before 🎒 area; partial, unreviewed work on branch `wip/t-36-bring-area`, resume from there or restart), then T-37, T-38 and the M10 exit review. T-28 (release) stays with the maintainer.
 
 ## Open questions for the maintainer
 
