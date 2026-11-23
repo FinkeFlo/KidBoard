@@ -33,11 +33,17 @@
       "KIDBOARD_ACCESS_TOKEN": {
         "description": "API access token: a long random string, e.g. `openssl rand -hex 32`. Open the board once as `https://<worker>/?key=<token>`. Must not contain `REPLACE_ME` (the API refuses it)."
       },
+      "KIDBOARD_PARENT_PIN": {
+        "description": "Parent PIN for the editor: 6 to 12 digits of your choice. Keep `REPLACE_ME` (or leave it empty) to stay with the read-only board; see [docs/DEPLOY.md](https://github.com/FinkeFlo/kidboard/blob/main/docs/DEPLOY.md)."
+      },
       "KIDBOARD_CONFIG": {
         "description": "Settings as single-line JSON (children, calendars, time zone, ...). Template: `config.example.json`, options: `docs/CONFIG.md`. Its calendar ids must match the `CAL_<ID>_URL` secrets."
       },
       "KIDBOARD_CACHE": {
         "description": "KV namespace for the calendar cache. Created automatically; keep the default."
+      },
+      "KIDBOARD_DATA": {
+        "description": "D1 database for entries made in the parent editor. Created automatically; keep the default."
       }
     }
   },

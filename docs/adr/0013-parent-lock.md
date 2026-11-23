@@ -30,11 +30,19 @@ Option 1.
   all sessions. No server-side session store.
 * **Write and editor-read routes** (`/api/parent/*` except `unlock`) need
   `X-KidBoard-Parent: <session token>` in addition to the access token; expired or wrong
-  → 401 `parent_locked`. Bearer header, no cookies → no CSRF; CORS for listed origins
+  → 403 `parent_locked`. A wrong PIN at unlock is 403 `wrong_pin` (with the attempts
+  left). 401 stays reserved for the access token: the board client forgets its token on
+  any 401. Bearer header, no cookies → no CSRF; CORS for listed origins
   additionally allows `POST, PATCH, DELETE` and the two headers.
 * **Lockout:** after 5 wrong PINs within 15 minutes the unlock route answers 429
   `parent_lockout` (with `Retry-After`) for 15 minutes. Counted in D1 (ADR-0014,
-  strongly consistent; one write per *failed* attempt only) plus a per-isolate counter. Not per IP: a family has one board.
+  strongly consistent) plus a per-isolate counter. Not per IP: a family has one board.
+  Every attempt is *reserved* before the PIN is compared, so parallel requests cannot
+  test more than 5 PINs per window: synchronously in the isolate, then in D1 with one
+  batch that inserts the attempt row only if no lockout is active and the window holds
+  fewer than 5 attempts; not reserved → 429 without comparing. A wrong PIN keeps the
+  row as a failure; a right PIN deletes its reservation (a success writes that one
+  reservation and its delete, nothing else).
 * **Tablet UI:** no visible "edit" button for children. The entry is a small, low-contrast
   ✏️ control in the nav rail that opens only after a 2-second press and hold (same pattern
   as the fullscreen control), then a PIN pad. The session lives in memory only (not in

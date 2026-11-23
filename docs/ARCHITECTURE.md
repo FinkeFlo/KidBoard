@@ -350,6 +350,30 @@ consistency, per-isolate memory). D1 unavailable or a render failure → the cac
 as `stale`, else `error`; the configured calendars are unaffected. With KV, the TTL
 write-budget floor counts the two app sources.
 
+### Parent lock (T-42, ADR-0013)
+
+`apps/worker/src/parent/routes.ts` is mounted at `/api/parent` behind the access token.
+Editor off (no `KIDBOARD_DATA` or no valid PIN) → every `/api/parent/*` is `404`; bodies
+are capped at 16 KB (`bodyLimit`, `413 payload_too_large`) and parsed with zod
+(`http/jsonBody.ts`, `400 bad_request`). `POST /api/parent/unlock` `{ pin }` compares with
+`tokensEqual` and returns `{ token, expiresAt }` (ISO UTC, now + 15 min); the token is
+`v1.<exp epoch s>.<base64url HMAC-SHA-256 of "v1.<exp>">`, keyed by HKDF-SHA-256 over a
+random 32-byte server secret (`kb_meta` key `parent_session_secret`, created with
+`INSERT OR IGNORE` + read in one batch, then cached per isolate) with the PIN in `info`:
+a new PIN or a new database ends every session. Wrong PIN → `403 wrong_pin` with
+`attemptsLeft` (401 stays the access token's). Each attempt is reserved before the
+compare (`parent/lockout.ts`): synchronously per isolate, then by one D1 batch whose
+conditional insert of a `kb_meta` row `parent_fail:<uuid>` → epoch s succeeds only
+without an active `parent_lock_until` and with fewer than 5 rows in the last 15 min (older
+rows are dropped); not reserved → `429 parent_lockout` with `Retry-After`, no compare. A
+wrong PIN keeps the row and, as the 5th in 15 min, writes `parent_lock_until` (now + 15
+min, also answered with 429); a right PIN deletes its row.
+`requireParentSession` (`parent/session.ts`) guards editor routes: it verifies
+`X-KidBoard-Parent` (canonical base64url, `crypto.subtle.verify`, `now < exp ≤ now +
+15 min`) or answers `403 parent_locked`; `GET /api/parent/session` → `{ expiresAt }`. CORS (`http/cors.ts`):
+only on `/api/parent/*` and only for listed origins are `POST, PATCH, DELETE`,
+`Content-Type`, `X-KidBoard-Parent` allowed and `Retry-After` exposed.
+
 ## Caching & offline (summary – details in [ADR-0006](adr/0006-caching-offline.md))
 
 | Layer | What | Lifetime |

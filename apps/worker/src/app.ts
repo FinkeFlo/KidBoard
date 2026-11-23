@@ -6,7 +6,6 @@ import {
   toPublicConfig,
 } from "@kidboard/shared";
 import { type Context, Hono } from "hono";
-import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { validator } from "hono/validator";
 import { z } from "zod";
@@ -24,9 +23,11 @@ import {
   type StoreBackend,
 } from "./feeds/sourceStore";
 import { accessToken } from "./http/auth";
+import { apiCors } from "./http/cors";
 import { parseCalendarDate } from "./ical/zonedTime";
 import { logError, logWarn } from "./log";
 import { editorEnabled } from "./parent/pin";
+import { parentRoutes } from "./parent/routes";
 
 /** Default `days` of `/api/agenda`. */
 export const DEFAULT_DAYS = 8;
@@ -144,13 +145,6 @@ export function effectiveTtlSeconds(
   return minimum;
 }
 
-function allowedOrigins(raw: string | undefined): string[] {
-  return (raw ?? "")
-    .split(",")
-    .map((o) => o.trim())
-    .filter((o) => o !== "");
-}
-
 /** Builds the Hono app. Options exist for tests (clock, cache, limits). */
 export function createApp(options: AppOptions = {}): Hono<AppEnv> {
   const now = options.now ?? Date.now;
@@ -175,19 +169,7 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
     c.header("Cache-Control", "no-store");
   });
   app.use("*", secureHeaders());
-  app.use(
-    "*",
-    cors({
-      // Same-origin requests need no CORS; cross-origin only for listed origins.
-      origin: (origin, c: Context<AppEnv>) =>
-        allowedOrigins(c.env.KIDBOARD_ALLOWED_ORIGINS).includes(origin)
-          ? origin
-          : null,
-      allowMethods: ["GET", "HEAD", "OPTIONS"],
-      allowHeaders: ["Authorization"],
-      maxAge: 600,
-    }),
-  );
+  app.use("*", apiCors());
   app.use("*", accessToken());
 
   app.get("/api/health", (c) => {
@@ -314,6 +296,9 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
       return c.json(body, status);
     },
   );
+
+  // Parent lock and editor API (ADR-0013), behind the access token.
+  app.route("/api/parent", parentRoutes({ now }).app);
 
   app.notFound((c) =>
     c.json({ error: "not_found", message: "Not found" }, 404),
