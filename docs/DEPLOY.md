@@ -48,6 +48,7 @@ The worker reads exactly these names (`apps/worker/src/env.ts`):
 | `KIDBOARD_CACHE`           | KV namespace binding | automatic | Declared without an id in `wrangler.jsonc`; Wrangler creates it on the first deploy.            |
 | `KIDBOARD_PARENT_PIN`      | secret              | no       | 6 to 12 digits; turns on the parent editor (with `KIDBOARD_DATA` and a set `KIDBOARD_ACCESS_TOKEN`). Unset, invalid or `REPLACE_ME`, or no access token = editor off. |
 | `KIDBOARD_DATA`            | D1 database binding | automatic | Entries made in the editor (ADR-0014). Declared without an id in `wrangler.jsonc`; Wrangler creates it on the first deploy, the worker creates its tables. |
+| `KIDBOARD_FEED_TOKEN`      | secret              | no       | Turns on the phone feed of the editor's entries (32 to 256 characters `A-Z a-z 0-9 _ -`); the parent area then shows the subscribe link. Unset = no feed. |
 
 Plain-text variables set in the dashboard survive later deploys (`keep_vars: true`);
 secrets always do. The template for all of them is [`.dev.vars.example`](../.dev.vars.example).
@@ -58,7 +59,8 @@ secrets always do. The template for all of them is [`.dev.vars.example`](../.dev
 
 1. Click the button and log in to Cloudflare.
 2. Connect GitHub or GitLab and choose a name for the new repository. Cloudflare copies
-   KidBoard into your account; later pushes to it redeploy automatically.
+   KidBoard into your account; later pushes to it redeploy automatically. This copy is
+   separate from this repository: new KidBoard versions do not reach it by themselves.
 3. Keep or change the **Worker name** (default `kidboard`, it becomes part of the URL) and
    keep the suggested **KV namespace** (`KIDBOARD_CACHE`) and **D1 database**
    (`KIDBOARD_DATA`).
@@ -92,7 +94,7 @@ pnpm exec wrangler login          # opens the browser once
 pnpm deploy:cloudflare            # builds apps/web, then `wrangler deploy`
 ```
 
-The first deploy creates the Worker and its KV namespace. Then set the secrets (each command
+The first deploy creates the Worker, its KV namespace and its D1 database. Then set the secrets (each command
 prompts for the value; every change is deployed at once):
 
 ```sh

@@ -17,7 +17,7 @@ Deutsche Kurzfassung am Ende dieses Dokuments.
 Set locally in `.dev.vars` in the repository root, next to `wrangler.jsonc` (copy from
 [`.dev.vars.example`](../.dev.vars.example), dotenv format, git-ignored). In production use
 `pnpm exec wrangler secret put NAME` or the hosting dashboard; step by step:
-[DEPLOY.md](DEPLOY.md). All five may be secrets; `KIDBOARD_CONFIG`,
+[DEPLOY.md](DEPLOY.md). All of them may be secrets; `KIDBOARD_CONFIG`,
 `KIDBOARD_ALLOWED_ORIGINS` and `KIDBOARD_CACHE_TTL` may also be plain-text variables
 (`keep_vars: true` keeps dashboard variables across deploys).
 
@@ -27,6 +27,8 @@ Set locally in `.dev.vars` in the repository root, next to `wrangler.jsonc` (cop
 | `KIDBOARD_ACCESS_TOKEN`   | no       | unset (no check)   | If set (non-empty), API requests must present this token as `Authorization: Bearer <token>` or `?key=<token>`, else `401`. Prefer the header: `?key=` ends up in browser history (Workers Logs drop query strings, `redact_query_string`). A value that still contains `REPLACE_ME` (the template) is refused: every protected path answers `500 server_misconfigured`. `/api/health` stays public (it only returns `{ "ok": true }`). |
 | `KIDBOARD_ALLOWED_ORIGINS`| no       | same origin only   | Comma-separated list of allowed CORS origins, e.g. `http://localhost:5173`.                                                                      |
 | `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh (integer 60-86400; other values fall back to 3600 with a log warning). With the KV cache at least `ceil(calendars × 86400 / 500)` (KV Free plan write quota; 2 calendars → 346; with the parent editor on, its two app sources count as calendars).                                    |
+| `KIDBOARD_PARENT_PIN`     | no       | unset (editor off) | 6 to 12 digits that unlock the parent editor. The editor also needs `KIDBOARD_ACCESS_TOKEN` and the D1 binding `KIDBOARD_DATA`. Unset, invalid or still `REPLACE_ME` = editor off. |
+| `KIDBOARD_FEED_TOKEN`     | no       | unset (no feed)    | Secret token of the phone feed `/api/feed.ics?token=…` with the editor's entries; 32-256 characters `A-Z a-z 0-9 _ -`. Changing it ends every subscription. |
 | `KIDBOARD_CONFIG`         | yes      | -                  | The JSON document described below (single line). Missing or invalid: the API answers `500` and the log lists the validation errors.             |
 
 The root `.env.example` only lists tooling variables (e.g. `PLAYWRIGHT_CHROMIUM_EXECUTABLE`).
@@ -174,7 +176,7 @@ Deployment: [DEPLOY.de.md](DEPLOY.de.md)). Pro Kalender in `calendars` gibt es
 Optional: `KIDBOARD_ACCESS_TOKEN` (dann brauchen alle API-Aufrufe außer `/api/health` den
 Token als `Authorization: Bearer <token>` oder `?key=<token>`; besser den Header, denn `?key=`
 landet im Browserverlauf; ein Wert, der noch `REPLACE_ME` enthält, wird abgelehnt (`500`); `/api/health` bleibt öffentlich und liefert nur `{ "ok": true }`),
-`KIDBOARD_ALLOWED_ORIGINS`, `KIDBOARD_CACHE_TTL` (Sekunden, 60-86400, Standard 3600; mit
+`KIDBOARD_PARENT_PIN` (6-12 Ziffern, schaltet den Eltern-Editor ein; braucht zusätzlich das Zugriffstoken), `KIDBOARD_FEED_TOKEN` (32-256 Zeichen, schaltet den Handy-Feed der Editor-Einträge ein), `KIDBOARD_ALLOWED_ORIGINS`, `KIDBOARD_CACHE_TTL` (Sekunden, 60-86400, Standard 3600; mit
 KV-Cache mindestens `Kalender × 86400 / 500`; bei eingeschaltetem Eltern-Editor zählen
 seine zwei App-Quellen mit). Die Kalender-IDs `app-events` und `app-meals` sind für die in
 der App angelegten Einträge reserviert.

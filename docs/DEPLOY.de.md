@@ -50,6 +50,7 @@ Der Worker liest genau diese Namen (`apps/worker/src/env.ts`):
 | `KIDBOARD_CACHE`           | KV-Namespace-Binding | automatisch | Ohne ID in `wrangler.jsonc` deklariert; Wrangler legt ihn beim ersten Deploy an.               |
 | `KIDBOARD_PARENT_PIN`      | Secret               | nein     | 6 bis 12 Ziffern; schaltet den Eltern-Editor ein (mit `KIDBOARD_DATA` und gesetztem `KIDBOARD_ACCESS_TOKEN`). Nicht gesetzt, ungültig oder `REPLACE_ME`, oder kein Zugriffstoken = Editor aus. |
 | `KIDBOARD_DATA`            | D1-Datenbank-Binding | automatisch | Im Editor angelegte Einträge (ADR-0014). Ohne ID in `wrangler.jsonc` deklariert; Wrangler legt sie beim ersten Deploy an, der Worker seine Tabellen. |
+| `KIDBOARD_FEED_TOKEN`      | Secret               | nein     | Schaltet den Handy-Feed der Editor-Einträge ein (32 bis 256 Zeichen `A-Z a-z 0-9 _ -`); der Eltern-Bereich zeigt dann den Abo-Link. Nicht gesetzt = kein Feed. |
 
 Im Dashboard gesetzte Klartext-Variablen bleiben bei späteren Deploys erhalten
 (`keep_vars: true`), Secrets sowieso. Die Vorlage für alle ist
@@ -61,7 +62,8 @@ Im Dashboard gesetzte Klartext-Variablen bleiben bei späteren Deploys erhalten
 
 1. Button klicken und bei Cloudflare anmelden.
 2. GitHub oder GitLab verbinden und einen Namen für das neue Repository wählen. Cloudflare
-   kopiert KidBoard in dein Konto; spätere Pushes darauf deployen automatisch.
+   kopiert KidBoard in dein Konto; spätere Pushes darauf deployen automatisch. Diese Kopie
+   ist von diesem Repository getrennt: neue KidBoard-Versionen kommen nicht von selbst an.
 3. **Worker-Namen** behalten oder ändern (Standard `kidboard`, er wird Teil der Adresse)
    und den vorgeschlagenen **KV-Namespace** (`KIDBOARD_CACHE`) und die **D1-Datenbank**
    (`KIDBOARD_DATA`) übernehmen.
@@ -94,7 +96,7 @@ pnpm exec wrangler login          # öffnet einmal den Browser
 pnpm deploy:cloudflare            # baut apps/web, dann `wrangler deploy`
 ```
 
-Der erste Deploy legt den Worker und seinen KV-Namespace an. Danach die Secrets setzen
+Der erste Deploy legt den Worker, seinen KV-Namespace und seine D1-Datenbank an. Danach die Secrets setzen
 (jeder Befehl fragt nach dem Wert; jede Änderung wird sofort deployt):
 
 ```sh
