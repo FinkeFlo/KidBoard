@@ -678,7 +678,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
      zone ≠ config zone; an entry's title text with HTML-looking content comes out as plain
      text; the round trip entry → agenda event keeps children, icon, title, slot, bring.
 
-- [ ] **T-42 Worker: parent lock** (risk: **high** → Opus, deps: T-40)
+- [x] **T-42 Worker: parent lock** (risk: **high** → Opus, deps: T-40)
   Acceptance: ADR-0013 implemented and tested: PIN validation (6–12 digits, template →
   off); server secret generated once in D1; `POST /api/parent/unlock` constant-time
   compare, session token format and 15 min expiry (fake clock), wrong/expired/tampered/
