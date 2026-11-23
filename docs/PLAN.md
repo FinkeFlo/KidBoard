@@ -691,7 +691,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
   with zod; editor off → all `/api/parent/*` 404; `.dev.vars.example` and the deploy-button
   variables list `KIDBOARD_PARENT_PIN`.
 
-- [ ] **T-43 Worker: editor API** (risk: **high** → Opus, deps: T-41, T-42)
+- [x] **T-43 Worker: editor API** (risk: **high** → Opus, deps: T-41, T-42)
   Acceptance:
   1. `GET /api/parent/entries?from&days` (≤ 31 days, same window rules as `/api/agenda`)
      → app entries (editable, with revision, series info) and Google occurrences (read-only,
