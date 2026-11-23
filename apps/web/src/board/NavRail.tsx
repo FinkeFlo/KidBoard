@@ -54,15 +54,16 @@ export function NavRail({
           </p>
         )}
         {weatherAttribution && (
-          // Required attribution of the forecast data (ADR-0015); small and quiet.
-          // The source name never breaks inside ("Open-" / "Meteo.com"); the label wraps
-          // before it. A size below `text-caption` so the name fits the rail.
+          // Required attribution of the forecast data (ADR-0015); quiet, but readable
+          // (13 px at 1280) and set apart from "Updated" and the parent entry. The
+          // source name never breaks inside ("Open-" / "Meteo.com"); the label wraps
+          // before it.
           <p
             data-testid="weather-attribution"
-            className="text-caption text-text-muted mt-1 text-center"
+            className="text-caption text-text-muted my-2.5 text-center"
           >
             {t("weather.attribution")}{" "}
-            <span className="text-[0.75rem] whitespace-nowrap">
+            <span className="text-[0.8125rem] tracking-tight whitespace-nowrap">
               {t("weather.source")}
             </span>
           </p>

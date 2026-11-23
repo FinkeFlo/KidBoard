@@ -31,6 +31,9 @@ fails, and say so discreetly.
   refresh, so the fresh TTL is raised to at least `ceil(sources × 86 400 / 500)` s
   (budget 500 writes/day, leaving room for day rollovers and concurrent refreshes in
   other data centers). Failed writes are logged and do not fail the request.
+  *Amended by ADR-0015:* while weather is on, its 49 writes/day (48 forecasts + the
+  geocoded place) are reserved first, so the floor becomes
+  `ceil(sources × 86 400 / (500 − 49))` s.
 * **Client:** TanStack Query with `PersistQueryClientProvider` +
   `createAsyncStoragePersister({ storage: window.localStorage })`, `gcTime`/`maxAge`
   7 days, `staleTime` 15 min, `refetchInterval` 60 min, refetch on window focus and

@@ -220,12 +220,12 @@ describe("GET /api/weather – happy path", () => {
       latitude: String(FIXTURE_LATITUDE),
       longitude: String(FIXTURE_LONGITUDE),
       timezone: "Europe/Berlin",
+      timeformat: "unixtime",
       forecast_days: "7",
       current: "temperature_2m,weather_code",
       hourly:
         "apparent_temperature,precipitation_probability,precipitation,snowfall,uv_index",
-      daily:
-        "weather_code,temperature_2m_max,temperature_2m_min,uv_index_max,precipitation_probability_max,precipitation_sum,snowfall_sum",
+      daily: "weather_code,temperature_2m_max,temperature_2m_min,uv_index_max",
       temperature_unit: "celsius",
     });
     const accept = fetchSpy.mock.calls[0]?.[1]?.headers;
@@ -320,6 +320,12 @@ describe("GET /api/weather – off, unknown place, misconfiguration", () => {
       error: "weather_place_unknown",
     });
     expect(requests(GEOCODING_ENDPOINT)).toHaveLength(1);
+    // Logged when the miss was resolved, not again for the cached hits.
+    expect(
+      output.filter((line) =>
+        line.includes("weather: the configured place was not found"),
+      ),
+    ).toHaveLength(1);
 
     // After the hour the place is looked up again (and is now known).
     geocodingHandler = geocodingHit;

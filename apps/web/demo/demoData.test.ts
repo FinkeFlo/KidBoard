@@ -207,11 +207,20 @@ describe("isoInZone", () => {
     expect(weatherIcon(today.code)).toBe("🌤️");
     expect(clothingFor(today).map((item) => item.emoji)).toEqual(["🧥"]);
     expect(weatherIcon(tomorrow.code)).toBe("🌧️");
+    expect(clothingFor(tomorrow).map((item) => item.key)).toEqual([
+      "umbrella",
+      "rainBoots",
+      "jacket",
+      "hat",
+      "gloves",
+    ]);
+    // The knitted hat is drawn by the app (no emoji up to Emoji 13.0).
     expect(clothingFor(tomorrow).map((item) => item.emoji)).toEqual([
-      "☔",
+      "🌂",
       "👢",
       "🧥",
-      "🧣",
+      undefined,
+      "🧤",
     ]);
   });
 });

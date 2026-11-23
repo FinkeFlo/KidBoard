@@ -214,8 +214,8 @@ function groupName(group: BringGroup, everyone: string): string {
 }
 
 /**
- * "→" before the day the bag is packed for (also before the day of the clothing row,
- * T-49). Decorative, `currentColor`.
+ * "→" before the day the bag is packed for (also before tomorrow's weather in the
+ * evening clothing pill, T-49). Decorative, `currentColor`.
  */
 export function TowardsArrow({
   testId = "bring-arrow",
@@ -239,7 +239,7 @@ export function TowardsArrow({
   );
 }
 
-/** The short weekday pill of a day cue (🎒 area and clothing row). */
+/** The short weekday pill of the 🎒 area's day cue. */
 export const DAY_PILL =
   "rounded-pill bg-surface-raised inset-ring-border text-meta text-text px-1.5 leading-tight font-black inset-ring-1";
 

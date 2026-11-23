@@ -406,8 +406,9 @@ type DemoWeatherDay = Omit<WeatherDay, "date">;
 
 /**
  * Seven synthetic forecast days from today (°C): a mild, mostly sunny today (a jacket),
- * a cold rainy tomorrow (so the evening clothing row shows ☔ 👢 🧥 🧣), then cloud, snow,
- * sun, fog and showers, so every overview and week column has a chip.
+ * a cold rainy tomorrow (so the evening clothing row shows 🌂 👢 🧥, the knitted hat and
+ * 🧤), then cloud, snow, sun, fog and showers, so every overview and week column has a
+ * chip.
  */
 export const DEMO_WEATHER_DAYS: readonly DemoWeatherDay[] = [
   {

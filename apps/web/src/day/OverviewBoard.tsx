@@ -45,6 +45,7 @@ export function OverviewBoard({
           nowTime={nowTime}
           reminder={day.isToday ? bring : undefined}
           weather={weather?.days.get(day.date)}
+          todayChip={day.isToday ? weather?.todayChip : undefined}
           clothing={day.isToday ? weather?.clothing : undefined}
         />
       ))}

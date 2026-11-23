@@ -178,6 +178,18 @@
   /* Disc behind a bring chip (T-35/T-36): the emoji disc by day; at night lighter than
      every surface and tint, >= 3:1 against a black and a dimmed white glyph. */
   --color-chip: #f3ece1;
+  /* Own clothing pictograms (ADR-0015, no emoji up to 13.0): knitted hat and sweater,
+     flat and shaded like Noto Color Emoji. Same in both themes: at night they are dimmed
+     with the emoji filter (brightness 0.75, saturate 0.8), never recoloured. */
+  --color-wear-hat: #e95b52;
+  --color-wear-hat-shade: #cc4038;
+  --color-wear-hat-band: #a8312b;
+  --color-wear-pompom: #f7c548;
+  --color-wear-pompom-shade: #e3a92a;
+  --color-wear-sweater: #f39234;
+  --color-wear-sweater-shade: #de7a1f;
+  --color-wear-sweater-rib: #b9600f;
+  --color-wear-sweater-stripe: #fde7bd;
 
   /* Elevation (day). */
   --shadow-card: 0 0.125rem 0.5rem rgb(43 33 24 / 0.1);
@@ -225,6 +237,16 @@
   --color-on-child: #1a1008;
   --color-surface-weekend: #2b2214;
   --color-chip: #6b5c4e;
+  /* Clothing pictograms: unchanged, dimmed by the emoji filter instead. */
+  --color-wear-hat: #e95b52;
+  --color-wear-hat-shade: #cc4038;
+  --color-wear-hat-band: #a8312b;
+  --color-wear-pompom: #f7c548;
+  --color-wear-pompom-shade: #e3a92a;
+  --color-wear-sweater: #f39234;
+  --color-wear-sweater-shade: #de7a1f;
+  --color-wear-sweater-rib: #b9600f;
+  --color-wear-sweater-stripe: #fde7bd;
 
   --shadow-card: 0 0.125rem 0.5rem rgb(0 0 0 / 0.5);
   --shadow-raised: 0 0.5rem 1.5rem rgb(0 0 0 / 0.6);

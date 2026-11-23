@@ -14,9 +14,11 @@ export interface EmojiProps {
   className?: string;
 }
 
+/** The night dimming of every emoji (and of the own clothing pictograms, ADR-0015). */
+export const EMOJI_NIGHT_DIM = "night:brightness-75 night:saturate-80";
+
 /** Base classes of every emoji: emoji font, no extra line box, dimmed at night. */
-export const EMOJI_CLASS =
-  "font-emoji leading-none night:brightness-75 night:saturate-80";
+export const EMOJI_CLASS = `font-emoji leading-none ${EMOJI_NIGHT_DIM}`;
 
 export function Emoji({
   emoji,

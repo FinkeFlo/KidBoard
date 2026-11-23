@@ -2,6 +2,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { demoEditorConfig } from "../demo/demoApi";
 import { demoAgenda, demoConfig, demoWeather } from "../demo/demoData";
+import { clothingPlacement } from "../e2e/layout";
 import { at, dateOf, MOCK_PARENT_PIN, mockBoard, NOW } from "../e2e/mockApi";
 import { SCREENSHOT_DIR } from "./paths";
 
@@ -119,7 +120,8 @@ for (const theme of ["light", "night"] as const) {
 
 /*
  * Weather (T-49): the evening overview with the weather chips, tomorrow's clothing row
- * (cold and rainy) and the 🎒 area, light at 18:30 and night at 20:00.
+ * (cold and rainy, led by tomorrow's weather), today's "now" chip and the 🎒 area, light
+ * at 18:30 and night at 20:00.
  */
 for (const theme of ["light", "night"] as const) {
   test(`day with weather, ${theme}`, async ({ page }, testInfo) => {
@@ -135,9 +137,34 @@ for (const theme of ["light", "night"] as const) {
     );
     await expect(page.getByTestId("bring-area")).toBeVisible();
     await expect(page.getByTestId("weather-attribution")).toBeVisible();
+    // "Today" is never covered by the weather (one line beside it).
+    expect((await clothingPlacement(page)).problems).toEqual([]);
     await shoot(page, `day-weather-${theme}`, size);
   });
 }
+
+/*
+ * Weather in the morning (today's chip leads today's clothes) and in the week view
+ * (weather above the weekday, the countdown moons below it).
+ */
+test("day with weather in the morning, light", async ({ page }, testInfo) => {
+  const size = testInfo.project.name.replace("tablet-", "");
+  await openBoard(page, "light", { now: at("09:00"), weather: true });
+  await expect(page.getByTestId("clothing-row")).toHaveAttribute(
+    "data-when",
+    "today",
+  );
+  expect((await clothingPlacement(page)).problems).toEqual([]);
+  await shoot(page, "day-weather-morning-light", size);
+});
+
+test("week with weather, light", async ({ page }, testInfo) => {
+  const size = testInfo.project.name.replace("tablet-", "");
+  await openBoard(page, "light", { weather: true });
+  await page.getByRole("button", { name: "Week" }).click();
+  await expect(page.getByTestId("week-weather")).toHaveCount(7);
+  await shoot(page, "week-weather-light", size);
+});
 
 test("week with bring chips, light", async ({ page }, testInfo) => {
   const size = testInfo.project.name.replace("tablet-", "");

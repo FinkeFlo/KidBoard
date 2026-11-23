@@ -1,67 +1,96 @@
 import { useTranslation } from "react-i18next";
 
 import { Emoji } from "../components/Emoji";
-import { DAY_PILL, TowardsArrow } from "../day/BringArea";
-import { type FormatContext, formatWeekdayShort } from "../i18n/format";
+import { TowardsArrow } from "../day/BringArea";
 import type { ClothingRowModel } from "./buildBoardWeather";
+import { ClothingIcon, EMOJI_BOX } from "./ClothingIcon";
+import { temperatureText, WEATHER_PILL, weatherName } from "./WeatherChip";
 
 /** Test hook of the row's "→" (the 🎒 area's is `bring-arrow`). */
 const ARROW_TEST_ID = "clothing-arrow";
 
 /**
- * What to wear, in today's overview column: a pill in the heading row just before the
- * weather chip (T-49; it wraps below the chip when both do not fit). One to five
- * clothing pictures (whole icons only; a pill too narrow for all wraps the rest out of
- * sight, while the list's name still says every item). In the
- * evening the clothes are for tomorrow, led by the 🎒 area's day cue ("→" and
- * tomorrow's short weekday). A labelled list ("Wear today: jacket, scarf"), not a live
- * region, nothing interactive; emoji through `<Emoji>` (dimmed at night).
+ * Icon sizes of the row in rem, largest first: the heading row picks the largest that
+ * keeps chip and pill on one line (`TodayWeatherHead`). Full class names for Tailwind.
+ */
+export const CLOTHING_ICON_STEPS = [
+  { rem: 2, icon: "text-[2rem]", lead: "text-[1.75rem]", gap: "gap-1" },
+  { rem: 1.75, icon: "text-[1.75rem]", lead: "text-[1.75rem]", gap: "gap-0.5" },
+  { rem: 1.5, icon: "text-[1.5rem]", lead: "text-[1.5rem]", gap: "gap-px" },
+] as const;
+
+export type ClothingIconStep = (typeof CLOTHING_ICON_STEPS)[number];
+
+/**
+ * What to wear, in today's overview column: a pill in the heading row just before
+ * today's chip (T-49), always on one line (the head picks the icon size, `step`). One to
+ * five clothing pictures through {@link ClothingIcon}. Until `bands.eveningStart` the
+ * clothes are today's (today's chip beside the pill is their weather); from then they are
+ * tomorrow's and the pill leads with tomorrow's weather: "→", its icon and high in a
+ * weather pill (the 🎒 area below carries the weekday). A labelled list ("Wear today:
+ * jacket, scarf" / "Tomorrow: Rain, high 7 degrees. Wear: …"), not a live region,
+ * nothing interactive; the pictures are dimmed at night like every emoji.
  */
 export function ClothingRow({
   row,
-  format,
+  step = CLOTHING_ICON_STEPS[0],
 }: {
   row: ClothingRowModel;
-  format: FormatContext;
+  step?: ClothingIconStep;
 }): React.JSX.Element {
   const { t } = useTranslation();
   const names = row.items.map((item) => t(`weather.clothing.${item.key}`));
-  const tomorrow = row.when === "tomorrow";
-  const label = t(tomorrow ? "weather.wear.tomorrow" : "weather.wear.today", {
-    items: names,
-  });
+  const label =
+    row.when === "tomorrow"
+      ? t("weather.wear.tomorrow", {
+          weather: weatherName(t, row.forecast, { current: false }),
+          items: names,
+        })
+      : t("weather.wear.today", { items: names });
   return (
     <div
       data-testid="clothing-row"
       data-when={row.when}
       data-date={row.date}
-      className="rounded-pill bg-surface-sunken flex h-9 min-w-0 shrink items-center gap-0.5 ps-1.5 pe-1"
+      data-icon-rem={step.rem}
+      className="rounded-pill bg-surface-sunken flex h-9 shrink-0 items-center gap-1 ps-1 pe-1"
     >
-      {tomorrow && (
-        // The list's name says "tomorrow"; the cue is for those who cannot read it.
-        <span aria-hidden="true" className="flex shrink-0 items-center">
+      {row.when === "tomorrow" && (
+        // The list's name says "tomorrow" and its weather; the lead is for the eyes.
+        <span
+          aria-hidden="true"
+          data-testid="clothing-lead"
+          className="flex shrink-0 items-center gap-0.5"
+        >
           <TowardsArrow testId={ARROW_TEST_ID} />
-          <span data-testid="clothing-day" className={DAY_PILL}>
-            {formatWeekdayShort(row.date, format)}
+          <span
+            data-testid="clothing-forecast"
+            data-kind={row.forecast.kind}
+            className={`${WEATHER_PILL} h-8 ps-0.5 pe-1.5`}
+          >
+            <Emoji
+              emoji={row.forecast.icon}
+              className={`${EMOJI_BOX} ${step.lead}`}
+            />
+            <span className="text-body leading-none font-black tracking-tight whitespace-nowrap">
+              {t("weather.temperature", {
+                value: temperatureText(row.forecast.high),
+              })}
+            </span>
           </span>
         </span>
       )}
-      <ul
-        aria-label={label}
-        className="flex h-9 min-w-0 flex-wrap items-center gap-x-0.5 overflow-hidden"
-      >
+      <ul aria-label={label} className={`flex items-center ${step.gap}`}>
         {row.items.map((item, index) => (
           <li
             key={item.key}
             data-testid="clothing-item"
             data-key={item.key}
-            className="flex h-9 items-center"
+            className="flex items-center"
           >
-            <Emoji
-              emoji={item.emoji}
-              label={names[index]}
-              className="text-[1.75rem]"
-            />
+            <span role="img" aria-label={names[index]} className="flex">
+              <ClothingIcon item={item} className={step.icon} />
+            </span>
           </li>
         ))}
       </ul>

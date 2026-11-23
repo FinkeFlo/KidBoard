@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { ApiError } from "../data/apiClient";
 import {
   configFixture,
   weatherDayFixture,
@@ -8,6 +9,7 @@ import {
 import {
   buildBoardWeather,
   CURRENT_MAX_AGE_MS,
+  forecastToShow,
   WEATHER_MAX_AGE_MS,
 } from "./buildBoardWeather";
 
@@ -123,7 +125,7 @@ describe("buildBoardWeather", () => {
     expect(tokyo?.days.get("2026-11-23")?.current).toBe(8);
   });
 
-  it("shows today's clothes until eveningStart, then tomorrow's", () => {
+  it("shows today's clothes until eveningStart, then tomorrow's led by its weather", () => {
     const forecast = weatherFixture();
     const morning = buildBoardWeather(
       forecast,
@@ -141,14 +143,18 @@ describe("buildBoardWeather", () => {
       CONFIG,
       at("2026-11-22T17:00:00+01:00"),
     );
-    expect(evening?.clothing?.when).toBe("tomorrow");
-    expect(evening?.clothing?.date).toBe("2026-11-23");
-    expect(evening?.clothing?.items.map((item) => item.emoji)).toEqual([
-      "☔",
-      "👢",
-      "🧥",
-      "🧣",
-    ]);
+    expect(evening?.clothing).toEqual({
+      when: "tomorrow",
+      date: "2026-11-23",
+      forecast: { date: "2026-11-23", icon: "🌧️", kind: "rain", high: 7 },
+      items: [
+        { key: "umbrella", emoji: "🌂" },
+        { key: "rainBoots", emoji: "👢" },
+        { key: "jacket", emoji: "🧥" },
+        { key: "hat" },
+        { key: "gloves", emoji: "🧤" },
+      ],
+    });
     // Until midnight; after it the new day's clothes are "today" again.
     const late = buildBoardWeather(
       forecast,
@@ -165,6 +171,67 @@ describe("buildBoardWeather", () => {
       when: "today",
       date: "2026-11-23",
     });
+  });
+
+  it("today's overview chip: the day until eveningStart, then only 'now' (or nothing)", () => {
+    const forecast = weatherFixture({ fetchedAt: "2026-11-22T16:30:00+01:00" });
+    const before = buildBoardWeather(
+      forecast,
+      CONFIG,
+      at("2026-11-22T16:59:00+01:00"),
+    );
+    expect(before?.todayChip).toEqual({
+      type: "day",
+      day: {
+        date: "2026-11-22",
+        icon: "🌤️",
+        kind: "mostlyClear",
+        high: 12,
+        current: 8,
+      },
+    });
+    const evening = buildBoardWeather(
+      forecast,
+      CONFIG,
+      at("2026-11-22T17:00:00+01:00"),
+    );
+    expect(evening?.todayChip).toEqual({
+      type: "now",
+      date: "2026-11-22",
+      temperature: 8,
+    });
+    // The week keeps the day's icon and high for today.
+    expect(evening?.days.get("2026-11-22")?.icon).toBe("🌤️");
+    // "Now" too old in the evening: no chip at all (never the day's sun after dark).
+    const stale = buildBoardWeather(
+      forecast,
+      CONFIG,
+      at("2026-11-22T16:30:00+01:00") + CURRENT_MAX_AGE_MS + 60_000,
+    );
+    expect(stale?.todayChip).toBeUndefined();
+    expect(stale?.clothing?.when).toBe("tomorrow");
+    // Morning with an old "now": the day's chip with the high.
+    const oldMorning = buildBoardWeather(
+      weatherFixture(),
+      CONFIG,
+      at("2026-11-22T08:00:00+01:00") + CURRENT_MAX_AGE_MS + 60_000,
+    );
+    expect(oldMorning?.todayChip).toEqual({
+      type: "day",
+      day: {
+        date: "2026-11-22",
+        icon: "🌤️",
+        kind: "mostlyClear",
+        high: 12,
+      },
+    });
+    // Today missing from the forecast: no chip.
+    const noToday = weatherFixture({
+      days: [weatherDayFixture("2026-11-23")],
+    });
+    expect(
+      buildBoardWeather(noToday, CONFIG, MORNING)?.todayChip,
+    ).toBeUndefined();
   });
 
   it("follows a configured eveningStart", () => {
@@ -187,8 +254,8 @@ describe("buildBoardWeather", () => {
     const warm = weatherFixture({
       days: [
         weatherDayFixture("2026-11-22", {
-          feelsMin: 15,
-          feelsMax: 18,
+          feelsMin: 18,
+          feelsMax: 21,
           uvMax: 1,
         }),
       ],
@@ -204,14 +271,14 @@ describe("buildBoardWeather", () => {
   });
 
   it("converts Fahrenheit forecasts for the clothing thresholds", () => {
-    // 50 °F feels-like is 10 °C: below the 12 °C jacket threshold; 44 °F (6.7 °C) is
-    // above the 5 °C scarf threshold.
+    // 50 °F feels-like is 10 °C: below the 14 °C jacket threshold; 47 °F (8.3 °C) is
+    // above the 8 °C hat threshold.
     const forecast = weatherFixture({
       unit: "fahrenheit",
       days: [
         weatherDayFixture("2026-11-22", {
           tempMax: 54,
-          feelsMin: 44,
+          feelsMin: 47,
           feelsMax: 50,
         }),
       ],
@@ -222,5 +289,39 @@ describe("buildBoardWeather", () => {
       "jacket",
     ]);
     expect(weather?.days.get("2026-11-22")?.high).toBe(54);
+  });
+});
+
+describe("forecastToShow", () => {
+  const forecast = weatherFixture();
+
+  it("passes the forecast through without an error", () => {
+    expect(forecastToShow(forecast, null)).toBe(forecast);
+    expect(forecastToShow(undefined, null)).toBeUndefined();
+  });
+
+  it("keeps the persisted forecast when the request got no answer", () => {
+    for (const kind of ["network", "timeout"] as const) {
+      expect(forecastToShow(forecast, new ApiError(kind, "/api/weather"))).toBe(
+        forecast,
+      );
+    }
+  });
+
+  it("hides it on an error status or an unusable answer", () => {
+    for (const [kind, status] of [
+      ["http", 404],
+      ["upstream", 502],
+      ["http", 503],
+      ["server", 500],
+      ["unauthorized", 401],
+      ["invalid-response", 200],
+    ] as const) {
+      expect(
+        forecastToShow(forecast, new ApiError(kind, "/api/weather", status)),
+      ).toBeUndefined();
+    }
+    // Anything that is not an ApiError is no "offline" either.
+    expect(forecastToShow(forecast, new Error("boom"))).toBeUndefined();
   });
 });

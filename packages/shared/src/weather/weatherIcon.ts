@@ -20,7 +20,8 @@ interface WeatherCodeRange {
 
 /**
  * WMO weather interpretation codes as documented by Open-Meteo, mapped to a category and
- * one emoji (Emoji <= 13.0, ADR-0011). Never a moon: the moon counts sleeps (rule 1).
+ * one emoji (Emoji <= 13.0, ADR-0011). Snow is ❄️, clearly apart from the rain cloud at
+ * small sizes. Never a moon: the moon counts sleeps (rule 1).
  */
 export const WEATHER_CODE_TABLE: readonly WeatherCodeRange[] = [
   { from: 0, to: 0, kind: "clear", icon: "☀️" },
@@ -30,9 +31,9 @@ export const WEATHER_CODE_TABLE: readonly WeatherCodeRange[] = [
   { from: 45, to: 48, kind: "fog", icon: "🌫️" },
   { from: 51, to: 57, kind: "drizzle", icon: "🌦️" },
   { from: 61, to: 67, kind: "rain", icon: "🌧️" },
-  { from: 71, to: 77, kind: "snow", icon: "🌨️" },
+  { from: 71, to: 77, kind: "snow", icon: "❄️" },
   { from: 80, to: 82, kind: "rain", icon: "🌧️" },
-  { from: 85, to: 86, kind: "snow", icon: "🌨️" },
+  { from: 85, to: 86, kind: "snow", icon: "❄️" },
   { from: 95, to: 99, kind: "thunder", icon: "⛈️" },
 ];
 

@@ -10,6 +10,7 @@ import {
 } from "./layout";
 import {
   agenda,
+  at,
   CHILDREN,
   config,
   dateOf,
@@ -69,7 +70,7 @@ const BRING_LISTS: (string[] | undefined)[] = [
 ];
 /**
  * The demo forecast with a freezing, wet and snowy today: the clothing row has its most
- * items (☔ 👢 🧥 🧣 🧤), so the header is as tall as it gets.
+ * items (🌂 🥾 🧥, the knitted hat, 🧤), so the header is as full as it gets.
  */
 function densityWeather(): unknown {
   const weather = demoWeather(dateOf(0), NOW);
@@ -85,12 +86,13 @@ function densityWeather(): unknown {
 }
 
 /**
- * Today's chip and its clothing pill are on screen: five whole icons, nothing overlaps
- * (on the heading row or wrapped below the chip; the wrap itself: weather.spec.ts).
+ * Today's chip and its clothing pill are on screen: five whole icons on the heading row
+ * beside the chip (never wrapped), nothing overlaps.
  */
 async function expectWeather(page: Page): Promise<void> {
   const placement = await clothingPlacement(page);
   expect(placement.problems).toEqual([]);
+  expect(placement.sameLine).toBe(true);
   const today = page.locator("[data-testid=day-column][data-today=true]");
   await expect(page.getByTestId("weather-chip")).toHaveCount(4);
   await expect(today.getByTestId("weather-chip")).toBeInViewport({ ratio: 1 });
@@ -302,6 +304,83 @@ for (let count = 1; count <= 12; count += 1) {
     await expectNoOverflow(page);
   });
 }
+
+/**
+ * The evening density case (M9 click test): at eveningStart, 12 events today, the 🎒 area
+ * for both children and five clothing items for tomorrow, led by tomorrow's weather. The
+ * heading row stays one line, so the 🎒 area keeps the rows it has without weather.
+ */
+test("evening: 🎒 for both children and five clothing items keep the bring rows", async ({
+  page,
+}) => {
+  const evening = at("17:00");
+  const weather = demoWeather(dateOf(0), evening);
+  const [first, tomorrow, ...rest] = weather.days;
+  if (first === undefined || tomorrow === undefined) throw new Error("days");
+  const frosty = {
+    ...weather,
+    days: [
+      first,
+      { ...tomorrow, code: 73, feelsMin: -4, feelsMax: 0, snow: true },
+      ...rest,
+    ],
+  };
+  const events: MockEvent[] = [
+    ...todayEvents(12),
+    {
+      title: "Schwimmen",
+      icon: "🏊",
+      time: "07:30",
+      day: 1,
+      childIds: ["mia"],
+      bring: ["🩱", "🧴", "🥽", "🧢"],
+    },
+    {
+      title: "Turnen",
+      icon: "🤸",
+      time: "09:30",
+      day: 1,
+      childIds: ["ben"],
+      bring: ["👟", "👕", "🩳"],
+    },
+  ];
+  const bringRows = async (withWeather: boolean): Promise<string | null> => {
+    await mockBoard(page, {
+      config: config({ locale: "de", weather: withWeather }),
+      agenda: agenda(
+        events,
+        MEALS.filter((meal) => meal.day < 4),
+      ),
+      ...(withWeather ? { weather: frosty } : {}),
+      now: evening,
+    });
+    await page.goto("/");
+    await expect(page.getByTestId("board-ready")).toBeVisible();
+    const column = page.locator("[data-testid=day-column][data-today=true]");
+    await expect(column.getByTestId("bring-area")).toBeVisible();
+    await expect(column.getByTestId("bring-group")).toHaveCount(2);
+    if (withWeather) {
+      await expect(column.getByTestId("clothing-item")).toHaveCount(5);
+      await expect(column.getByTestId("clothing-forecast")).toBeVisible();
+    }
+    return column.getByTestId("bring-area").getAttribute("data-rows");
+  };
+
+  const without = await bringRows(false);
+  await page.unrouteAll();
+  const rows = await bringRows(true);
+  expect(without).toBe("2");
+  expect(rows).toBe(without);
+  const placement = await clothingPlacement(page);
+  expect(placement.problems).toEqual([]);
+  expect(placement.sameLine).toBe(true);
+  expect(placement.iconRem).toBeGreaterThanOrEqual(1.5);
+  const today = page.locator("[data-testid=day-column][data-today=true]");
+  const account = await columnAccount(today);
+  expect(account.shown.length + account.folded + account.hidden).toBe(12);
+  await expectWholeChips(page);
+  await expectNoOverflow(page);
+});
 
 /**
  * All-day event of the week matrix, for two children: a three-child all-day `week-slim`

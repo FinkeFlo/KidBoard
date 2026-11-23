@@ -288,6 +288,66 @@ function mixOklab(a: string, b: string, weight: number): string {
   ]);
 }
 
+describe("clothing pictogram colours (--color-wear-*, ADR-0015)", () => {
+  const wear = [...light.keys()].filter((k) => k.startsWith("--color-wear-"));
+
+  it("defines the hat and sweater parts", () => {
+    expect(wear).toEqual(
+      expect.arrayContaining([
+        "--color-wear-hat",
+        "--color-wear-hat-shade",
+        "--color-wear-hat-band",
+        "--color-wear-pompom",
+        "--color-wear-sweater",
+        "--color-wear-sweater-rib",
+        "--color-wear-sweater-stripe",
+      ]),
+    );
+  });
+
+  it("keeps them unchanged at night (the emoji filter dims them, like every emoji)", () => {
+    for (const name of wear) {
+      expect(color(night, name).toLowerCase(), name).toBe(
+        color(light, name).toLowerCase(),
+      );
+    }
+  });
+
+  /** `brightness(0.75)` of the night emoji filter: every sRGB channel times 0.75. */
+  const dimmed = (hex: string): string =>
+    `#${[1, 3, 5]
+      .map((i) =>
+        Math.round(parseInt(hex.slice(i, i + 2), 16) * 0.75)
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")}`;
+  const backgrounds = ["--color-surface-sunken", "--color-surface-raised"];
+
+  it("light: the hat's cuff and the sweater's ribs stand out from the pill and the column", () => {
+    for (const part of ["--color-wear-hat-band", "--color-wear-sweater-rib"]) {
+      for (const bg of backgrounds) {
+        expect(
+          contrast(color(light, part), color(light, bg)),
+          `${part} on ${bg}`,
+        ).toBeGreaterThanOrEqual(UI_AA);
+      }
+    }
+  });
+
+  it("night: the dimmed hat and sweater bodies stand out from the dark pill and column", () => {
+    expect(dimmed("#ffffff")).toBe(DIMMED_WHITE_GLYPH);
+    for (const part of ["--color-wear-hat", "--color-wear-sweater"]) {
+      for (const bg of backgrounds) {
+        expect(
+          contrast(dimmed(color(night, part)), color(night, bg)),
+          `${part} on ${bg}`,
+        ).toBeGreaterThanOrEqual(UI_AA);
+      }
+    }
+  });
+});
+
 describe("night dimming of child colours (avatars, tile edges)", () => {
   it("round-trips OKLab (the mix helper itself is exact)", () => {
     for (const hex of ["#000000", "#ffffff", "#56b4e9", "#c2410c"]) {

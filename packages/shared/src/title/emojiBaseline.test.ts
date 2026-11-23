@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_COUNTDOWN_EMOJIS } from "../config";
 import { isEmojiGrapheme } from "../primitives";
-import { CLOTHING_MAX_ITEMS, clothingFor } from "../weather/clothingFor";
+import {
+  CLOTHING_EMOJI,
+  CLOTHING_KEYS,
+  clothingFor,
+  CUSTOM_CLOTHING_KEYS,
+} from "../weather/clothingFor";
 import { WEATHER_CODE_TABLE } from "../weather/weatherIcon";
 import {
   DEFAULT_EVENT_ICON,
@@ -75,22 +80,52 @@ describe("emoji baseline (ADR-0011)", () => {
     const icons = WEATHER_CODE_TABLE.map((entry) => entry.icon);
     expect(icons.length).toBeGreaterThan(5);
     expect(tooNew(icons.join(" "))).toEqual([]);
-    // Every clothing emoji, reached through the real rules (all items on, uncapped by
-    // listing the groups separately).
-    const clothing = [
+    // Every clothing emoji of the table, and every emoji the real rules hand out (the
+    // groups listed separately so the cap of five does not hide any).
+    const table = Object.values(CLOTHING_EMOJI);
+    expect(table).toHaveLength(
+      CLOTHING_KEYS.length - CUSTOM_CLOTHING_KEYS.length,
+    );
+    const days = [
       { code: 0, feelsMin: -3, feelsMax: 25, rain: true, snow: true, uvMax: 8 },
       {
+        code: 3,
+        feelsMin: 2,
+        feelsMax: 10,
+        rain: false,
+        snow: false,
+        uvMax: 1,
+      },
+      {
         code: 0,
-        feelsMin: 10,
+        feelsMin: 18,
         feelsMax: 25,
         rain: false,
         snow: false,
         uvMax: 8,
       },
-    ].flatMap((day) => clothingFor(day, "celsius").map((item) => item.emoji));
-    expect(new Set(clothing).size).toBe(CLOTHING_MAX_ITEMS + 4);
-    expect(tooNew(clothing.join(" "))).toEqual([]);
-    for (const icon of [...icons, ...clothing]) {
+      {
+        code: 61,
+        feelsMin: 15,
+        feelsMax: 16,
+        rain: true,
+        snow: false,
+        uvMax: 1,
+      },
+    ];
+    const items = days.flatMap((day) => clothingFor(day, "celsius"));
+    const reached = items.flatMap((item) =>
+      item.emoji === undefined ? [] : [item.emoji],
+    );
+    expect(new Set(reached)).toEqual(new Set(table));
+    // The custom items (hat, sweater) are reached too, without an emoji.
+    expect(
+      new Set(
+        items.filter((item) => item.emoji === undefined).map((i) => i.key),
+      ),
+    ).toEqual(new Set(CUSTOM_CLOTHING_KEYS));
+    expect(tooNew(table.join(" "))).toEqual([]);
+    for (const icon of [...icons, ...table]) {
       expect(isEmojiGrapheme(icon)).toBe(true);
     }
   });

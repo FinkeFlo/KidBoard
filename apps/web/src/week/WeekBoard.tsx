@@ -109,7 +109,18 @@ function WeekColumn({
       className={`${surface} ${ring} rounded-column flex min-h-0 min-w-0 flex-col gap-2 overflow-hidden p-3`}
     >
       <div className="shrink-0">
-        {/* With weather the heading's name adds it (the chip below is decorative). */}
+        {/* Weather first, on a line of its own (seven columns leave no room beside the
+            weekday or the date), kept in every column while the board shows weather so
+            the lists start level. The weekday sits between it and the moons on the date
+            line, so a chip never stacks on a 🌙 (they would read as night and day).
+            Decorative: the heading names the weather (the daily high, as every day). */}
+        {weatherRow && (
+          <div data-testid="week-weather" className="flex h-8 items-center">
+            {weather !== undefined && (
+              <WeatherChip day={weather} size="week" decorative />
+            )}
+          </div>
+        )}
         <h2
           id={headingId}
           aria-label={
@@ -117,14 +128,16 @@ function WeekColumn({
               ? undefined
               : t("weather.heading", {
                   day: formatWeekday(day.date, format),
-                  weather: weatherName(t, weather),
+                  weather: weatherName(t, weather, { current: false }),
                 })
           }
           className={`${label} text-tile font-extrabold break-words hyphens-auto`}
         >
           {formatWeekday(day.date, format)}
         </h2>
-        <div className="flex h-8 items-center justify-between gap-1">
+        <div
+          className={`flex ${weatherRow ? "h-7" : "h-8"} items-center justify-between gap-1`}
+        >
           <p className="text-caption text-text-muted min-w-0 truncate font-bold">
             {formatDayMonthShort(day.date, format)}
           </p>
@@ -156,16 +169,6 @@ function WeekColumn({
             )}
           </span>
         </div>
-        {/* A line of its own (the date row has no room left in seven columns); kept in
-            every column while the board shows weather, so the lists start level.
-            Decorative: the heading names the weather. */}
-        {weatherRow && (
-          <div data-testid="week-weather" className="flex h-7 items-center">
-            {weather !== undefined && (
-              <WeatherChip day={weather} size="week" decorative />
-            )}
-          </div>
-        )}
       </div>
       <ul
         ref={listRef}

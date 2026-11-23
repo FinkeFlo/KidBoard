@@ -1060,23 +1060,32 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
 
 - **Upstreams:** Open-Meteo geocoding (`weather.place`: first result, `countryCode` from
   `weather.country`, `language` `de` for locale `de`, else `en`) and forecast (`timezone` =
-  config zone, `forecast_days=7`, `current`, `hourly`, `daily` variables, `temperature_unit`
-  from the config). Plain `fetch` through the feed downloader: 5 s timeout, 1 MB cap; JSON
+  config zone, `timeformat=unixtime`, `forecast_days=7`, `current`, `hourly`, `daily`
+  variables, `temperature_unit` from the config). Plain `fetch` through the feed downloader: 5 s timeout, 1 MB cap; JSON
   validated with zod (extra keys ignored). Non-2xx (e.g. `400 { error, reason }`) is never
   read, so upstream text never travels further.
+- **Time zones / DST:** Open-Meteo fixes the zone's UTC offset at request time
+  (`utc_offset_seconds`) for all timestamps and daily boundaries and ignores DST changes
+  within the range (every day has 24 hours). Hence unix timestamps: each hourly value is
+  grouped by its config-zone date and hour via `@date-fns/tz` (DST-aware), so the daytime
+  window follows the config zone after a switch. Daily entries (code, high, low, UV max)
+  stay Open-Meteo's aggregates, labelled with the date of their timestamp shifted by
+  `utc_offset_seconds`; after a switch they span 01:00–01:00 or 23:00–23:00 local time,
+  a night hour that does not change a day's symbol, high/low or UV maximum.
 - **Condensing** (`condense.ts`): temperatures rounded to whole degrees; `feelsMin`/
-  `feelsMax` = hourly `apparent_temperature` 07:00–19:00, grouped by the local time strings
-  (DST days with 23/25 hours need no special case); `rain` = drizzle/rain/shower/thunder
-  code, or daytime precipitation probability ≥ 50 % and daytime sum ≥ 0.5 mm; `snow` = snow
-  code or `snowfall_sum` > 0; `uvMax` = daily max (fallback: daytime hourly max).
-  Preceding-hour variables (precipitation, its probability, `uv_index`; Open-Meteo docs)
-  count at 08:00–19:00, the instant `apparent_temperature` at 07:00–19:00. Days
-  with a missing code, high, low or daytime feels-like are skipped.
+  `feelsMax` = hourly `apparent_temperature` 07:00–19:00 (config zone); `rain` =
+  drizzle/rain/shower/thunder code, or daytime precipitation probability ≥ 50 % and daytime
+  sum ≥ 0.5 mm; `snow` = snow code or daytime hourly `snowfall` sum > 0 cm (night snow
+  alone does not count); `uvMax` = daily max (fallback: daytime hourly max).
+  Preceding-hour variables (precipitation, its probability, `snowfall`, `uv_index`;
+  Open-Meteo docs) count at 08:00–19:00, the instant `apparent_temperature` at
+  07:00–19:00. Days with a missing date, code, high, low or daytime feels-like are skipped.
 - **Cache:** place coordinates 30 days (`v1/weather/place/<hash>`), forecast fresh 30 min
   and last good 24 h (`v1/weather/forecast/<hash>`, hash of the weather block, zone and
   geocoding language) in KV or the Cache API, memory map and single flight per isolate as
   for the feeds. At most 48 forecast writes/day. A geocoding miss is cached for 1 hour
-  (memory + KV/Cache API; ≤ 24 writes/day, and then no forecast is written). After a
+  (memory + KV/Cache API; ≤ 24 writes/day, and then no forecast is written); it is logged
+  once per lookup, not for requests served from the cached miss. After a
   failed upstream load the isolate does not ask Open-Meteo again for 5 minutes (memory
   only; meanwhile last good as `stale` or `503`).
 - **Errors:** weather off → `404 weather_off`; no geocoding match →

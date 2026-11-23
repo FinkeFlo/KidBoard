@@ -159,29 +159,42 @@ export async function columnAccount(column: Locator): Promise<ColumnAccount> {
 }
 
 export interface ClothingPlacement {
-  /** Overlaps, cut icons, parts outside today's column, icons below 1.75rem. */
+  /** Icon size (rem) the row picked to stay on one line. */
+  iconRem: number;
+  /** Overlaps, cut icons, parts outside today's column, icons below 1.5rem. */
   problems: string[];
   /** The clothing pill sits on the heading row (beside the chip), not wrapped below it. */
   sameLine: boolean;
 }
 
 /**
- * Where today's clothing pill (T-49) sits: in the heading row before the weather chip, or
- * wrapped below it; never over the heading, the chip or the event list, whole icons only.
+ * Where today's clothing pill (T-49) sits: in the heading row before the weather chip (it
+ * must never wrap below it); never over the heading, the chip or the event list, whole
+ * icons only, each at least 1.5rem. `iconRem` is the size the row picked.
  */
 export async function clothingPlacement(
   page: Page,
 ): Promise<ClothingPlacement> {
+  // The fit is checked again once the web fonts are in: measure after them.
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      }),
+  );
   return page
     .locator("[data-testid=day-column][data-today=true]")
     .evaluate((column) => {
       const problems: string[] = [];
       const row = column.querySelector("[data-testid=clothing-row]");
-      const chip = column.querySelector("[data-testid=weather-chip]");
+      const chip = column.querySelector(
+        "[data-testid=weather-head] [data-testid=weather-chip]",
+      );
       const heading = column.querySelector("h2");
       const list = column.querySelector("[data-testid=column-events]");
-      if (row === null || chip === null || heading === null || list === null) {
-        return { problems: ["missing part"], sameLine: false };
+      if (row === null || heading === null || list === null) {
+        return { problems: ["missing part"], sameLine: false, iconRem: 0 };
       }
       const inside = (rect: DOMRect, outer: DOMRect): boolean =>
         rect.left >= outer.left - 0.5 &&
@@ -194,13 +207,24 @@ export async function clothingPlacement(
         a.top < b.bottom - 0.5 &&
         b.top < a.bottom - 0.5;
       const box = row.getBoundingClientRect();
-      const chipBox = chip.getBoundingClientRect();
+      // The chip may have given way (evening fallback): the pill's own line then counts.
+      const chipBox = chip?.getBoundingClientRect() ?? box;
+      const headingBox = heading.getBoundingClientRect();
       const columnBox = column.getBoundingClientRect();
       if (!inside(box, columnBox)) problems.push("row out");
       if (!inside(chipBox, columnBox)) problems.push("chip out");
-      if (overlap(box, chipBox)) problems.push("row over the chip");
-      if (overlap(box, heading.getBoundingClientRect()))
-        problems.push("row over the heading");
+      if (chip !== null && overlap(box, chipBox)) {
+        problems.push("row over the chip");
+      }
+      if (overlap(box, headingBox)) problems.push("row over the heading");
+      if (chip !== null && overlap(chipBox, headingBox)) {
+        problems.push("chip over the heading");
+      }
+      // The pill is never clipped by the weather head (nothing hides on its left).
+      const head = column.querySelector("[data-testid=weather-head]");
+      if (head !== null && !inside(box, head.getBoundingClientRect())) {
+        problems.push("row clipped");
+      }
       if (box.bottom > list.getBoundingClientRect().top + 0.5)
         problems.push("row over the events");
       for (const item of row.querySelectorAll("[data-testid=clothing-item]")) {
@@ -211,14 +235,21 @@ export async function clothingPlacement(
       const rem = parseFloat(
         getComputedStyle(document.documentElement).fontSize,
       );
-      for (const emoji of row.querySelectorAll(".font-emoji")) {
-        const size = parseFloat(getComputedStyle(emoji).fontSize) / rem;
-        if (size < 1.75 - 0.01) problems.push(`small icon ${String(size)}`);
+      for (const icon of row.querySelectorAll(
+        "[data-testid=clothing-item] .font-emoji, [data-testid=clothing-pictogram]",
+      )) {
+        const size = parseFloat(getComputedStyle(icon).fontSize) / rem;
+        if (size < 1.5 - 0.01) problems.push(`small icon ${String(size)}`);
+      }
+      // The heading keeps its whole text ("Today" is never cut by the weather).
+      if (heading.scrollWidth > heading.clientWidth + 1) {
+        problems.push("heading cut");
       }
       const middle = (box.top + box.bottom) / 2;
       return {
         problems,
         sameLine: middle > chipBox.top && middle < chipBox.bottom,
+        iconRem: Number(row.getAttribute("data-icon-rem")),
       };
     });
 }

@@ -259,6 +259,10 @@ export function createWeather(options: WeatherOptions): WeatherService {
     };
     if (cached === null) {
       write(c, backend, key, entry, placeExpiry(entry), placeTtlSeconds(entry));
+      if (entry.found === null) {
+        // Logged once per lookup, not on every request served from the cached miss.
+        logWarn("weather: the configured place was not found");
+      }
     }
     if (entry.found === null) {
       throw new PlaceUnknownError();
@@ -351,7 +355,12 @@ export function createWeather(options: WeatherOptions): WeatherService {
             weather.unit,
             limits,
           );
-          const forecast = condenseForecast(raw, weather.unit, nowMs);
+          const forecast = condenseForecast(
+            raw,
+            config.timeZone,
+            weather.unit,
+            nowMs,
+          );
           const entry: ForecastEntry = { v: ENTRY_VERSION, forecast };
           write(
             c,
@@ -384,7 +393,6 @@ export function createWeather(options: WeatherOptions): WeatherService {
         return serve(forecast, false);
       } catch (error) {
         if (error instanceof PlaceUnknownError) {
-          logWarn("weather: the configured place was not found");
           return { kind: "place-unknown" };
         }
         backOff(key, options.now());

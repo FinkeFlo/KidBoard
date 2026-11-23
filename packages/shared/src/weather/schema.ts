@@ -20,9 +20,16 @@ export const WeatherDaySchema = z.object({
   feelsMin: z.number().int(),
   /** Highest feels-like temperature over the daytime hours 07:00-19:00. */
   feelsMax: z.number().int(),
-  /** Rain (incl. drizzle, showers) expected during the day. */
+  /**
+   * Rain: the day's WMO code is drizzle, rain (incl. freezing rain, showers) or thunder,
+   * or during 07:00-19:00 the hourly precipitation probability reaches 50 % and the
+   * precipitation sum reaches 0.5 mm.
+   */
   rain: z.boolean(),
-  /** Snow expected during the day. */
+  /**
+   * Snow: the day's WMO code is a snow code (snow fall, grains, showers), or the hourly
+   * snowfall during 07:00-19:00 adds up to more than 0 cm (night snow alone does not count).
+   */
   snow: z.boolean(),
   /** Maximum UV index of the day. */
   uvMax: z.number().min(0),

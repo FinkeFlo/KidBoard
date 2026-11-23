@@ -17,7 +17,10 @@ import { formatTime, useFormatContext } from "../i18n/format";
 import { useLockWhenEditorOff, useParentGateOpen } from "../parent";
 import { useNightTheme } from "../theme";
 import { useNow } from "../time";
-import { buildBoardWeather } from "../weather/buildBoardWeather";
+import {
+  buildBoardWeather,
+  forecastToShow,
+} from "../weather/buildBoardWeather";
 import { buildWeekModel } from "../week/buildWeekModel";
 import { WeekBoard } from "../week/WeekBoard";
 import { BoardFrame } from "./BoardFrame";
@@ -61,11 +64,12 @@ export function Board(): React.JSX.Element {
   const apiError = useApiErrorKind();
   const data = agenda.data;
   const weatherQuery = useWeather(config?.weather === true);
-  // Any weather failure hides the weather (never an error on the board); so does a
-  // forecast older than 24 h (see `buildBoardWeather`).
+  // An error status hides the weather (never an error on the board); offline or on a
+  // timeout the persisted forecast stays while it is under 24 h old and not in the past
+  // (see `forecastToShow`, `buildBoardWeather`).
   const forecast =
-    config?.weather === true && !weatherQuery.isError
-      ? weatherQuery.data
+    config?.weather === true
+      ? forecastToShow(weatherQuery.data, weatherQuery.error)
       : undefined;
   const timeZone = config?.timeZone ?? "UTC";
   const format = useFormatContext(timeZone);

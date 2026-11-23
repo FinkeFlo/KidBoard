@@ -2,16 +2,24 @@ import { clothingFor, WeatherResponseSchema } from "@kidboard/shared";
 import { describe, expect, it } from "vitest";
 
 import { condenseForecast } from "./condense";
-import { type FixtureForecast, forecastFixture } from "./forecastFixture";
+import {
+  fixedOffsetTimes,
+  type FixtureForecast,
+  fixtureUnix,
+  forecastFixture,
+  unixAtOffset,
+} from "./forecastFixture";
 import { ForecastSchema, WeatherResponseError } from "./openMeteo";
 
 const FETCHED = Date.parse("2026-11-23T08:00:00Z");
+const BERLIN = "Europe/Berlin";
 
 function condense(
   fx: FixtureForecast,
   unit: "celsius" | "fahrenheit" = "celsius",
+  timeZone = BERLIN,
 ): ReturnType<typeof condenseForecast> {
-  return condenseForecast(ForecastSchema.parse(fx), unit, FETCHED);
+  return condenseForecast(ForecastSchema.parse(fx), timeZone, unit, FETCHED);
 }
 
 function nth<T>(items: readonly T[], i: number): T {
@@ -23,7 +31,7 @@ function nth<T>(items: readonly T[], i: number): T {
 }
 
 function hourIndex(fx: FixtureForecast, time: string): number {
-  const i = fx.hourly.time.indexOf(time);
+  const i = fx.hourly.time.indexOf(fixtureUnix(time));
   if (i < 0) {
     throw new Error(`no hour ${time}`);
   }
@@ -130,15 +138,17 @@ describe("condenseForecast – fixture", () => {
     const { days } = condense(forecastFixture());
     expect(clothingFor(nth(days, 1)).map((i) => i.key)).toEqual([
       "umbrella",
-      "boots",
+      "rainBoots",
       "jacket",
-      "scarf",
+      "hat",
+      "gloves",
     ]);
     expect(clothingFor(nth(days, 3)).map((i) => i.key)).toEqual([
-      "boots",
+      "winterBoots",
       "jacket",
-      "scarf",
+      "hat",
       "gloves",
+      "scarf",
     ]);
     expect(clothingFor(nth(days, 4)).map((i) => i.key)).toEqual([
       "tshirt",
@@ -216,86 +226,127 @@ describe("condenseForecast – daytime window 07:00–19:00", () => {
   });
 
   it.each([
-    [71, 0, true],
-    [77, 0, true],
-    [85, 0, true],
-    [86, 0, true],
-    [3, 0.1, true],
-    [3, 0, false],
-    [61, 0, false],
-  ])("snow by code %i / snowfall_sum %s cm -> %s", (code, sum, snow) => {
+    [71, true],
+    [77, true],
+    [85, true],
+    [86, true],
+    [3, false],
+    [61, false],
+  ])("snow by daily code %i -> %s", (code, snow) => {
     const fx = forecastFixture();
     fx.daily.weather_code[0] = code;
-    fx.daily.snowfall_sum[0] = sum;
+    expect(condense(fx).days[0]?.snow).toBe(snow);
+  });
+
+  it.each([
+    ["2026-11-23T12:00", 0.1, true],
+    ["2026-11-23T19:00", 0.2, true],
+    ["2026-11-23T12:00", 0, false],
+    // Night snow does not count; 07:00 holds 06:00-07:00 and 20:00 19:00-20:00.
+    ["2026-11-23T03:00", 5, false],
+    ["2026-11-23T07:00", 2, false],
+    ["2026-11-23T20:00", 2, false],
+  ])("snow by daytime snowfall at %s (%s cm) -> %s", (time, cm, snow) => {
+    const fx = forecastFixture();
+    fx.hourly.snowfall[hourIndex(fx, time)] = cm;
     expect(condense(fx).days[0]?.snow).toBe(snow);
   });
 });
 
-/** One day of local hour strings as Open-Meteo would list them. */
-function dayTimes(date: string, hours: readonly number[]): string[] {
-  return hours.map((h) => `${date}T${String(h).padStart(2, "0")}:00`);
-}
-
-const ALL_HOURS = Array.from({ length: 24 }, (_, h) => h);
-
+/**
+ * A 7-day forecast as Open-Meteo returns it for a request on `firstDate` at the
+ * request-time `offsetSeconds`: 24 fixed-offset hours per day, DST ignored. Hourly
+ * feels-like = 100 × day index + fixed-offset hour, so the expected window is visible
+ * in the values: 7…19 when the config zone matches the fixed offset, shifted by one hour
+ * after a switch.
+ */
 function dstForecast(
-  days: { date: string; hours: number[] }[],
+  firstDate: string,
+  offsetSeconds: number,
 ): FixtureForecast {
   const fx = forecastFixture();
-  const time = days.flatMap((d) => dayTimes(d.date, d.hours));
-  // Value = 100 × day index + hour: a misaligned day would pick up another day's values.
-  const apparent = days.flatMap((d, i) => d.hours.map((h) => i * 100 + h));
+  const times = fixedOffsetTimes(firstDate, 7, offsetSeconds);
+  fx.utc_offset_seconds = offsetSeconds;
+  fx.current.time = times.hourly[9] ?? 0;
   fx.hourly = {
-    time,
-    apparent_temperature: apparent,
-    precipitation_probability: time.map(() => 0),
-    precipitation: time.map(() => 0),
-    snowfall: time.map(() => 0),
-    uv_index: time.map(() => 0),
+    time: times.hourly,
+    apparent_temperature: times.hourly.map(
+      (_, i) => Math.floor(i / 24) * 100 + (i % 24),
+    ),
+    precipitation_probability: times.hourly.map(() => 0),
+    precipitation: times.hourly.map(() => 0),
+    snowfall: times.hourly.map(() => 0),
+    uv_index: times.hourly.map(() => 0),
   };
-  const n = days.length;
   fx.daily = {
-    time: days.map((d) => d.date),
-    weather_code: Array.from({ length: n }, () => 3),
-    temperature_2m_max: Array.from({ length: n }, () => 10),
-    temperature_2m_min: Array.from({ length: n }, () => 0),
-    uv_index_max: Array.from({ length: n }, () => 1),
-    precipitation_probability_max: Array.from({ length: n }, () => 0),
-    precipitation_sum: Array.from({ length: n }, () => 0),
-    snowfall_sum: Array.from({ length: n }, () => 0),
+    time: times.daily,
+    weather_code: times.daily.map(() => 3),
+    temperature_2m_max: times.daily.map(() => 10),
+    temperature_2m_min: times.daily.map(() => 0),
+    uv_index_max: times.daily.map(() => 1),
   };
   return fx;
 }
 
-describe("condenseForecast – DST days (Europe/Berlin)", () => {
-  it("spring forward (23 hours, no 02:00) keeps every following day aligned", () => {
-    const fx = dstForecast([
-      { date: "2026-03-28", hours: ALL_HOURS },
-      { date: "2026-03-29", hours: ALL_HOURS.filter((h) => h !== 2) },
-      { date: "2026-03-30", hours: ALL_HOURS },
-    ]);
-    expect(fx.hourly.time).toHaveLength(71);
-    const days = condense(fx).days;
-    expect(days.map((d) => [d.date, d.feelsMin, d.feelsMax])).toEqual([
-      ["2026-03-28", 7, 19],
-      ["2026-03-29", 107, 119],
-      ["2026-03-30", 207, 219],
+function feelsByDay(
+  fx: FixtureForecast,
+  timeZone: string,
+): [string, number, number][] {
+  return condense(fx, "celsius", timeZone).days.map((d) => [
+    d.date,
+    d.feelsMin,
+    d.feelsMax,
+  ]);
+}
+
+describe("condenseForecast – DST switch inside the forecast (config zone wins)", () => {
+  // Requested on 2026-10-22 at CEST (+02:00); Berlin falls back on 2026-10-25 at 03:00.
+  const BERLIN_CEST = 2 * 3600;
+
+  it("Europe/Berlin fall back: the window moves to fixed-offset 08:00-20:00 after the switch", () => {
+    const fx = dstForecast("2026-10-22", BERLIN_CEST);
+    expect(fx.hourly.time).toHaveLength(7 * 24);
+    expect(feelsByDay(fx, BERLIN)).toEqual([
+      ["2026-10-22", 7, 19],
+      ["2026-10-23", 107, 119],
+      ["2026-10-24", 207, 219],
+      // 07:00 CET = 08:00 at the request-time offset.
+      ["2026-10-25", 308, 320],
+      ["2026-10-26", 408, 420],
+      ["2026-10-27", 508, 520],
+      ["2026-10-28", 608, 620],
     ]);
   });
 
-  it("fall back (25 hours, 02:00 twice) keeps every following day aligned", () => {
-    const fx = dstForecast([
-      { date: "2026-10-24", hours: ALL_HOURS },
-      { date: "2026-10-25", hours: [0, 1, 2, ...ALL_HOURS.slice(2)] },
-      { date: "2026-10-26", hours: ALL_HOURS },
+  it("America/Los_Angeles spring forward: the window moves to fixed-offset 06:00-18:00 after the switch", () => {
+    // Requested on 2027-03-11 at PST (−08:00); LA springs forward on 2027-03-14 at 02:00.
+    const fx = dstForecast("2027-03-11", -8 * 3600);
+    expect(feelsByDay(fx, "America/Los_Angeles")).toEqual([
+      ["2027-03-11", 7, 19],
+      ["2027-03-12", 107, 119],
+      ["2027-03-13", 207, 219],
+      // 07:00 PDT = 06:00 at the request-time offset.
+      ["2027-03-14", 306, 318],
+      ["2027-03-15", 406, 418],
+      ["2027-03-16", 506, 518],
+      ["2027-03-17", 606, 618],
     ]);
-    expect(fx.hourly.time).toHaveLength(73);
-    const days = condense(fx).days;
-    expect(days.map((d) => [d.date, d.feelsMin, d.feelsMax])).toEqual([
-      ["2026-10-24", 7, 19],
-      ["2026-10-25", 107, 119],
-      ["2026-10-26", 207, 219],
-    ]);
+  });
+
+  it("counts preceding-hour precipitation by config-zone hours after the switch", () => {
+    const rainy = (fixedTime: string): boolean | undefined => {
+      const fx = dstForecast("2026-10-22", BERLIN_CEST);
+      const i = fx.hourly.time.indexOf(unixAtOffset(fixedTime, BERLIN_CEST));
+      fx.hourly.precipitation_probability[i] = 80;
+      fx.hourly.precipitation[i] = 3;
+      return condense(fx).days.find((d) => d.date === "2026-10-26")?.rain;
+    };
+    // Fixed +02:00 times: 20:00 = 19:00 CET (holds 18:00-19:00, inside), 21:00 = 20:00
+    // CET (outside), 08:00 = 07:00 CET (holds 06:00-07:00, outside), 09:00 = 08:00 CET.
+    expect(rainy("2026-10-26T20:00")).toBe(true);
+    expect(rainy("2026-10-26T21:00")).toBe(false);
+    expect(rainy("2026-10-26T08:00")).toBe(false);
+    expect(rainy("2026-10-26T09:00")).toBe(true);
   });
 });
 
@@ -321,7 +372,7 @@ describe("condenseForecast – missing data", () => {
   it("tolerates missing optional values (UV, precipitation, snowfall)", () => {
     const fx = forecastFixture();
     fx.daily.uv_index_max[0] = null;
-    fx.daily.snowfall_sum[0] = null;
+    fx.hourly.snowfall[hourIndex(fx, "2026-11-23T12:00")] = null;
     fx.hourly.precipitation[hourIndex(fx, "2026-11-23T12:00")] = null;
     const day = condense(fx).days[0];
     // UV falls back to the daytime hourly maximum (1 from 10:00 to 15:00).
@@ -338,19 +389,20 @@ describe("condenseForecast – missing data", () => {
     expect(day?.rain).toBe(false);
 
     const bare = ForecastSchema.parse({
+      utc_offset_seconds: 3600,
       current: { temperature_2m: 1, weather_code: 0 },
       hourly: {
-        time: ["2026-11-23T12:00"],
+        time: [fixtureUnix("2026-11-23T12:00")],
         apparent_temperature: [0.4],
       },
       daily: {
-        time: ["2026-11-23"],
+        time: [fixtureUnix("2026-11-23T00:00")],
         weather_code: [0],
         temperature_2m_max: [2],
         temperature_2m_min: [-1],
       },
     });
-    expect(condenseForecast(bare, "celsius", FETCHED).days).toEqual([
+    expect(condenseForecast(bare, BERLIN, "celsius", FETCHED).days).toEqual([
       {
         date: "2026-11-23",
         code: 0,
@@ -367,8 +419,9 @@ describe("condenseForecast – missing data", () => {
 
   it("skips malformed dates and duplicate days, and keeps at most 7 days", () => {
     const fx = forecastFixture();
-    fx.daily.time[1] = "24.11.2026";
-    fx.daily.time[2] = "2026-11-23";
+    // Not a whole unix second, and a repeated midnight.
+    fx.daily.time[1] = 1.5;
+    fx.daily.time[2] = fixtureUnix("2026-11-23T00:00");
     expect(condense(fx).days.map((d) => d.date)).toEqual([
       "2026-11-23",
       "2026-11-26",
@@ -378,11 +431,11 @@ describe("condenseForecast – missing data", () => {
     ]);
 
     const long = forecastFixture();
-    long.daily.time.push("2026-11-30");
+    long.daily.time.push(fixtureUnix("2026-11-30T00:00"));
     for (const key of Object.keys(FIXTURE_DAILY_KEYS) as DailyKey[]) {
       long.daily[key].push(long.daily[key][0] ?? null);
     }
-    long.hourly.time.push("2026-11-30T12:00");
+    long.hourly.time.push(fixtureUnix("2026-11-30T12:00"));
     long.hourly.apparent_temperature.push(1);
     expect(condense(long).days).toHaveLength(7);
   });
@@ -407,8 +460,5 @@ const FIXTURE_DAILY_KEYS = {
   temperature_2m_max: true,
   temperature_2m_min: true,
   uv_index_max: true,
-  precipitation_probability_max: true,
-  precipitation_sum: true,
-  snowfall_sum: true,
 } as const;
 type DailyKey = keyof typeof FIXTURE_DAILY_KEYS;

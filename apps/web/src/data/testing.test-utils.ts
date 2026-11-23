@@ -83,7 +83,7 @@ export function weatherDayFixture(
 
 /**
  * A `/api/weather` answer fetched 2026-11-22 08:00 Berlin: today mild (🧥), tomorrow cold
- * and rainy (☔ 👢 🧥 🧣), then five dry days.
+ * and rainy (🌂 👢 🧥, knitted hat, 🧤), then five dry days.
  */
 export function weatherFixture(
   overrides: Partial<WeatherResponse> = {},

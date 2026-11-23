@@ -6,13 +6,15 @@ import { EventTile, showsBring } from "../components/EventTile";
 import {
   type FormatContext,
   formatDayMonth,
+  formatDayMonthShort,
   formatWeekday,
 } from "../i18n/format";
 import type {
   ClothingRowModel,
   DayWeather,
+  TodayChipModel,
 } from "../weather/buildBoardWeather";
-import { ClothingRow } from "../weather/ClothingRow";
+import { TodayWeatherHead } from "../weather/TodayWeatherHead";
 import { WeatherChip } from "../weather/WeatherChip";
 import { AllDayBanner } from "./AllDayBanner";
 import { BringArea, bringAreaRows } from "./BringArea";
@@ -46,8 +48,10 @@ export interface DayColumnProps {
    * when it has something to pack; ignored on the other days.
    */
   reminder?: BringReminder | undefined;
-  /** The day's weather chip (T-49), when the forecast has the day. */
+  /** The day's weather chip (T-49), when the forecast has the day (not today, see below). */
   weather?: DayWeather | undefined;
+  /** Today only: today's chip (the day's weather, from eveningStart "now" only). */
+  todayChip?: TodayChipModel | undefined;
   /** Today only: what to wear (today, or tomorrow from eveningStart); ignored otherwise. */
   clothing?: ClothingRowModel | undefined;
 }
@@ -74,6 +78,7 @@ export function DayColumn({
   nowTime,
   reminder,
   weather,
+  todayChip,
   clothing,
 }: DayColumnProps): React.JSX.Element {
   const { t } = useTranslation();
@@ -85,8 +90,10 @@ export function DayColumn({
   const body = useContentHeight(bodyRef);
   const showNow = day.isToday && day.events.length > 0;
   const todayClothing = day.isToday ? clothing : undefined;
+  const todayWeatherChip = day.isToday ? todayChip : undefined;
   const todayWeather =
-    day.isToday && (weather !== undefined || todayClothing !== undefined);
+    day.isToday &&
+    (todayWeatherChip !== undefined || todayClothing !== undefined);
   // "Now" stands out: the current events, else the next one, get a larger tile.
   const prominent =
     day.current.length > 0 ? day.current : day.next === null ? [] : [day.next];
@@ -166,37 +173,28 @@ export function DayColumn({
       } text-text rounded-column flex min-h-0 min-w-0 flex-col gap-2.5 overflow-hidden p-3.5`}
     >
       {/* Today's weekday and date are in the board header already (no repeat here). The
-          weather chip sits at the end of today's heading row (with the clothing pill
-          before it) and of the other days' date line (the date truncates first). */}
+          weather sits at the end of today's heading row (clothing pill, then the chip; one
+          line, the icons sized to fit) and of the other days' date line, whose date is
+          then the short one ("23. Nov." / "Nov 23") and never cut by the chip. */}
       <div className="shrink-0">
         <div
           className={
-            todayWeather
-              ? "flex items-start justify-between gap-1.5"
-              : undefined
+            todayWeather ? "flex items-center justify-between gap-1" : undefined
           }
         >
           <h2
             id={headingId}
-            className={`${day.isToday ? "text-heading" : "text-title"} min-w-0 truncate`}
+            className={`${day.isToday ? "text-heading" : "text-title"} ${
+              todayWeather ? "shrink-0" : "min-w-0"
+            } truncate`}
           >
             {day.isToday ? t("day.today") : formatWeekday(day.date, format)}
           </h2>
           {todayWeather && (
-            // Clothing pill and chip side by side at the end of the heading row; when
-            // both do not fit, the pill wraps to a line below the chip (wrap-reverse),
-            // still right-aligned.
-            <div
-              data-testid="weather-head"
-              className="flex min-w-0 flex-1 flex-wrap-reverse items-center justify-end gap-x-1 gap-y-1"
-            >
-              {todayClothing !== undefined && (
-                <ClothingRow row={todayClothing} format={format} />
-              )}
-              {weather !== undefined && (
-                <WeatherChip day={weather} size="today" />
-              )}
-            </div>
+            <TodayWeatherHead
+              chip={todayWeatherChip}
+              clothing={todayClothing}
+            />
           )}
         </div>
         {!day.isToday &&
@@ -206,8 +204,11 @@ export function DayColumn({
             </p>
           ) : (
             <div className="flex items-center justify-between gap-1.5">
-              <p className="text-body text-text-muted min-w-0 truncate">
-                {formatDayMonth(day.date, format)}
+              <p
+                data-testid="column-date"
+                className="text-body text-text-muted min-w-0 truncate"
+              >
+                {formatDayMonthShort(day.date, format)}
               </p>
               <WeatherChip day={weather} size="day" />
             </div>

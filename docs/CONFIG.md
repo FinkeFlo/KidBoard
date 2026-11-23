@@ -117,11 +117,30 @@ midnight for tomorrow.
 - **Terms:** Open-Meteo is free for non-commercial use without an account or API key; its
   data is licensed under CC BY 4.0, so the board shows "Weather: Open-Meteo.com" in the
   rail while weather is on. Commercial use needs an Open-Meteo plan.
-- **Clothing pictures** (feels-like temperature 07:00-19:00, in °C; °F is converted): 🧥
-  below 12°, 🧣 below 5°, 🧤 below 0° or with snow; 👕 from 22°, 🩳 from 24° (warmest
-  hour); ☔ + 👢 with rain, 🧤 + 👢 with snow; 🧢 when sunny with UV ≥ 3 from 15°, 🧴 from
-  UV 5. At most five, protection first.
-- A forecast older than 24 hours, or any weather error, simply hides the weather.
+- **Evening:** from `bands.eveningStart` the clothing pictures are tomorrow's, led by "→",
+  tomorrow's weather icon and high; today's chip then shows only 🌡️ and the current
+  temperature.
+- **Clothing pictures** (feels-like temperature 07:00-19:00 in °C, °F is converted; "min"
+  = coolest, "max" = warmest hour). At most five, in this order (protection first):
+
+  | Picture | Item          | When                                          |
+  | ------- | ------------- | --------------------------------------------- |
+  | 🌂      | umbrella      | rain                                          |
+  | 👢      | rain boots    | rain and max below 20° (not with snow)        |
+  | 🥾      | winter boots  | snow                                          |
+  | 🧥      | jacket        | min below 14°                                 |
+  | (drawn) | warm hat      | min below 8°                                  |
+  | 🧤      | gloves        | min below 3°, or snow                         |
+  | 🧣      | scarf         | min below 5°                                  |
+  | (drawn) | sweater       | min from 14° to below 18° (no jacket)         |
+  | 👕      | T-shirt       | max from 22°                                  |
+  | 🩳      | shorts        | max from 24°                                  |
+  | 🧢      | cap           | sunny (WMO code ≤ 2), UV ≥ 3 and max from 15° |
+  | 🧴      | sunscreen     | sunny (WMO code ≤ 2) and UV ≥ 4               |
+
+  The warm hat and the sweater have no emoji, so KidBoard draws them itself.
+- A forecast older than 24 hours, or an error answer of the server, hides the weather.
+  Without a connection the last forecast stays (while under 24 hours old).
 
 ## API behavior
 
@@ -208,11 +227,30 @@ alternativ `latitude` und `longitude` (nie beides). `unit`: `celsius` (Standard)
 - **Bedingungen:** Open-Meteo ist für nicht kommerzielle Nutzung kostenlos, ohne Konto und
   API-Schlüssel; die Daten stehen unter CC BY 4.0, daher zeigt die Leiste "Wetter:
   Open-Meteo.com", solange Wetter an ist. Kommerzielle Nutzung braucht einen Open-Meteo-Tarif.
-- **Kleidungsbilder** (gefühlte Temperatur 07:00-19:00 in °C, °F wird umgerechnet): 🧥 unter
-  12°, 🧣 unter 5°, 🧤 unter 0° oder bei Schnee; 👕 ab 22°, 🩳 ab 24° (wärmste Stunde); ☔ + 👢
-  bei Regen, 🧤 + 👢 bei Schnee; 🧢 bei Sonne mit UV ≥ 3 ab 15°, 🧴 ab UV 5. Höchstens fünf,
-  Schutz zuerst.
-- Eine Vorhersage älter als 24 Stunden oder ein Wetterfehler blendet das Wetter einfach aus.
+- **Abends:** ab `bands.eveningStart` gelten die Kleidungsbilder für morgen, angeführt von
+  "→", dem Wetter-Icon und Höchstwert von morgen; der Chip von heute zeigt dann nur 🌡️ und
+  die aktuelle Temperatur.
+- **Kleidungsbilder** (gefühlte Temperatur 07:00-19:00 in °C, °F wird umgerechnet; "min" =
+  kühlste, "max" = wärmste Stunde). Höchstens fünf, in dieser Reihenfolge (Schutz zuerst):
+
+  | Bild        | Kleidung      | Wann                                           |
+  | ----------- | ------------- | ---------------------------------------------- |
+  | 🌂          | Regenschirm   | Regen                                          |
+  | 👢          | Gummistiefel  | Regen und max unter 20° (nicht bei Schnee)     |
+  | 🥾          | Winterstiefel | Schnee                                         |
+  | 🧥          | Jacke         | min unter 14°                                  |
+  | (gezeichnet)| Mütze         | min unter 8°                                   |
+  | 🧤          | Handschuhe    | min unter 3° oder Schnee                       |
+  | 🧣          | Schal         | min unter 5°                                   |
+  | (gezeichnet)| Pulli         | min von 14° bis unter 18° (ohne Jacke)         |
+  | 👕          | T-Shirt       | max ab 22°                                     |
+  | 🩳          | kurze Hose    | max ab 24°                                     |
+  | 🧢          | Kappe         | sonnig (WMO-Code ≤ 2), UV ≥ 3 und max ab 15°   |
+  | 🧴          | Sonnencreme   | sonnig (WMO-Code ≤ 2) und UV ≥ 4               |
+
+  Für Mütze und Pulli gibt es kein Emoji, KidBoard zeichnet sie selbst.
+- Eine Vorhersage älter als 24 Stunden oder eine Fehlerantwort des Servers blendet das
+  Wetter aus. Ohne Verbindung bleibt die letzte Vorhersage (solange jünger als 24 Stunden).
 
 **API:** `/api/agenda?from=JJJJ-MM-TT&days=N` liefert 1-14 Tage (Standard 8 ab heute) innerhalb
 von gestern bis heute + 31 Tage. Kalender werden mit 10 s Timeout und 5 MB Limit geladen und pro

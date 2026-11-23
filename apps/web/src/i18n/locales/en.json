@@ -457,6 +457,7 @@
     "degrees_other": "{{count}} degrees",
     "nowAndHigh": "{{kind}}, now {{now}}, high {{high}}",
     "high": "{{kind}}, high {{high}}",
+    "now": "Now {{now}}",
     "heading": "{{day}}, {{weather}}",
     "kind": {
       "clear": "Sunny",
@@ -471,14 +472,17 @@
     },
     "wear": {
       "today": "Wear today: {{items, list}}",
-      "tomorrow": "Wear tomorrow: {{items, list}}"
+      "tomorrow": "Tomorrow: {{weather}}. Wear: {{items, list}}"
     },
     "clothing": {
       "umbrella": "umbrella",
-      "boots": "boots",
+      "rainBoots": "rain boots",
+      "winterBoots": "winter boots",
       "jacket": "jacket",
-      "scarf": "scarf",
+      "hat": "warm hat",
       "gloves": "gloves",
+      "scarf": "scarf",
+      "sweater": "sweater",
       "tshirt": "T-shirt",
       "shorts": "shorts",
       "cap": "cap",

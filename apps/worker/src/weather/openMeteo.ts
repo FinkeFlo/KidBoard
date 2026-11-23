@@ -30,9 +30,6 @@ export const DAILY_VARIABLES = [
   "temperature_2m_max",
   "temperature_2m_min",
   "uv_index_max",
-  "precipitation_probability_max",
-  "precipitation_sum",
-  "snowfall_sum",
 ] as const;
 
 /** Forecast days requested (the DTO holds at most `WEATHER_MAX_DAYS` = 7). */
@@ -41,18 +38,29 @@ export const FORECAST_DAYS = 7;
 /** Open-Meteo marks missing data with `null`; a missing array counts as all `null`. */
 const Series = z.array(z.number().nullable()).default([]);
 
+/** Unix seconds (`timeformat=unixtime`). */
+const UnixTimes = z.array(z.number());
+
 /**
- * The part of the forecast response KidBoard reads. Objects are not strict: Open-Meteo
- * adds keys (`*_units`, `generationtime_ms`, `elevation`, …) that are ignored.
+ * The part of the forecast response KidBoard reads (requested with
+ * `timeformat=unixtime`). Objects are not strict: Open-Meteo adds keys (`*_units`,
+ * `generationtime_ms`, `elevation`, `current.time`, …) that are ignored.
+ *
+ * Per the Open-Meteo docs (`timezone` and `timeformat` parameters), the UTC offset of
+ * the requested zone *at request time* is returned as `utc_offset_seconds` and fixes the
+ * daily boundaries of the whole response; DST changes within the range are ignored.
+ * Hence `condense` groups hourly values by the config-zone wall time of each timestamp
+ * (DST-aware) and only labels daily entries via `utc_offset_seconds`.
  */
 export const ForecastSchema = z.object({
+  utc_offset_seconds: z.number().int(),
   current: z.object({
     temperature_2m: z.number().nullable(),
     weather_code: z.number().nullable(),
   }),
   hourly: z.object({
-    /** Local wall time in the requested zone without offset, e.g. `2026-11-23T07:00`. */
-    time: z.array(z.string()),
+    /** Start of each hour, unix seconds (hours at the request-time offset). */
+    time: UnixTimes,
     apparent_temperature: Series,
     precipitation_probability: Series,
     precipitation: Series,
@@ -60,15 +68,12 @@ export const ForecastSchema = z.object({
     uv_index: Series,
   }),
   daily: z.object({
-    /** Local dates `YYYY-MM-DD` in the requested zone. */
-    time: z.array(z.string()),
+    /** Midnight at the request-time offset (`utc_offset_seconds`), unix seconds. */
+    time: UnixTimes,
     weather_code: Series,
     temperature_2m_max: Series,
     temperature_2m_min: Series,
     uv_index_max: Series,
-    precipitation_probability_max: Series,
-    precipitation_sum: Series,
-    snowfall_sum: Series,
   }),
 });
 export type Forecast = z.infer<typeof ForecastSchema>;
@@ -175,7 +180,10 @@ export async function geocode(
     : { latitude: first.latitude, longitude: first.longitude };
 }
 
-/** Forecast request URL: local times in `timeZone`, temperatures in `unit`. */
+/**
+ * Forecast request URL: days in `timeZone`, timestamps as unix seconds (DST-aware
+ * conversion happens in `condense`), temperatures in `unit`.
+ */
 export function forecastUrl(
   at: Coordinates,
   timeZone: string,
@@ -185,6 +193,7 @@ export function forecastUrl(
   url.searchParams.set("latitude", String(at.latitude));
   url.searchParams.set("longitude", String(at.longitude));
   url.searchParams.set("timezone", timeZone);
+  url.searchParams.set("timeformat", "unixtime");
   url.searchParams.set("forecast_days", String(FORECAST_DAYS));
   url.searchParams.set("current", CURRENT_VARIABLES.join(","));
   url.searchParams.set("hourly", HOURLY_VARIABLES.join(","));

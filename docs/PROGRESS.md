@@ -4,6 +4,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 
 | Date | Task | Builder model | Reviewer model | Review rounds | Notes |
 |---|---|---|---|---|---|
+| 2026-11-23 | M9 | Opus 5.5 (reviewer-opus) + UI/UX click test Haiku/Sonnet/Opus, Sonnet re-check | PASS after fixes (round 2; last item was the plan text, fixed in its own `docs(plan)` commit) | Review round 1 blocking: Open-Meteo ignores DST inside the range → `timeformat=unixtime` + config-zone grouping; also offline keeps the forecast on network errors, daytime snowfall, ADR-0006 note, one log per miss, evening density case. Click test round 1: children 6–6/10, parents 7–7.5/10 (tomorrow's rain clothes next to today's sun, small icons, rain/snow alike, no hat/sweater, summer storm boots). Fixes: evening lead with tomorrow's weather, one-line fit, ❄️, drawn hat/sweater pictograms, new thresholds, short dates, week row apart from 🌙. Re-check: children 8.5, parents 8.5, no blocker/major. Open minors: ☀️ on the Today button vs weather sun, clothing icons ~30px at 1280, aria minus/°F unit words, pale cloud/fog icons on cream, cap at UV 3. |
 | 2026-11-22 | T-00 Planning & agent setup | Opus 5.5 (orchestrator) | – | – | Stack evaluated via Context7 + npm; ADRs 0001–0009. |
 | 2026-11-22 | T-01 Workspace scaffold | Sonnet 5.5 | Sonnet 5.5 | 2 | Round 1: named non-handler export crashed workerd. |
 | 2026-11-22 | T-02 Lint, format, git hooks | Sonnet 5.5 | Sonnet 5.5 | 1 | Orchestrator spot-checked lefthook config against Context7. |
