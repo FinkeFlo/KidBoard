@@ -9,6 +9,8 @@ import {
   formatWeekday,
 } from "../i18n/format";
 import { AllDayBanner } from "./AllDayBanner";
+import { BringArea } from "./BringArea";
+import type { BringReminder } from "./buildBringReminder";
 import type { DayEvent } from "./buildDayModel";
 import type { OverviewDay } from "./buildOverviewModel";
 import { COLUMN_GAP_REM, fitColumn, freeRem } from "./columnCapacity";
@@ -24,6 +26,11 @@ export interface DayColumnProps {
   format: FormatContext;
   /** Current time, formatted, for the now line's name (today only). */
   nowTime: string;
+  /**
+   * Today only: the 🎒 area (T-36), between the event list and the meal plates. Shown
+   * when it has something to pack; ignored on the other days.
+   */
+  reminder?: BringReminder | undefined;
 }
 
 /**
@@ -35,13 +42,16 @@ export interface DayColumnProps {
  * "+N"; nothing is hidden silently and nothing scrolls. The current event (else the
  * next one) gets a larger tile while space allows. When every event of today is over,
  * the free space below shows "All done" ({@link DayDone}); another day without anything
- * planned shows a quiet placeholder ({@link DayFree}).
+ * planned shows a quiet placeholder ({@link DayFree}). Today's column can carry the 🎒
+ * area ({@link BringArea}) below the list: a fixed-height row outside the `flex-1` list,
+ * so the measured list is shorter by it and the tiles fit around it.
  */
 export function DayColumn({
   day,
   childList,
   format,
   nowTime,
+  reminder,
 }: DayColumnProps): React.JSX.Element {
   const { t } = useTranslation();
   const headingId = useId();
@@ -164,6 +174,9 @@ export function DayColumn({
           </>
         )}
       </div>
+      {day.isToday && reminder !== undefined && (
+        <BringArea reminder={reminder} />
+      )}
       <MealPlates meals={day.meals} today={day.isToday} />
     </section>
   );

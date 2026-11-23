@@ -8,6 +8,7 @@ import {
   useConnectionStatus,
   useTodayAgenda,
 } from "../data";
+import { buildBringReminder } from "../day/buildBringReminder";
 import { buildOverviewModel } from "../day/buildOverviewModel";
 import { DayError, type DayErrorKind, DayLoading } from "../day/DayStates";
 import { OverviewBoard } from "../day/OverviewBoard";
@@ -42,7 +43,8 @@ const DEFAULT_AUTO_RETURN_SECONDS = 120;
  * The week view returns to the overview after `config.autoReturnSeconds` of inactivity.
  * The "How many sleeps?" countdown (T-19) sits in the header: full on the week view, a
  * compact badge on the overview; it is built from the same agenda query (31 days), whose
- * `dataUpdatedAt` is the rail's "Stand" time.
+ * `dataUpdatedAt` is the rail's "Stand" time. The evening-before 🎒 area (T-36) comes from
+ * the same agenda (it always covers today and tomorrow) and only shows on the overview.
  */
 export function Board(): React.JSX.Element {
   const config = useConfig().data;
@@ -71,6 +73,9 @@ export function Board(): React.JSX.Element {
             overview: buildOverviewModel(data, config, today, now),
             week: buildWeekModel(data, config, today, now),
             countdown: buildCountdown(data.events, today, config.timeZone),
+            // From the minute clock: it switches at eveningStart, at midnight and at
+            // every event start, also offline on persisted data.
+            bring: buildBringReminder(data, config, now),
           },
     [config, today, data, now],
   );
@@ -106,6 +111,7 @@ export function Board(): React.JSX.Element {
           childList={config.children}
           format={format}
           nowTime={formatTime(now, format)}
+          bring={models.bring}
         />
       ) : (
         <WeekBoard

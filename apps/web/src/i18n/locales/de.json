@@ -95,5 +95,10 @@
     "todayLabel": "Heute ist es so weit: {{titles, list}}!",
     "today": "Heute!",
     "count": "{{count}} ×"
+  },
+  "bring": {
+    "tomorrow": "Für morgen einpacken: {{groups, list}}",
+    "today": "Heute mitbringen: {{groups, list}}",
+    "everyone": "Alle"
   }
 }

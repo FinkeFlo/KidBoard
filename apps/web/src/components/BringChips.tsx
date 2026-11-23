@@ -41,6 +41,14 @@ const CHIP_SIZES: Record<ChipSize, ChipClasses> = {
   },
 };
 
+/**
+ * The disc behind one bring chip (size classes not included): `--color-chip` (the emoji
+ * disc colour by day, lighter than every surface and tint at night, so dark glyphs stay
+ * visible) with a thin `--color-border` ring. Shared by the tiles and the 🎒 area.
+ */
+export const CHIP_DISC =
+  "bg-chip rounded-pill inset-ring-border inline-grid shrink-0 place-items-center inset-ring-1";
+
 /** Row metrics of `size` (for the pure fit, {@link iconsThatFit}). */
 export function chipMetrics(size: ChipSize): IconRowMetrics {
   const { slotRem, gapRem, moreRem } = CHIP_SIZES[size];
@@ -60,9 +68,9 @@ export function chipsThatFit(
 }
 
 /**
- * An event's bring list as small emoji chips on its tile (ADR-0010): each icon on a light
- * disc with a thin ring (as the tile's own emoji, so pale glyphs stay visible on every
- * tint and at night), then a plain-text "+N" for the icons that do not fit. Decorative:
+ * An event's bring list as small emoji chips on its tile (ADR-0010): each icon on a
+ * {@link CHIP_DISC} (light by day like the tile's own emoji disc, lighter than the tile at
+ * night, so pale and dark glyphs stay visible on every tint), then a plain-text "+N" for the icons that do not fit. Decorative:
  * the tile names the whole list once in its accessible description (`event.bring`:
  * "Bring along: 👟 🩱").
  *
@@ -111,7 +119,7 @@ export function BringChips({
           // The list is deduplicated server-side; the index keeps keys unique anyway.
           key={`${String(index)}-${icon}`}
           data-testid="bring-chip"
-          className={`${sizes.chip} bg-surface-sunken rounded-pill inset-ring-border inline-grid shrink-0 place-items-center inset-ring-1`}
+          className={`${sizes.chip} ${CHIP_DISC}`}
         >
           <Emoji emoji={icon} className={sizes.emoji} />
         </span>

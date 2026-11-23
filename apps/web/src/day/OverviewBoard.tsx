@@ -1,6 +1,7 @@
 import type { Child } from "@kidboard/shared";
 
 import type { FormatContext } from "../i18n/format";
+import type { BringReminder } from "./buildBringReminder";
 import type { OverviewModel } from "./buildOverviewModel";
 import { DayColumn } from "./DayColumn";
 
@@ -10,17 +11,21 @@ export interface OverviewBoardProps {
   format: FormatContext;
   /** Current time, formatted, for the now line's accessible name. */
   nowTime: string;
+  /** The 🎒 area for today's column (T-36); not shown in the other columns. */
+  bring?: BringReminder | undefined;
 }
 
 /**
  * The main screen (below the shared board frame): today plus the next three days as
- * columns, today about twice as wide. Purely presentational.
+ * columns, today about twice as wide; only today's column carries the 🎒 area. Purely
+ * presentational.
  */
 export function OverviewBoard({
   model,
   childList,
   format,
   nowTime,
+  bring,
 }: OverviewBoardProps): React.JSX.Element {
   return (
     <div
@@ -34,6 +39,7 @@ export function OverviewBoard({
           childList={childList}
           format={format}
           nowTime={nowTime}
+          reminder={day.isToday ? bring : undefined}
         />
       ))}
     </div>
