@@ -702,8 +702,9 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
      writes an exception or override for that date only; series edits keep exceptions
      whose dates still exist; revision mismatch → 409 `conflict`; response
      `{ entry, boardRefresh: "now" }`.
-  3. `GET /api/parent/templates` → up to 12 suggestions from app and Google entries of
-     the last 8 weeks and next 4 (same icon + title + children), most frequent first.
+  3. `GET /api/parent/templates` → up to 12 suggestions (same icon + title + children, most frequent
+     first) from app entries of the last 8 weeks and next 4 and from Google entries of the
+     cached feed window (today − 1 to today + 28).
   4. `GET /api/parent/export` (JSON download) and `POST /api/parent/import`
      (`merge`|`replace`, validated, size-limited).
   5. Tests for every route incl. auth (no session → 403 `parent_locked`), validation errors with field
@@ -834,6 +835,7 @@ stored in D1 instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-23 | T-43: Google template suggestions use the cached feed window (today − 1 to today + 28) instead of 8 weeks back | Looking 8 weeks back would need a second feed expansion per request, outside the Workers CPU budget (ADR-0003); app entries still count 8 weeks back |
 | 2026-11-23 | T-42/T-43: PIN errors answer 403 (`wrong_pin`, `parent_locked`), 401 stays reserved for the access token; unlock attempts are reserved before the PIN compare (a success deletes its reservation) | The board client wipes its access token on any 401; reserving first closes the parallel-request bypass of the lockout (T-42 review) |
 | 2026-11-23 | M11 reworked after the maintainer's storage decision: app entries stored by KidBoard in the family's D1 (ADR-0014) instead of writing to Google; tasks now T-39–T-46 (entry store, board merge, parent lock, editor API, gate, screens, phone feed/docs); ADR-0012 deferred to an optional later Google sync | Per-family Google Cloud setup judged too complicated; central Google sign-in needs verification and a central service |
 | 2026-11-23 | New milestone M11 Parent editor (T-39–T-45, exit review + UI/UX click test) before v1.0.0; ADR-0012 (write via Google Calendar API with a service account, reading stays on iCal) and ADR-0013 (parent PIN, sessions, lockout); non-goals updated; T-28 also depends on M11; M12 setup wizard noted as an idea | Maintainer wants to maintain entries in the app (child, activity, once/weekly) instead of typing title conventions in Google Calendar |
