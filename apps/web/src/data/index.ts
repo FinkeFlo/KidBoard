@@ -5,6 +5,9 @@ export {
   ApiError,
   type ApiErrorKind,
   createApiClient,
+  EditorApiError,
+  type EditorExport,
+  type EditorScope,
 } from "./apiClient";
 export {
   type ConnectionStatus,

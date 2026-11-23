@@ -1,14 +1,21 @@
 import type { ReactNode } from "react";
 
+import { Editor } from "../editor/Editor";
 import { EditorScreen } from "./EditorScreen";
 import { useParentGate, useParentGateOpen } from "./parentGate";
 import { PinPad } from "./PinPad";
 
-/** The PIN pad or the editor above the board, depending on the gate's stage. */
+/** The PIN pad or the editor (T-45) above the board, depending on the gate's stage. */
 export function ParentLayer(): React.JSX.Element | null {
   const { stage } = useParentGate();
   if (stage === "pin") return <PinPad />;
-  if (stage === "editor") return <EditorScreen />;
+  if (stage === "editor") {
+    return (
+      <EditorScreen>
+        <Editor />
+      </EditorScreen>
+    );
+  }
   return null;
 }
 

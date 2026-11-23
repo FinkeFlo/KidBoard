@@ -10,7 +10,7 @@ import {
   ParentGateContext,
   type UnlockOutcome,
 } from "./parentGate";
-import { lockoutMinutesLeft, PinPad } from "./PinPad";
+import { DEMO_PIN, lockoutMinutesLeft, PinPad } from "./PinPad";
 
 const T0 = Date.parse("2026-11-22T11:00:00Z");
 
@@ -74,6 +74,12 @@ describe("PinPad", () => {
     ]) {
       expect(key(name)).toHaveClass("min-h-touch");
     }
+  });
+
+  it("shows no demo PIN outside the demo build", () => {
+    expect(DEMO_PIN).toBeNull();
+    renderWithGate(<PinPad />, fakeGate({ stage: "pin" }));
+    expect(screen.queryByTestId("demo-pin")).toBeNull();
   });
 
   it("masks the digits: only dots and their count, never the PIN", () => {

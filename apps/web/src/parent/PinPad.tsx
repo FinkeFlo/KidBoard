@@ -8,6 +8,14 @@ import {
   useParentGate,
 } from "./parentGate";
 
+/**
+ * The PIN of the in-memory demo API (`pnpm dev:demo`, `vite --mode demo`), shown on the
+ * pad only there. `import.meta.env.MODE` is replaced at build time, so production
+ * builds carry `null` and drop the hint.
+ */
+export const DEMO_PIN: string | null =
+  import.meta.env.MODE === "demo" ? "123456" : null;
+
 /** Keypad digits in reading order; `0` sits in the bottom row between ⌫ and OK. */
 const TOP_DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 const BOTTOM_DIGIT = "0";
@@ -227,6 +235,14 @@ export function PinPad(): React.JSX.Element {
         <p className="text-body text-text-muted text-center">
           {pending ? t("parent.pin.checking") : t("parent.pin.prompt")}
         </p>
+        {DEMO_PIN !== null && (
+          <p
+            className="text-meta text-text-muted text-center"
+            data-testid="demo-pin"
+          >
+            {t("parent.pin.demo", { pin: DEMO_PIN })}
+          </p>
+        )}
         <div
           key={errorCount}
           data-testid="pin-dots-row"

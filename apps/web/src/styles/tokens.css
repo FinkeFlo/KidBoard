@@ -66,6 +66,8 @@
   --spacing-burn-in: 0.5rem;
   /* Minimum touch target for child interactions: >= 64px at every root size. */
   --spacing-touch: max(64px, 4rem);
+  /* Minimum touch target of parent surfaces (editor, M11): >= 48px at every root size. */
+  --spacing-touch-parent: max(48px, 3rem);
   /* Event tile heights: today's column / other days. Dense days shrink below them. */
   --spacing-tile: 5rem;
   --spacing-tile-compact: 4.75rem;
@@ -113,6 +115,8 @@
   --color-border: #d8c8b2;
   /* Quiet parent controls (lock, fullscreen); >= 3:1 on every surface. */
   --color-control-quiet: #8a7968;
+  /* Edge of the parent text, date and time fields; >= 3:1 on every surface (WCAG 1.4.11). */
+  --color-input-border: #7a6a5a;
   /* Rare emphasis: focus ring, primary parent action. */
   --color-accent: #a63a08;
   /* Text on color-accent. */
@@ -190,6 +194,7 @@
   --color-text-muted: #b3a48f;
   --color-border: #4a3d30;
   --color-control-quiet: #7d6e5d;
+  --color-input-border: #8f7f6a;
   --color-accent: #f0a35e;
   --color-on-accent: #1a1008;
   --color-nav-active: #9c8966;

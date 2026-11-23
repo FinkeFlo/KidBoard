@@ -1,4 +1,7 @@
+import { AgendaResponseSchema, PublicConfigSchema } from "@kidboard/shared";
 import type { BrowserContext, Page } from "@playwright/test";
+
+import { createFakeEditor, type FakeEditor } from "../demo/fakeEditorApi";
 
 /*
  * Synthetic API for the E2E specs. Everything derives from one date, {@link TODAY}: the
@@ -245,6 +248,12 @@ export interface MockApi {
   requests: string[];
   /** The parent lock (`/api/parent/*`); answered only when `config.editor` is true. */
   parent: MockParent;
+  /**
+   * The editor API behind the parent lock (`demo/fakeEditorApi.ts`, in memory): seed
+   * entries, inject failures, read the writes. Its app entries are added to the agenda
+   * answers, like the worker's virtual app sources.
+   */
+  editor: FakeEditor;
 }
 
 export interface MockBoardOptions {
@@ -267,6 +276,9 @@ export async function mockBoard(
   page: Page,
   options: MockBoardOptions = {},
 ): Promise<MockApi> {
+  // The mock's clock follows the page clock (fixed "now" at page load, then ticking).
+  const clockOffset = Date.parse(options.now ?? NOW) - Date.now();
+  const mockNow = (): number => Date.now() + clockOffset;
   const api: MockApi = {
     config: options.config ?? config(),
     configStatus: options.configStatus ?? 200,
@@ -279,6 +291,23 @@ export async function mockBoard(
       lockedUntil: null,
       unlocks: [],
     },
+    editor: createFakeEditor({
+      config: () => PublicConfigSchema.parse(api.config),
+      now: mockNow,
+      isSession: (token) => token === MOCK_PARENT_SESSION,
+      google: (range) => {
+        const parsed = AgendaResponseSchema.safeParse(api.agenda);
+        if (!parsed.success) return { events: [], meals: [] };
+        const inRange = (date: string): boolean =>
+          date >= range.from && date < range.to;
+        return {
+          events: parsed.data.events.filter((event) =>
+            inRange(event.start.slice(0, 10)),
+          ),
+          meals: parsed.data.meals.filter((meal) => inRange(meal.date)),
+        };
+      },
+    }),
   };
   await fixClock(page, options.now);
   const target: Page | BrowserContext =
@@ -290,7 +319,10 @@ export async function mockBoard(
       return route.fulfill({ status: api.configStatus, json: api.config });
     }
     if (path === "/api/agenda") {
-      return route.fulfill({ status: api.agendaStatus, json: api.agenda });
+      return route.fulfill({
+        status: api.agendaStatus,
+        json: withAppEntries(api),
+      });
     }
     if (path.startsWith("/api/parent/")) {
       return route.fulfill(answerParent(api, path, route.request()));
@@ -298,6 +330,28 @@ export async function mockBoard(
     return route.fulfill({ status: 404, json: { error: "not_found" } });
   });
   return api;
+}
+
+/**
+ * The agenda answer plus the editor's app entries (as the worker's `app-events` /
+ * `app-meals` sources); unchanged while there are none.
+ */
+function withAppEntries(api: MockApi): unknown {
+  if (api.agendaStatus !== 200 || api.editor.entries().length === 0) {
+    return api.agenda;
+  }
+  const parsed = AgendaResponseSchema.safeParse(api.agenda);
+  if (!parsed.success) return api.agenda;
+  const body = parsed.data;
+  const app = api.editor.agendaItems({
+    from: body.range.from,
+    to: body.range.to,
+  });
+  return {
+    ...body,
+    events: [...body.events, ...app.events],
+    meals: [...body.meals, ...app.meals],
+  };
 }
 
 /** Synthetic parent PIN of the mock (ADR-0013: 6-12 digits). */
@@ -321,6 +375,7 @@ export interface MockParent {
 
 interface ParentRequest {
   method(): string;
+  url(): string;
   postData(): string | null;
   headers(): Record<string, string>;
 }
@@ -329,7 +384,8 @@ interface ParentRequest {
  * Mirrors the worker's parent routes (docs/ARCHITECTURE.md "Parent lock"): editor off
  * (config without `editor: true`) → 404; `POST /unlock` → 200 `{ token, expiresAt }`,
  * 403 `wrong_pin` with `attemptsLeft`, or 429 `parent_lockout` with `Retry-After`;
- * `GET /session` with `X-KidBoard-Parent` → `{ expiresAt }` or 403 `parent_locked`.
+ * `GET /session` with `X-KidBoard-Parent` → `{ expiresAt }` or 403 `parent_locked`;
+ * the editor routes go to {@link MockApi.editor}.
  */
 function answerParent(
   api: MockApi,
@@ -393,7 +449,14 @@ function answerParent(
       ? { status: 200, json: { expiresAt } }
       : { status: 403, json: { error: "parent_locked" } };
   }
-  return { status: 404, json: { error: "not_found" } };
+  const editorAnswer = api.editor.handle({
+    method: request.method(),
+    path,
+    search: new URL(request.url()).search,
+    body: request.postData(),
+    session: request.headers()["x-kidboard-parent"] ?? null,
+  });
+  return editorAnswer ?? { status: 404, json: { error: "not_found" } };
 }
 
 /** localStorage key of the persisted query cache (`PERSIST_STORAGE_KEY`). */

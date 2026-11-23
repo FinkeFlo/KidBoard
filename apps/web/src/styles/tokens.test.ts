@@ -129,12 +129,11 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   // Today ring around the countdown pill's surface-raised fill on its "today" (0 nights).
   ["--color-today-ring", "--color-surface-raised", UI_AA] as const,
   // Countdown target day ring in the week view (`ring-band-evening-accent`, outside the
-  // column): against the page and the column surfaces it can border (T-27a).
-  ...[
-    "--color-surface",
-    "--color-surface-sunken",
-    "--color-surface-weekend",
-  ].map((bg) => ["--color-band-evening-accent", bg, UI_AA] as const),
+  // column): against the page (band accents above) and the column surfaces it can
+  // border (T-27a).
+  ...["--color-surface-sunken", "--color-surface-weekend"].map(
+    (bg) => ["--color-band-evening-accent", bg, UI_AA] as const,
+  ),
   // Check mark on the "vorbei" icons: surface glyph on a muted disc (T-27a).
   ["--color-surface", "--color-text-muted", UI_AA] as const,
   ...CHILD_TINTS.map((tint) => ["--color-now", tint, UI_AA] as const),
@@ -171,7 +170,26 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   // `surface-raised` column; its "+N" is `text-muted` on that row (above), on a child tint
   // and on the neutral group's `surface-raised` pill (both above).
   ["--color-border", "--color-surface-raised", 1.2] as const,
+  // Parent editor (T-45; pairs not listed above): the chip outline on its sunken fill,
+  // field errors in danger text on raised cards, muted text in a calm notice, and the
+  // edge of text, date and time fields on every surface (WCAG 1.4.11).
+  ["--color-border", "--color-surface-sunken", 1.1] as const,
+  ["--color-danger", "--color-surface-raised", TEXT_AA] as const,
+  ["--color-text-muted", "--color-notice", TEXT_AA] as const,
+  ...[
+    "--color-surface",
+    "--color-surface-raised",
+    "--color-surface-sunken",
+  ].map((bg) => ["--color-input-border", bg, UI_AA] as const),
 ];
+
+it("checks every contrast pair once", () => {
+  const pairs = PAIRS.map(
+    ([fg, bg, min]) => `${fg} on ${bg} at ${String(min)}:1`,
+  );
+  const repeated = pairs.filter((pair, index) => pairs.indexOf(pair) !== index);
+  expect(repeated).toEqual([]);
+});
 
 describe.each([
   ["light", light],
@@ -355,6 +373,12 @@ describe("token structure", () => {
     expect(light.has("--spacing-page")).toBe(true);
     const touch = light.get("--spacing-touch");
     expect(touch).toMatch(/^max\(64px,\s*4rem\)$/);
+  });
+
+  it("defines a parent touch target of at least 48px (editor, M11)", () => {
+    expect(light.get("--spacing-touch-parent")).toMatch(
+      /^max\(48px,\s*3rem\)$/,
+    );
   });
 
   it("keeps the burn-in amplitude well below the gutter (both rem based, so at every root size)", () => {
