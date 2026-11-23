@@ -75,6 +75,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 
 | Date | Milestone | Reviewer | Verdict | Notes |
 |---|---|---|---|---|
+| 2026-11-23 | M10 | Opus 5.5 (reviewer-opus) + Sonnet UI/UX check | PASS after fixes | Code review PASS (escalation rows added). UI check round 1: child 6/10, parent 7/10, major: a child's items hidden behind "+N" in the bag area. Fixed (one row per child, day cue, 28px chips, compact titles), reviewer-opus PASS after plan rewording; UI re-check child 8/10, parent 9/10, ready. Follow-ups (text-only day cue, week compact titles, week evening cue) in issue #5. Fresh clone, e2e 228, gitleaks, forbidden terms green. Context7 unreachable (installed sources checked). |
 | 2026-11-22 | M5b | Opus 5.5 (reviewer-opus) | PASS after fixes (round 2) | Blocking: missing T-30b/T-32 escalation rows, ARCHITECTURE/ADR-0009 still described bands. Decision: dense tiles 3.75rem with ~3rem emoji (plan change). Follow-ups in T-27/T-27a. Context7 unreachable (installed sources checked). |
 | 2026-11-22 | M5 | Opus 5.5 (reviewer-opus) | PASS after fixes | Blocking: wake lock dropped during error fallback, fullscreen glyph contrast, missing T-23 escalation row; plus pre-existing day-band clipping. All fixed (2 re-review rounds). Context7 unreachable for the first review (installed sources checked). Follow-ups in T-25/T-27. |
 | 2026-11-22 | M4 | Opus 5.5 (reviewer-opus) | PASS after docs fix | Only finding: missing T-19 escalation row (added). CI + CodeQL green at 55c3587. Follow-ups folded into T-20/21/22/23/24. |
