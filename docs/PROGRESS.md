@@ -38,6 +38,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-31 Week view in the new tile language | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; space-based +N with titles, countdown column tint, header moons, meal rows; deterministic screenshot raster flags; nits (countdown events[0] guard) folded into T-32 |
 | 2026-11-22 | T-32 States and night mode per hand-off | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; error card on unchanged boundary logic, calm 401, no-flash measurement, review follow-ups a-g; dense emoji tuck under edge (open for M5b review / T-27a) |
 | 2026-11-22 | T-27 Documentation | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; title rules, KB-* codes, token flow checked against code; links verified by script |
+| 2026-11-23 | T-27a UI/UX dummy test loop | Opus 5.5 (builder-opus, 4 fix batches) | Sonnet (reviewer) + Opus (reviewer-opus, Batch B) | 4 test rounds | Round 1: Haiku 7/5, Sonnet 8/7, Opus 6.5/6 (children/parents), 22 findings (A1–A12 overview/tiles, B1–B10 week/countdown/states). Fixed in batches A and B, then Sonnet re-checks: round 2 8/8.5, round 3 8.5/8, round 4 8.5/9, no blockers or majors since round 2; round 4 verdict release-ready. Remaining minor week polish in issue #5. |
 
 ## Escalations
 
@@ -55,6 +56,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-30b | Sonnet → Opus | Architecture: replaces the main screen layout (bands → four-day overview, nav rail, capacity measurement) |
 | 2026-11-22 | T-32 | Sonnet → Opus | Error boundary × kiosk recovery, offline/401 states (caching/offline) |
 | 2026-11-22 | M2 date-only fix | Sonnet → Opus | Time-zone fix from the M2 milestone review |
+| 2026-11-23 | T-27a | Sonnet → Opus | High-risk parts (tile capacity layout, caching/refetch on reload in B5); Batch B reviewed by reviewer-opus |
 
 ## Milestone reviews
 
@@ -70,5 +72,5 @@ One row per completed task. Escalations to Opus are logged with their reason.
 
 ## Open questions for the maintainer
 
-1. **Repo setting needed (blocks releases, T-28):** Settings → Actions → General → Workflow permissions → enable "Allow GitHub Actions to create and approve pull requests". release-please fails on every push until then.
+1. ~~Repo setting for release-please~~ done by the maintainer (2026-11-22); release-please runs on manual dispatch until v1.0.0.
 2. Before M6: Cloudflare account/API token and the secret iCal URLs (only the maintainer can provide them).
