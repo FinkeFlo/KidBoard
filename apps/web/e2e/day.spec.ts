@@ -106,7 +106,7 @@ test.describe("overview (main screen)", () => {
       expect(other.bg).toBe(await tokenColor(page, "--color-surface-sunken"));
     }
 
-    // Today's emoji: large tiles at least 3.5rem, medium 3rem, dense 2.75rem.
+    // Today's emoji: large tiles at least 3.5rem, medium 3rem, dense 2.75rem, slim 2rem.
     const emojiSizes = await today
       .getByTestId("column-events")
       .getByTestId("event-tile")

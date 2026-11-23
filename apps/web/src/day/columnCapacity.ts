@@ -12,7 +12,12 @@ export const COLUMN_GAP_REM = 0.5;
 export const SUMMARY_ROW_REM = 2.25;
 
 /** Tile sizes of today's column, largest first: the steps it shrinks through. */
-export const TODAY_SIZES: readonly TileSize[] = ["large", "medium", "dense"];
+export const TODAY_SIZES: readonly TileSize[] = [
+  "large",
+  "medium",
+  "dense",
+  "slim",
+];
 /** Tile sizes of the other overview days, largest first. */
 export const DAY_SIZES: readonly TileSize[] = ["compact", "compact-dense"];
 
@@ -93,14 +98,22 @@ export function fitColumn<T extends { status: EventStatus }>(
 
   // 1. Everything as tiles at the largest size.
   if (fits(all, largest, true)) {
-    return { size: largest, prominent: prominent.length > 0, layout: all };
+    return {
+      size: largest,
+      prominent: prominent.length > 0 && PROMINENT_EXTRA_REM[largest] > 0,
+      layout: all,
+    };
   }
   // 2. All past events fold (none if there are none); the rest shrinks step by step.
   const upcoming = items.filter((item) => item.status !== "past").length;
   const folded = columnLayout(items, upcoming);
   for (const size of ladder) {
     for (const enlarged of [true, false]) {
-      if (enlarged && prominent.length === 0) continue;
+      if (
+        enlarged &&
+        (prominent.length === 0 || PROMINENT_EXTRA_REM[size] === 0)
+      )
+        continue;
       if (fits(folded, size, enlarged)) {
         return { size, prominent: enlarged, layout: folded };
       }
@@ -114,4 +127,23 @@ export function fitColumn<T extends { status: EventStatus }>(
     }
   }
   return { size: smallest, prominent: false, layout: columnLayout(items, 0) };
+}
+
+/**
+ * Height in rem left below `fit`'s rows in a list `heightRem` high, after `reservedRem`
+ * (the now line plus its gap); `null` while the list is not measured. Never negative.
+ */
+export function freeRem<T>(
+  fit: ColumnFit<T>,
+  heightRem: number | null,
+  reservedRem = 0,
+  prominent: readonly T[] = [],
+): number | null {
+  if (heightRem === null) return null;
+  const used = layoutHeightRem(
+    fit.layout,
+    fit.size,
+    fit.prominent ? prominent : [],
+  );
+  return Math.max(0, heightRem - reservedRem - used);
 }

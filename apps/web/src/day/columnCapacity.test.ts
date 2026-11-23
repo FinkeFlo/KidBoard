@@ -5,6 +5,7 @@ import {
   COLUMN_GAP_REM,
   DAY_SIZES,
   fitColumn,
+  freeRem,
   layoutHeightRem,
   SUMMARY_ROW_REM,
   tileHeightRem,
@@ -35,11 +36,12 @@ const rows = (n: number, rem: number): number =>
 const LARGE = TILE_HEIGHT_REM.large;
 const MEDIUM = TILE_HEIGHT_REM.medium;
 const DENSE = TILE_HEIGHT_REM.dense;
+const SLIM = TILE_HEIGHT_REM.slim;
 const STRIP = SUMMARY_ROW_REM + COLUMN_GAP_REM;
 
 describe("tile sizes", () => {
-  it("shrink step by step: today large > medium > dense, other days compact > compact-dense", () => {
-    expect(TODAY_SIZES).toEqual(["large", "medium", "dense"]);
+  it("shrink step by step: today large > medium > dense > slim, other days compact > compact-dense", () => {
+    expect(TODAY_SIZES).toEqual(["large", "medium", "dense", "slim"]);
     expect(DAY_SIZES).toEqual(["compact", "compact-dense"]);
     for (const ladder of [TODAY_SIZES, DAY_SIZES]) {
       const heights = ladder.map((size) => TILE_HEIGHT_REM[size]);
@@ -48,8 +50,10 @@ describe("tile sizes", () => {
     }
   });
 
-  it("a prominent tile is about 1.2-1.3x taller in today's column, never elsewhere", () => {
-    for (const size of TODAY_SIZES) {
+  it("a prominent tile is about 1.2-1.3x taller in today's column (not slim), never elsewhere", () => {
+    // Slim is the last step before "+N": no enlargement, every event first.
+    expect(PROMINENT_EXTRA_REM.slim).toBe(0);
+    for (const size of TODAY_SIZES.filter((s) => s !== "slim")) {
       const ratio = tileHeightRem(size, true) / tileHeightRem(size, false);
       expect(ratio).toBeGreaterThanOrEqual(1.2);
       expect(ratio).toBeLessThanOrEqual(1.5);
@@ -86,7 +90,7 @@ describe("fitColumn", () => {
     expect(few.size).toBe("large");
     expect(few.layout.visible).toHaveLength(3);
     const many = fitColumn(items("ppcuuuuu"), true, null);
-    expect(many.size).toBe("dense");
+    expect(many.size).toBe("slim");
     expect(many.layout.visible).toHaveLength(8);
     expect(fitColumn(items("uuuuuu"), false, null).size).toBe("compact-dense");
   });
@@ -121,7 +125,7 @@ describe("fitColumn", () => {
     expect(roomy).toMatchObject({ size: "large", prominent: true });
   });
 
-  it("shrinks large -> medium -> dense before anything is summed up", () => {
+  it("shrinks large -> medium -> dense -> slim before anything is summed up", () => {
     const all = items("uuuuu");
     const medium = rows(5, MEDIUM);
     expect(rows(5, LARGE)).toBeGreaterThan(medium);
@@ -130,14 +134,61 @@ describe("fitColumn", () => {
     const fit = fitColumn(all, true, dense);
     expect(fit.size).toBe("dense");
     expect(fit.layout.hiddenLater).toBe(0);
-    // A bit less: four dense tiles plus the "+N" row.
-    const tight = fitColumn(all, true, dense - 0.1);
-    expect(tight.size).toBe("dense");
+    // A bit less: slim tiles, still every event.
+    const slimFit = fitColumn(all, true, dense - 0.1);
+    expect(slimFit.size).toBe("slim");
+    expect(slimFit.layout.hiddenLater).toBe(0);
+    // Less than five slim tiles: four slim tiles plus the "+N" row.
+    const slim = rows(5, SLIM);
+    const tight = fitColumn(all, true, slim - 0.1);
+    expect(tight.size).toBe("slim");
     expect(tight.layout.visible).toHaveLength(4);
     expect(tight.layout.later.map((i) => i.id)).toEqual(["u4"]);
-    expect(layoutHeightRem(tight.layout, "dense")).toBeLessThanOrEqual(
-      dense - 0.1,
+    expect(layoutHeightRem(tight.layout, "slim")).toBeLessThanOrEqual(
+      slim - 0.1,
     );
+  });
+
+  it('fits today at 10:20 without "+N" (21.125rem list, two done, next and four later)', () => {
+    // The demo board's today column at 1280x800 and 2000x1200 (the list scales with rem):
+    // dense tiles left two events in "+2" with free space below; slim ones fit them all.
+    const all = items("ppuuuuu");
+    const next = [all[2] as Item];
+    const reserved = 1.75 + COLUMN_GAP_REM;
+    const fit = fitColumn(all, true, 21.125, reserved, next);
+    expect(fit.size).toBe("slim");
+    expect(fit.prominent).toBe(false);
+    expect(fit.layout.hiddenLater).toBe(0);
+    expect(fit.layout.pastStrip).toHaveLength(2);
+    expect(fit.layout.visible).toHaveLength(5);
+    expect(freeRem(fit, 21.125, reserved, next)).toBeGreaterThanOrEqual(0);
+  });
+
+  it("uses the enlargement whenever a size still fits with it", () => {
+    const all = items("ppcuu");
+    const now = [all[2] as Item];
+    const plain = STRIP + rows(3, DENSE);
+    // Exactly the room for the enlarged dense tile: kept.
+    const roomy = fitColumn(
+      all,
+      true,
+      plain + PROMINENT_EXTRA_REM.dense,
+      0,
+      now,
+    );
+    expect(roomy).toMatchObject({ size: "dense", prominent: true });
+    // Just below it: the same size without the enlargement, not a smaller one.
+    const tight = fitColumn(all, true, plain + 0.5, 0, now);
+    expect(tight).toMatchObject({ size: "dense", prominent: false });
+  });
+
+  it("reports the free height below the rows (null until measured, never negative)", () => {
+    const all = items("uu");
+    const fit = fitColumn(all, true, 20);
+    expect(freeRem(fit, 20)).toBeCloseTo(20 - rows(2, LARGE));
+    expect(freeRem(fit, 20, 2)).toBeCloseTo(18 - rows(2, LARGE));
+    expect(freeRem(fitColumn(all, true, null), null)).toBeNull();
+    expect(freeRem(fitColumn(items("uuuuuuuuuu"), true, 3), 3)).toBe(0);
   });
 
   it("subtracts reserved space (the now line)", () => {
@@ -187,9 +238,17 @@ describe("fitColumn", () => {
             // Size and enlargement come from the column's own steps.
             const ladder = today ? TODAY_SIZES : DAY_SIZES;
             expect(ladder).toContain(size);
-            // Summed up only at the smallest size.
+            // Summed up only at the smallest size, and only when one more tile there
+            // would not fit (no "+N" while the space would take the event).
             if (layout.hiddenLater > 0) {
               expect(size).toBe(ladder[ladder.length - 1]);
+              const upcoming = count - pastCount;
+              const oneMore = columnLayout(all, layout.visible.length + 1);
+              if (layout.visible.length + 1 <= upcoming) {
+                expect(layoutHeightRem(oneMore, size)).toBeGreaterThan(
+                  height - 2 + 1e-6,
+                );
+              }
             }
           }
         }

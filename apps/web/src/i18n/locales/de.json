@@ -66,7 +66,9 @@
     "past": {
       "label": "vorbei",
       "list": "Schon vorbei: {{titles, list}}"
-    }
+    },
+    "done": "Alles geschafft!",
+    "free": "Nichts geplant"
   },
   "fullscreen": {
     "enter": "Vollbild an (gedrückt halten)",

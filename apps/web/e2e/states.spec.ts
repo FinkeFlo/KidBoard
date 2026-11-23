@@ -271,10 +271,10 @@ test.describe("empty day", () => {
   }
 });
 
-test("dense tiles: the emoji box stays inside the child edge, the edge is drawn on top", async ({
+test("the smallest today tiles (slim): the emoji box stays inside the child edge, the edge is drawn on top", async ({
   page,
 }) => {
-  // 4 past (folded), 1 current and 9 upcoming at 12:00: more than fit, so dense.
+  // 4 past (folded), 1 current and 9 upcoming at 12:00: more than fit, so slim.
   const events = Array.from({ length: 14 }, (_, i) => ({
     title: `Football ${String(i)}`,
     icon: "⚽",
@@ -284,7 +284,7 @@ test("dense tiles: the emoji box stays inside the child edge, the edge is drawn 
   await mockBoard(page, { agenda: agenda(events, []) });
   await page.goto("/?burnin=0");
   const today = page.getByTestId("day-column").first();
-  await expect(today).toHaveAttribute("data-size", "dense");
+  await expect(today).toHaveAttribute("data-size", "slim");
   const report = await today
     .locator("article[data-tint=single]")
     .evaluateAll((tiles) =>

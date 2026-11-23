@@ -5,6 +5,7 @@ import { resolveChildTint } from "../components/childTint";
 import { Emoji } from "../components/Emoji";
 import { ErrorCard } from "../components/ErrorCard";
 import { errorCode } from "../components/errorCode";
+import { CheckIcon } from "../components/TimeOfDayIcon";
 import { type ApiErrorKind, useRetryNow } from "../data";
 
 /** Tile placeholders per skeleton column: today first, then the next three days. */
@@ -130,6 +131,58 @@ export function DayEmpty({
       </div>
       <h3 className="text-title">{t("day.empty.title")}</h3>
       <p className="text-body text-text-muted">{t("day.empty.hint")}</p>
+    </div>
+  );
+}
+
+/**
+ * Height in rem {@link DayDone} needs in today's list (its own height plus the list gap);
+ * with less free space it is left out (the "done" strip still says it).
+ */
+export const DONE_MIN_REM = 8;
+
+/**
+ * Today after its last event: a large check mark on a quiet disc and "All done!", in the
+ * free space below the "done" strip, so the column does not end in a void. Icon-first
+ * (the check is the "done" sign of the strip, large); never a moon (merge rule 1: 🌙
+ * counts sleeps). Only shown while nothing of today is still to come.
+ */
+export function DayDone(): React.JSX.Element {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-testid="day-done"
+      className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-hidden text-center"
+    >
+      <span
+        aria-hidden="true"
+        className="bg-surface-sunken text-text rounded-pill inset-ring-border grid size-20 shrink-0 place-items-center inset-ring-2"
+      >
+        <CheckIcon className="size-12" />
+      </span>
+      <p className="text-title">{t("day.done")}</p>
+    </div>
+  );
+}
+
+/**
+ * Another day of the overview with nothing planned: a small kite (the playful sign of
+ * {@link DayEmpty}, quieter) and "Nothing planned", so the column is not blank.
+ */
+export function DayFree(): React.JSX.Element {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-testid="day-free"
+      className="text-text-muted flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-hidden text-center"
+    >
+      <span
+        aria-hidden="true"
+        className="bg-surface-raised rounded-pill grid size-16 shrink-0 place-items-center"
+      >
+        <Emoji emoji="🪁" className="text-[2.25rem]" />
+      </span>
+      <p className="text-meta">{t("day.free")}</p>
     </div>
   );
 }

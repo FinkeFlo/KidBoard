@@ -537,7 +537,6 @@ describe("Board", () => {
       expect(fake.calls.map((c) => c.url)).toContain(
         "/api/agenda?from=2026-11-22&days=31",
       );
-      expect(compact).toHaveAttribute("data-variant", "compact");
       expect(compact).toHaveAttribute("data-nights", "26");
       expect(compact).toHaveTextContent("26 more sleeps until Christmas");
       expect(within(compact).getByTestId("countdown-grouped")).toBeTruthy();
@@ -549,7 +548,8 @@ describe("Board", () => {
 
       fireEvent.click(screen.getByRole("button", { name: en.board.week }));
       const full = screen.getByRole("region", { name: en.countdown.label });
-      expect(full).toHaveAttribute("data-variant", "full");
+      // The same pill (one size) on the week view.
+      expect(full.className).toBe(compact.className);
       expect(full).toHaveTextContent("26 more sleeps until Christmas");
     });
 

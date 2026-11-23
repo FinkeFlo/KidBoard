@@ -11,9 +11,9 @@ import {
 import { AllDayBanner } from "./AllDayBanner";
 import type { DayEvent } from "./buildDayModel";
 import type { OverviewDay } from "./buildOverviewModel";
-import { COLUMN_GAP_REM, fitColumn } from "./columnCapacity";
+import { COLUMN_GAP_REM, fitColumn, freeRem } from "./columnCapacity";
 import { MoreLater, PastStrip } from "./ColumnSummaries";
-import { DayEmpty } from "./DayStates";
+import { DayDone, DayEmpty, DayFree, DONE_MIN_REM } from "./DayStates";
 import { MealPlates } from "./MealPlates";
 import { NOW_LINE_REM, NowLine } from "./NowLine";
 import { useContentHeight } from "./useContentHeight";
@@ -33,7 +33,9 @@ export interface DayColumnProps {
  * whole day does not fit at the largest size, all past events fold into the "vorbei"
  * strip, then the tiles shrink step by step, and only then the latest are summed up in
  * "+N"; nothing is hidden silently and nothing scrolls. The current event (else the
- * next one) gets a larger tile while space allows.
+ * next one) gets a larger tile while space allows. When every event of today is over,
+ * the free space below shows "All done" ({@link DayDone}); another day without anything
+ * planned shows a quiet placeholder ({@link DayFree}).
  */
 export function DayColumn({
   day,
@@ -49,11 +51,13 @@ export function DayColumn({
   // "Now" stands out: the current events, else the next one, get a larger tile.
   const prominent =
     day.current.length > 0 ? day.current : day.next === null ? [] : [day.next];
+  const heightRem = measured === null ? null : measured.height / measured.rem;
+  const reservedRem = showNow ? NOW_LINE_REM + COLUMN_GAP_REM : 0;
   const plan = fitColumn(
     day.events,
     day.isToday,
-    measured === null ? null : measured.height / measured.rem,
-    showNow ? NOW_LINE_REM + COLUMN_GAP_REM : 0,
+    heightRem,
+    reservedRem,
     prominent,
   );
   const { layout } = plan;
@@ -62,6 +66,13 @@ export function DayColumn({
   const after = layout.visible.filter((item) => !started.has(item));
   const hiddenLater = layout.later;
   const empty = day.events.length === 0 && day.allDay.length === 0;
+  // Every timed event of today is over: "All done" in the free space, if it fits there.
+  const free = freeRem(plan, heightRem, reservedRem, prominent);
+  const allDone =
+    day.isToday &&
+    day.events.length > 0 &&
+    day.events.every((item) => item.status === "past") &&
+    (free === null || free >= DONE_MIN_REM);
 
   const tile = (item: DayEvent): React.JSX.Element => (
     <li key={item.event.id} className="min-w-0">
@@ -117,8 +128,12 @@ export function DayColumn({
         data-testid="column-events"
         className="-mx-1.5 flex min-h-0 flex-1 basis-0 flex-col gap-2 overflow-hidden px-1.5 pt-2 pb-1.5"
       >
-        {day.isToday && empty ? (
-          <DayEmpty childList={childList} />
+        {empty ? (
+          day.isToday ? (
+            <DayEmpty childList={childList} />
+          ) : (
+            <DayFree />
+          )
         ) : (
           <>
             {layout.pastStrip.length > 0 && (
@@ -140,6 +155,7 @@ export function DayColumn({
                 )}
               </ol>
             )}
+            {allDone && <DayDone />}
           </>
         )}
       </div>

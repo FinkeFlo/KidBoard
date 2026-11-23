@@ -14,7 +14,8 @@ fixed per size, so a column can compute how many tiles fit.
 |---|---|---|---|---|
 | `large` | today | `--spacing-tile` (80) | 56 (68) | `--text-tile`, 2 lines |
 | `medium` | today, 1st step down | 72 | 48 (60) | `--text-tile-compact`, 2 lines |
-| `dense` | today, last step before "+N" | 56 | 44 (50) | `--text-tile-compact`, 1 line |
+| `dense` | today, 3rd step | 56 | 44 (50) | `--text-tile-compact`, 1 line |
+| `slim` | today, last step before "+N" | 44 | 32 (36) | `--text-tile-compact`, 1 line, time in the same row |
 | `compact` | other days | `--spacing-tile-compact` (76) | 40 (48) | `--text-tile-compact`, 2 lines |
 | `compact-dense` | other days, last step | 60 | 36 (44) | `--text-tile-compact`, 1 line |
 | `week` | week columns | 104 | 40 (no disc) | `--text-meta`, 1 line |
@@ -22,7 +23,10 @@ fixed per size, so a column can compute how many tiles fit.
 | `week-mini` | week, last step before "+N" | 68 | 32 (no disc) | none (name only) |
 
 - **Prominent (now, else next) in today's column:** about 1.3× taller with a larger emoji
-  (large: 104 high, emoji 72) while space allows; it is the first thing given up.
+  (large: 104 high, emoji 72) whenever a size still fits with it; it is the first thing
+  given up at each size. `slim` has no enlargement (ring and cue carry now/next).
+- **Titles** break between words only (no automatic hyphenation); a word longer than the
+  line ends in "…". The badges keep an 8px gap to the title.
 - **Disc:** the emoji sits on a `--color-surface-sunken` disc with a 1px `--color-border`
   ring and `--shadow-card`, so pale glyphs (🦷, 🥛) stay visible, also at night.
 - **One child:** fill `--color-child-N-tint`, 4px inset edge `--color-child-N` (drawn above
@@ -38,7 +42,8 @@ fixed per size, so a column can compute how many tiles fit.
   plus the time in `--text-meta`, `--color-text-muted`. All-day: a span icon (a bar
   between two end marks) and "Ganztägig".
 - **States:** upcoming; **current** ("jetzt"): 4px ring `--color-now` plus a clock cue on
-  the disc; **next**: 3px ring `--color-today-ring` with a 2px offset; **past**:
+  the disc; **next**: 3px dashed outline `--color-now` with a 2px offset plus an outlined
+  ▶ cue on the disc (not the gold of today's column ring); **past**:
   `--color-surface-sunken` fill, `--color-text-muted`, grey emoji, no edge (never opacity:
   `--opacity-past*` fails AA on text). Now/next colours are person-neutral, never a child's.
 - **Week tiles:** stacked (emoji, one-line truncated title, time row), badges in the top
@@ -63,9 +68,14 @@ One column per day; events top to bottom in time order, meals at the bottom.
 - **Space rule (no fixed count):** the list's height is measured. In this order, the first
   that fits wins: every event as a tile at the largest size (past ones receded); else
   *all* past events fold into the "vorbei" strip and the rest shrinks step by step
-  (today `large` → `medium` → `dense`, other days `compact` → `compact-dense`), with the
-  prominent tile first; only then the latest upcoming events are summed up in "+N".
-  Never scroll, never hide silently.
+  (today `large` → `medium` → `dense` → `slim`, other days `compact` → `compact-dense`),
+  with the prominent tile first; only then the latest upcoming events are summed up in
+  "+N", and only if one more tile would not fit. Never scroll, never hide silently.
+- **All done (today):** when every timed event is over and there is room, a 80px disc
+  (`--color-surface-sunken`, `--color-border` ring) with a large check mark and "Alles
+  geschafft!" (`--text-title`) below the "vorbei" strip. Never a moon.
+- **Nothing planned (other days):** a quiet 64px `--color-surface-raised` disc with 🪁 and
+  "Nichts geplant" (`--text-meta`, muted).
 - **"vorbei" strip (36 high):** a check mark and "vorbei" (`--text-meta`), then up to 8 grey
   30px emoji with a small check badge, then "+N"; its accessible name lists every title.
 - **"+N" row (36 high):** the hidden events' emoji (26px, up to 4) and "+N" in
@@ -101,7 +111,9 @@ neutral): a 28px clock disc, a 6px bar and a "jetzt" pill (`--text-meta`, 900, t
 Breakfast, lunch, dinner in fixed places: circles up to 60 (today) / 52 (other days) with
 a 1px `--color-border` ring, emoji at 60 % of the circle and a small time-of-day badge
 bottom-right; today on `--color-surface-sunken`, other days on `--color-surface-raised`
-inside a `--color-surface` strip. Captions (`--text-caption`, muted) wrap to two lines. A
+inside a `--color-surface` strip. Captions in today's column (`--text-caption`, muted,
+tight tracking) use the plate's full share of the width and wrap to two lines between words
+(no hyphenation; a too long word ends in "…"). A
 missing meal leaves its place empty. There is no separate meal-plan screen.
 
 ## SleepCountdown
@@ -114,8 +126,9 @@ event emoji on a disc in the child's tint and edge (neutral with `--color-border
 a child; up to 3 for events on the same day), then the first title, truncated. Today: 🎉
 and "Heute!", then the emoji and title, with a 4px `--color-today-ring` ring. Accessible
 name "Wie oft noch schlafen?" and a label "Noch 6 Mal schlafen bis Mias Geburtstag"
-(visuals `aria-hidden`). `full` in the week view, `compact` (smaller emoji and title) in
-the overview. Static.
+(visuals `aria-hidden`). One size in both views (emoji `--text-title` on a 44px disc,
+title `--text-body`, up to 160 wide), so the pill does not change between overview and
+week. Static.
 
 ## ChildLegend
 

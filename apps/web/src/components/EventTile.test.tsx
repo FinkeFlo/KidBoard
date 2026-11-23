@@ -137,7 +137,8 @@ describe("EventTile", () => {
       />,
     );
     const float = screen.getByTestId("badge-float");
-    expect(float).toHaveClass("float-end");
+    // A small gap between the title and the badges.
+    expect(float).toHaveClass("float-end", "ms-2");
     // Inside the tile (no corner overlay any more) and inside the title paragraph.
     expect(tile()).toContainElement(float);
     expect(float.parentElement).toContainElement(
@@ -272,8 +273,17 @@ describe("EventTile", () => {
       <EventTile event={eventFixture()} childList={[]} format={format} next />,
     );
     expect(tile()).toHaveAttribute("data-next", "true");
-    expect(tile()).toHaveClass("ring-today-ring", "ring-3");
+    // "Next" is not the gold of today's column: a dashed outline in the "now" ink and
+    // an outlined ▶ cue (now: solid ring and filled clock).
+    expect(tile()).toHaveClass("outline-dashed", "outline-now", "outline-3");
+    expect(tile().className).not.toMatch(/today-ring/u);
     expect(within(tile()).queryByTestId("now-cue")).toBeNull();
+    const cue = within(tile()).getByTestId("next-cue");
+    expect(cue).toHaveClass("bg-surface", "text-now", "ring-now");
+    expect(within(cue).getByTestId("next-icon")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
     expect(tile()).toHaveAccessibleName(
       `Swimming, 2:30 PM, For everyone, ${en.event.status.next}`,
     );
@@ -328,6 +338,54 @@ describe("EventTile", () => {
     expect(screen.getByText("🏊")).toHaveClass("text-[2.5rem]");
   });
 
+  it("breaks titles between words only: no automatic hyphenation, long words end in …", () => {
+    for (const size of ["large", "compact", "dense", "slim"] as const) {
+      const { unmount } = render(
+        <EventTile
+          event={eventFixture({ title: "Swimming", childIds: ["mia"] })}
+          childList={[MIA]}
+          format={format}
+          size={size}
+        />,
+      );
+      const title = screen.getByTestId("tile-title").closest("p");
+      expect(title?.className).not.toMatch(/hyphens-auto|break-word/u);
+      expect(title?.className).toMatch(/hyphens-manual|truncate/u);
+      expect(title?.className).toMatch(/text-ellipsis|truncate/u);
+      unmount();
+    }
+  });
+
+  it("slim (last today step): title, badges and time in one row, 2rem emoji, no prominence", () => {
+    render(
+      <EventTile
+        event={eventFixture({ childIds: ["mia"] })}
+        childList={[MIA]}
+        format={format}
+        timeOfDay="midday"
+        size="slim"
+        next
+        prominent
+      />,
+    );
+    expect(tile()).toHaveAttribute("data-size", "slim");
+    expect(tile()).toHaveAttribute("data-prominent", "false");
+    expect(tile()).toHaveClass("h-11");
+    expect(screen.getByText("🏊")).toHaveClass("text-[2rem]");
+    const title = screen.getByTestId("tile-title").parentElement;
+    expect(title).toHaveClass("truncate");
+    // One row: the title, the badges and the time share a parent.
+    const row = title?.parentElement;
+    expect(row).toHaveClass("items-center");
+    expect(row).toContainElement(screen.getByTestId("child-badges"));
+    expect(row).toContainElement(screen.getByText("2:30 PM"));
+    // The next cue scales down with the disc.
+    expect(screen.getByTestId("next-cue")).toHaveClass("size-4");
+    expect(tile()).toHaveAccessibleName(
+      `Swimming, 2:30 PM, For Mia, ${en.event.status.next}`,
+    );
+  });
+
   it("uses the tile height tokens it reports for the column capacity", () => {
     const token = (name: string): number =>
       parseFloat(
@@ -340,6 +398,10 @@ describe("EventTile", () => {
     expect(TILE_HEIGHT_REM.medium).toBeLessThan(TILE_HEIGHT_REM.large);
     expect(TILE_HEIGHT_REM.dense).toBeLessThan(TILE_HEIGHT_REM.medium);
     expect(TILE_HEIGHT_REM.dense).toBeGreaterThanOrEqual(2.75 + 2 * 0.25);
+    // Slim keeps its 2.25rem disc (size-9) inside the 4px edge on both sides.
+    expect(TILE_HEIGHT_REM.slim).toBeLessThan(TILE_HEIGHT_REM.dense);
+    expect(TILE_HEIGHT_REM.slim).toBeGreaterThanOrEqual(2.25 + 2 * 0.25);
+    expect(tileClasses("slim", false).disc).toBe("size-9");
     expect(TILE_HEIGHT_REM["compact-dense"]).toBeLessThan(
       TILE_HEIGHT_REM.compact,
     );

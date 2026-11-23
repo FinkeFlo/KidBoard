@@ -115,7 +115,7 @@ describe("DayColumn", () => {
   it("shows every event until the list is measured", () => {
     const column = renderColumn(day(hourly(9, 7)));
     expect(timedTiles(column)).toHaveLength(9);
-    expect(column).toHaveAttribute("data-size", "dense");
+    expect(column).toHaveAttribute("data-size", "slim");
   });
 
   it("today: heading, past events, the now line with its time, then the upcoming ones; the next one emphasised", () => {
@@ -300,6 +300,13 @@ describe("DayColumn", () => {
     expect(column).toHaveAttribute("data-size", "dense");
     expect(timedTiles(column)).toHaveLength(5);
     expect(within(column).queryByTestId("column-more")).toBeNull();
+    // Less than that: slim tiles (title and time in one row), still all five.
+    cleanup();
+    stubListHeight(NOW_ROW + 5 * TILE_HEIGHT_REM.slim + 4 * GAP);
+    const slim = renderColumn(day(hourly(5, 13)));
+    expect(slim).toHaveAttribute("data-size", "slim");
+    expect(timedTiles(slim)).toHaveLength(5);
+    expect(within(slim).queryByTestId("column-more")).toBeNull();
   });
 
   it("other days: weekday heading, compact tiles, no now line", () => {
@@ -380,9 +387,69 @@ describe("DayColumn", () => {
     expect(fills[1]).toContain("color-mix");
   });
 
-  it("other days without events show no empty illustration", () => {
+  it("other days without events show a quiet placeholder, not the big illustration", () => {
     const column = renderColumn(day([], [], 1));
     expect(within(column).queryByTestId("day-empty")).toBeNull();
+    const free = within(column).getByTestId("day-free");
+    expect(free).toHaveTextContent(en.day.free);
+    expect(free.querySelector("[aria-hidden=true]")).toHaveTextContent("🪁");
+    // A day with something planned has no placeholder.
+    cleanup();
+    const busy = renderColumn(day(hourly(1, 9, "2026-11-23"), [], 1));
+    expect(within(busy).queryByTestId("day-free")).toBeNull();
+  });
+
+  it("all done: after today's last event a big check and 'All done!' fill the free space", () => {
+    const late = Date.parse("2026-11-22T21:00:00+01:00");
+    const model = buildOverviewModel(
+      { events: hourly(7, 9), meals: [mealFixture()] },
+      CONFIG,
+      TODAY,
+      late,
+    ).days[0] as OverviewDay;
+    stubListHeight(21);
+    const column = renderColumn(model);
+    const done = within(column).getByTestId("day-done");
+    expect(done).toHaveTextContent(en.day.done);
+    // Icon-first: the check mark, never a moon (merge rule 1).
+    expect(within(done).getByTestId("done-icon")).toBeInTheDocument();
+    expect(done.textContent).not.toContain("🌙");
+    // Below the strip and the now line, and the meals stay.
+    const list = within(column).getByTestId("column-events");
+    expect(list.lastElementChild).toBe(done);
+    expect(
+      within(column).getByRole("img", { name: "Lunch: Pasta" }),
+    ).toBeInTheDocument();
+  });
+
+  it("no 'All done' while an event is still current or upcoming, or when it does not fit", () => {
+    stubListHeight(21);
+    // 12:00: e3 (11:30-12:00) is over, e4 at 12:20 is still to come.
+    const column = renderColumn(day(hourly(5, 9)));
+    expect(within(column).queryByTestId("day-done")).toBeNull();
+    cleanup();
+    // Current: 9:00-9:30, now 9:10.
+    const current = buildOverviewModel(
+      { events: hourly(1, 9), meals: [] },
+      CONFIG,
+      TODAY,
+      Date.parse("2026-11-22T09:10:00+01:00"),
+    ).days[0] as OverviewDay;
+    expect(within(renderColumn(current)).queryByTestId("day-done")).toBeNull();
+    cleanup();
+    // All over, but the list has no room left below the strip and the now line.
+    const late = Date.parse("2026-11-22T23:30:00+01:00");
+    stubListHeight(ROW + NOW_ROW + 3);
+    const tight = renderColumn(
+      buildOverviewModel(
+        { events: hourly(10, 9), meals: [] },
+        CONFIG,
+        TODAY,
+        late,
+      ).days[0] as OverviewDay,
+    );
+    expect(within(tight).getByTestId("past-strip")).toBeInTheDocument();
+    expect(within(tight).queryByTestId("day-done")).toBeNull();
   });
 
   it("renders titles as text, never as markup", () => {

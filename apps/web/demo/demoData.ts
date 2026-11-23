@@ -3,6 +3,7 @@ import {
   addCalendarDays,
   type AgendaResponse,
   type CalendarEvent,
+  isDateKey,
   type Meal,
   type MealSlot,
   type PublicConfig,
@@ -173,6 +174,17 @@ const MEAL_WEEK: { slot: MealSlot; title: string; icon: string }[][] = [
 /** Today's date key in {@link DEMO_TIME_ZONE} at `nowMs`. */
 export function demoToday(nowMs: number): string {
   return todayInZone(nowMs, DEMO_TIME_ZONE);
+}
+
+/**
+ * The day the demo agenda starts on for a request: its `from` query parameter when that
+ * is a valid date key (as the worker honours it), else today at `nowMs`. So a browser
+ * whose clock is set to another day (Playwright `page.clock`) gets an agenda for its own
+ * day instead of a range mismatch (which the client rejects as an invalid response).
+ */
+export function demoAgendaStart(search: string, nowMs: number): string {
+  const from = new URLSearchParams(search).get("from");
+  return from !== null && isDateKey(from) ? from : demoToday(nowMs);
 }
 
 function pad(value: number): string {

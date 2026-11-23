@@ -4,7 +4,7 @@ import type * as DemoData from "./demoData.ts";
 
 /**
  * Dev-only Vite plugin (`pnpm dev:demo`): answers `/api/config` and `/api/agenda` with the
- * synthetic demo data for the current day, so the board can be developed without a worker,
+ * synthetic demo data for the requested day (`from`, else today), so the board can be developed without a worker,
  * secrets or a calendar. It only exists in the dev server (`apply: "serve"`), never in a build.
  *
  * The data module is loaded through the dev server (`ssrLoadModule`) because it imports the
@@ -17,7 +17,7 @@ export function demoApiPlugin(): Plugin {
     apply: "serve",
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
-        const path = (request.url ?? "").split("?")[0];
+        const [path, search = ""] = (request.url ?? "").split("?");
         if (path !== "/api/config" && path !== "/api/agenda") {
           next();
           return;
@@ -32,7 +32,7 @@ export function demoApiPlugin(): Plugin {
               path === "/api/config"
                 ? demo.demoConfig()
                 : demo.demoAgenda(
-                    demo.demoToday(now),
+                    demo.demoAgendaStart(search, now),
                     new Date(now).toISOString(),
                   );
             response.setHeader("Content-Type", "application/json");

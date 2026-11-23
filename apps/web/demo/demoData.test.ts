@@ -5,6 +5,7 @@ import {
   DEMO_COUNTDOWN_DAYS,
   DEMO_TIME_ZONE,
   demoAgenda,
+  demoAgendaStart,
   demoConfig,
   isoInZone,
 } from "./demoData.ts";
@@ -122,5 +123,17 @@ describe("isoInZone", () => {
     expect(isoInZone("2026-07-15", "08:30", "Asia/Kolkata")).toBe(
       "2026-07-15T08:30:00+05:30",
     );
+  });
+
+  it("starts the agenda at the requested day, else today (clock moved in the browser)", () => {
+    const now = Date.parse("2026-11-23T09:20:00Z");
+    expect(demoAgendaStart("from=2026-11-24&days=31", now)).toBe("2026-11-24");
+    expect(
+      demoAgenda(demoAgendaStart("from=2026-11-24", now), NOW).range.from,
+    ).toBe("2026-11-24");
+    // Missing or invalid: today in the demo zone.
+    expect(demoAgendaStart("", now)).toBe("2026-11-23");
+    expect(demoAgendaStart("from=2026-13-40", now)).toBe("2026-11-23");
+    expect(demoAgendaStart("from=tomorrow", now)).toBe("2026-11-23");
   });
 });

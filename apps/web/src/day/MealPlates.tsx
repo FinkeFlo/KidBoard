@@ -41,7 +41,7 @@ export function platesOf(meals: readonly Meal[]): Plate[] {
 /**
  * The day's meals at the bottom of a column: round plates with the meal emoji and a small
  * time-of-day badge (none for `unspecified`); today's column also shows the name in up to
- * two small lines (the narrow columns show none).
+ * two small lines, broken between words only (the narrow columns show none).
  * Each plate is an image named "Lunch: Spaghetti". Plates shrink when a day has more
  * meals than the three positions (size container), so they never overflow.
  */
@@ -58,14 +58,14 @@ export function MealPlates({
     <ul
       aria-label={t("day.meals")}
       data-testid="meal-plates"
-      className={`${today ? "" : "bg-surface px-2 py-2"} rounded-tile mt-auto flex shrink-0 items-start justify-around gap-2`}
+      className={`${today ? "gap-1" : "bg-surface gap-2 px-2 py-2"} rounded-tile mt-auto flex shrink-0 items-start justify-around`}
     >
       {platesOf(meals).map(({ key, meal }) => (
         <li
           key={key}
           data-slot={meal?.slot ?? "empty"}
           aria-hidden={meal === null ? true : undefined}
-          className={`${today ? "max-w-24" : "max-w-13"} flex min-w-0 flex-1 flex-col items-center gap-1`}
+          className={`${today ? "" : "max-w-13"} flex min-w-0 flex-1 basis-0 flex-col items-center gap-1`}
         >
           <span
             className={`${meal === null ? "" : `${today ? "bg-surface-sunken" : "bg-surface-raised"} inset-ring-border inset-ring-1`} rounded-pill @container relative flex aspect-square w-full items-center justify-center ${today ? "max-w-15" : "max-w-13"}`}
@@ -91,7 +91,7 @@ export function MealPlates({
           {today && meal !== null && (
             <span
               aria-hidden="true"
-              className="text-caption text-text-muted line-clamp-2 w-full text-center leading-tight wrap-break-word hyphens-auto"
+              className="text-caption text-text-muted line-clamp-2 w-full text-center leading-tight tracking-tight text-ellipsis hyphens-manual"
             >
               {meal.title}
             </span>

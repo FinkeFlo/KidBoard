@@ -12,13 +12,18 @@ import {
   tileTintStyle,
 } from "./childTint";
 import { Emoji } from "./Emoji";
-import { AllDayIcon, ClockIcon, TimeOfDayIcon } from "./TimeOfDayIcon";
+import {
+  AllDayIcon,
+  ClockIcon,
+  NextIcon,
+  TimeOfDayIcon,
+} from "./TimeOfDayIcon";
 
 export type EventStatus = "upcoming" | "current" | "past";
 
 /**
- * Tile sizes: `large` → `medium` → `dense` in today's column (it shrinks step by step
- * when space is short), `compact` / `compact-dense` on the other days, `week` /
+ * Tile sizes: `large` → `medium` → `dense` → `slim` in today's column (it shrinks step by
+ * step when space is short; `slim` puts title and time in one row), `compact` / `compact-dense` on the other days, `week` /
  * `week-dense` → `week-mini` for the seven narrow week columns (stacked: emoji, a one-line title where
  * the column is wide enough, then the time). Heights are fixed, so a column can derive how many tiles fit from its height
  * ({@link TILE_HEIGHT_REM}, plus {@link PROMINENT_EXTRA_REM} for a prominent tile).
@@ -27,6 +32,7 @@ export type TileSize =
   | "large"
   | "medium"
   | "dense"
+  | "slim"
   | "compact"
   | "compact-dense"
   | "week"
@@ -38,6 +44,7 @@ export const TILE_HEIGHT_REM: Record<TileSize, number> = {
   large: 5,
   medium: 4.5,
   dense: 3.5,
+  slim: 2.75,
   compact: 4.75,
   "compact-dense": 3.75,
   week: 6.5,
@@ -53,6 +60,7 @@ export const PROMINENT_EXTRA_REM: Record<TileSize, number> = {
   large: 1.5,
   medium: 1,
   dense: 1,
+  slim: 0,
   compact: 0,
   "compact-dense": 0,
   week: 0,
@@ -82,11 +90,16 @@ export interface SizeClasses {
   stacked: boolean;
   /** Stacked tiles: a one-line title between emoji and time (where the column is wide enough). */
   stackedTitle: boolean;
+  /** Title, badges and time in one row (the slimmest today tile). */
+  inline: boolean;
+  /** Size of the "now" / "next" cue on the emoji disc. */
+  cue: string;
 }
 
 // Full class names so Tailwind can see them. Today's large emoji stay >= 3.5rem, medium
-// ones are 3rem and dense ones 2.75rem (the last step before "+N"); the disc leaves a thin
-// light ring around the glyph.
+// ones are 3rem and dense ones 2.75rem; slim tiles (the last step before "+N", so a whole
+// day still fits) put the title and time in one row next to a 2rem emoji (as on week tiles). The disc
+// leaves a thin light ring around the glyph.
 const SIZES: Record<TileSize, SizeClasses> = {
   large: {
     tile: "h-tile gap-3 ps-3 pe-3",
@@ -100,6 +113,8 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeFloat: true,
     stacked: false,
     stackedTitle: false,
+    inline: false,
+    cue: "size-6",
   },
   medium: {
     tile: "h-18 gap-3 ps-3 pe-3",
@@ -113,6 +128,8 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeFloat: true,
     stacked: false,
     stackedTitle: false,
+    inline: false,
+    cue: "size-6",
   },
   dense: {
     tile: "h-14 gap-2.5 ps-2.5 pe-3",
@@ -126,6 +143,23 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeFloat: false,
     stacked: false,
     stackedTitle: false,
+    inline: false,
+    cue: "size-6",
+  },
+  slim: {
+    tile: "h-11 gap-2.5 ps-2 pe-3",
+    disc: "size-9",
+    emoji: "text-[2rem]",
+    title: "text-tile-compact",
+    timeIcon: "text-[1.5rem]",
+    badge: "size-6",
+    badgeText: "text-caption",
+    badgeOverlap: "-ms-1.5",
+    badgeFloat: false,
+    stacked: false,
+    stackedTitle: false,
+    inline: true,
+    cue: "size-4",
   },
   compact: {
     tile: "h-tile-compact gap-1.5 ps-1.5 pe-1.5",
@@ -139,6 +173,8 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeFloat: true,
     stacked: false,
     stackedTitle: false,
+    inline: false,
+    cue: "size-6",
   },
   "compact-dense": {
     tile: "h-15 gap-1.5 ps-1.5 pe-1.5",
@@ -152,6 +188,8 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeFloat: false,
     stacked: false,
     stackedTitle: false,
+    inline: false,
+    cue: "size-6",
   },
   // Week tiles stack emoji, a one-line title and the time; the title shows where the
   // column is wide enough (container query on the column's list), else only the name has it.
@@ -167,6 +205,8 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeFloat: false,
     stacked: true,
     stackedTitle: true,
+    inline: false,
+    cue: "size-6",
   },
   "week-dense": {
     tile: "h-21 flex-col justify-center gap-0.5 px-1.5",
@@ -180,6 +220,8 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeFloat: false,
     stacked: true,
     stackedTitle: true,
+    inline: false,
+    cue: "size-6",
   },
   // Last step before "+N" in a week column: emoji and time only (the title stays in the
   // accessible name), so no event is hidden just to keep a title line.
@@ -195,6 +237,8 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeFloat: false,
     stacked: true,
     stackedTitle: false,
+    inline: false,
+    cue: "size-6",
   },
 };
 
@@ -244,8 +288,9 @@ const EDGE_OVERLAY =
 /**
  * Status look. Past events recede through surface/text tokens, never opacity (merge
  * rule 4). "Now" and "next" read without words (merge rule 3) and in person-neutral
- * colours, never a child's: the current event has a thick ring in the "now" ink (plus
- * the clock cue on its emoji), the next upcoming one a ring in the today-ring gold.
+ * colours, never a child's: the current event has a thick solid ring in the "now" ink
+ * (plus the filled clock cue on its emoji), the next upcoming one a dashed outline in the
+ * same ink (plus an outlined ▶ cue), so it does not repeat the gold of today's column.
  */
 function statusClasses(
   status: EventStatus,
@@ -263,7 +308,7 @@ function statusClasses(
     status === "current"
       ? "ring-now shadow-raised ring-4"
       : next
-        ? "ring-today-ring ring-offset-surface-raised shadow-raised ring-3 ring-offset-2"
+        ? "outline-now shadow-raised outline-3 outline-offset-2 outline-dashed"
         : "";
   return `text-text ${edge} ${emphasis}`;
 }
@@ -459,9 +504,17 @@ export function EventTile({
           {status === "current" && (
             <span
               data-testid="now-cue"
-              className="bg-now text-surface rounded-pill absolute start-0 top-0 grid size-6 place-items-center"
+              className={`bg-now text-surface rounded-pill absolute start-0 top-0 grid place-items-center ${sizes.cue}`}
             >
-              <ClockIcon className="size-4.5" />
+              <ClockIcon className="size-[75%]" />
+            </span>
+          )}
+          {status === "upcoming" && next && (
+            <span
+              data-testid="next-cue"
+              className={`bg-surface text-now ring-now rounded-pill absolute start-0 top-0 grid place-items-center ring-2 ${sizes.cue}`}
+            >
+              <NextIcon className="size-[70%]" />
             </span>
           )}
         </EmojiDisc>
@@ -484,17 +537,28 @@ export function EventTile({
             {badges}
           </span>
         </>
+      ) : sizes.inline ? (
+        // Slim: one row (title cut with an ellipsis, badges, time), so a full day fits.
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <p className={`${sizes.title} min-w-0 flex-1 truncate`}>
+            <span data-testid="tile-title">{event.title}</span>
+          </p>
+          {badges}
+          <div className="shrink-0">{meta}</div>
+        </div>
       ) : (
         <div className="flex min-w-0 flex-1 flex-col">
           {sizes.badgeFloat ? (
             // The badges float at the end of the first line only (one line high), so a
             // second line and the time run under them; a word that does not fit beside
             // them starts on the next line instead of being cut.
-            <p className={`${sizes.title} max-h-[2lh] min-w-0 hyphens-auto`}>
+            <p
+              className={`${sizes.title} max-h-[2lh] min-w-0 text-ellipsis hyphens-manual`}
+            >
               {tint.badges.length > 0 && (
                 <span
                   data-testid="badge-float"
-                  className="float-end ms-1 h-[1lh]"
+                  className="float-end ms-2 h-[1lh]"
                 >
                   {badges}
                 </span>
@@ -502,8 +566,10 @@ export function EventTile({
               <span data-testid="tile-title">{event.title}</span>
             </p>
           ) : (
-            <div className="flex min-w-0 items-start gap-1">
-              <p className={`${sizes.title} min-w-0 flex-1 wrap-break-word`}>
+            <div className="flex min-w-0 items-start gap-2">
+              <p
+                className={`${sizes.title} min-w-0 flex-1 text-ellipsis hyphens-manual`}
+              >
                 <span data-testid="tile-title">{event.title}</span>
               </p>
               {badges}

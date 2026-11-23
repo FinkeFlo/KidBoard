@@ -122,8 +122,19 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   // "now" pill and clock cue: surface-coloured text/glyph on the "now" ink (T-27a).
   ["--color-surface", "--color-now", TEXT_AA] as const,
   ["--color-now", "--color-surface", TEXT_AA] as const,
-  // Ring of the next tile, on its surface-raised offset (T-27a).
+  // Dashed outline of the next tile (now ink) on its surface-raised offset, and its ▶
+  // cue: now-ink glyph and ring on a surface disc (T-27a, distinct from the today ring).
+  ["--color-now", "--color-surface-raised", UI_AA] as const,
+  ["--color-now", "--color-surface", UI_AA] as const,
+  // Today ring around the countdown pill's surface-raised fill on its "today" (0 nights).
   ["--color-today-ring", "--color-surface-raised", UI_AA] as const,
+  // Countdown target day ring in the week view (`ring-band-evening-accent`, outside the
+  // column): against the page and the column surfaces it can border (T-27a).
+  ...[
+    "--color-surface",
+    "--color-surface-sunken",
+    "--color-surface-weekend",
+  ].map((bg) => ["--color-band-evening-accent", bg, UI_AA] as const),
   // Check mark on the "vorbei" icons: surface glyph on a muted disc (T-27a).
   ["--color-surface", "--color-text-muted", UI_AA] as const,
   ...CHILD_TINTS.map((tint) => ["--color-now", tint, UI_AA] as const),

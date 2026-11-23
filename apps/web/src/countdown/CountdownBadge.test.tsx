@@ -7,7 +7,6 @@ import { applyLocale } from "../i18n";
 import type { Countdown } from "./buildCountdown";
 import {
   CountdownBadge,
-  type CountdownVariant,
   MAX_INDIVIDUAL_MOONS,
   moonRows,
 } from "./CountdownBadge";
@@ -27,10 +26,9 @@ function party(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
 function renderBadge(
   nights: number,
   events: CalendarEvent[] = [party()],
-  variant: CountdownVariant = "full",
 ): HTMLElement {
   const countdown: Countdown = { date: "2026-11-25", nights, events };
-  render(<CountdownBadge countdown={countdown} variant={variant} />);
+  render(<CountdownBadge countdown={countdown} />);
   return screen.getByRole("region", { name: /How many sleeps|Wie oft/ });
 }
 
@@ -82,7 +80,7 @@ describe("CountdownBadge", () => {
     expect(screen.getByTestId("countdown-count")).toHaveTextContent("15 ×");
     expect(badge).toHaveTextContent("15 more sleeps until Birthday party");
     cleanup();
-    renderBadge(30, [party()], "compact");
+    renderBadge(30, [party()]);
     expect(screen.getByTestId("countdown-count")).toHaveTextContent("30 ×");
   });
 
@@ -116,11 +114,8 @@ describe("CountdownBadge", () => {
     expect(name).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("is as high as the name chips in both variants (h-16)", () => {
-    for (const variant of ["full", "compact"] as const) {
-      expect(renderBadge(14, [party()], variant)).toHaveClass("h-16");
-      cleanup();
-    }
+  it("is as high as the name chips (h-16)", () => {
+    expect(renderBadge(14, [party()])).toHaveClass("h-16");
   });
 
   it("draws 8 to 14 moons in two smaller rows so they fit the pill", () => {
@@ -139,18 +134,15 @@ describe("CountdownBadge", () => {
     }
   });
 
-  it("shows the today state without moons but with a pictorial 🎉 cue, in both variants", () => {
-    for (const variant of ["full", "compact"] as const) {
-      const badge = renderBadge(0, [party()], variant);
-      expect(moonCount(badge)).toBe(0);
-      expect(badge).toHaveTextContent("Today!");
-      expect(badge).toHaveTextContent("Today is the day: Birthday party!");
-      const cue = screen.getByTestId("countdown-today");
-      expect(cue).toHaveTextContent("🎉");
-      // A picture for children, decorative for assistive tech (the label says it).
-      expect(cue.closest('[aria-hidden="true"]')).not.toBeNull();
-      cleanup();
-    }
+  it("shows the today state without moons but with a pictorial 🎉 cue", () => {
+    const badge = renderBadge(0, [party()]);
+    expect(moonCount(badge)).toBe(0);
+    expect(badge).toHaveTextContent("Today!");
+    expect(badge).toHaveTextContent("Today is the day: Birthday party!");
+    const cue = screen.getByTestId("countdown-today");
+    expect(cue).toHaveTextContent("🎉");
+    // A picture for children, decorative for assistive tech (the label says it).
+    expect(cue.closest('[aria-hidden="true"]')).not.toBeNull();
   });
 
   it("has no 🎉 cue while nights are left", () => {
@@ -216,24 +208,20 @@ describe("CountdownBadge", () => {
     );
   });
 
-  it("has a smaller event icon in the compact variant", () => {
-    const full = renderBadge(2, [party()], "full");
-    expect(full).toHaveAttribute("data-variant", "full");
-    expect(full.querySelector(".text-heading")).not.toBeNull();
-    const icon = (badge: HTMLElement): Element | undefined =>
-      [...badge.querySelectorAll(".font-emoji")].find(
-        (el) => el.textContent === "🎂",
-      );
-    expect(icon(full)).toHaveClass("text-heading");
-    cleanup();
-    const compact = renderBadge(2, [party()], "compact");
-    expect(compact).toHaveAttribute("data-variant", "compact");
-    expect(icon(compact)).toHaveClass("text-title");
-    expect(icon(compact)).not.toHaveClass("text-heading");
+  it("has one size in both views: title-sized event icon, body-sized name", () => {
+    const badge = renderBadge(2, [party()]);
+    expect(badge).not.toHaveAttribute("data-variant");
+    const icon = [...badge.querySelectorAll(".font-emoji")].find(
+      (el) => el.textContent === "🎂",
+    );
+    expect(icon).toHaveClass("text-title");
+    expect(within(badge).getByTestId("countdown-name")).toHaveClass(
+      "text-body",
+    );
   });
 
-  it("draws the compact moons large (heading size), not body size", () => {
-    const compact = renderBadge(3, [party()], "compact");
+  it("draws the moons large (heading size), not body size", () => {
+    const compact = renderBadge(3, [party()]);
     const moonEls = [...compact.querySelectorAll(".font-emoji")].filter(
       (el) => el.textContent === MOON,
     );
@@ -244,7 +232,7 @@ describe("CountdownBadge", () => {
     }
     cleanup();
     // Grouped (> 14 nights) uses the same moon size.
-    renderBadge(20, [party()], "compact");
+    renderBadge(20, [party()]);
     const grouped = screen.getByTestId("countdown-grouped");
     expect(grouped.querySelector(".font-emoji")).toHaveClass("text-heading");
   });
@@ -258,13 +246,7 @@ describe("CountdownBadge", () => {
         party({ id: "fair", icon: "🎡", childIds: [] }),
       ],
     };
-    render(
-      <CountdownBadge
-        countdown={countdown}
-        variant="compact"
-        childList={[MIA, BEN]}
-      />,
-    );
+    render(<CountdownBadge countdown={countdown} childList={[MIA, BEN]} />);
     const [mine, everyone] = screen.getAllByTestId("countdown-target");
     expect(mine).toHaveAttribute("data-tint", "single");
     expect(mine?.style.background).toBe("var(--color-child-1-tint)");

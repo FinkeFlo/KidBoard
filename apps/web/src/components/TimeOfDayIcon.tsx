@@ -109,3 +109,25 @@ export function CheckIcon({
     </svg>
   );
 }
+
+/**
+ * "Next" cue on the emoji of the next upcoming tile: a play triangle ("this comes next"),
+ * distinct from the clock of "now". Decorative (`currentColor`); the tile's name says it.
+ */
+export function NextIcon({
+  className = "size-4",
+}: {
+  className?: string;
+}): React.JSX.Element {
+  return (
+    <svg
+      aria-hidden="true"
+      data-testid="next-icon"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={`shrink-0 ${className} rtl:-scale-x-100`}
+    >
+      <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" />
+    </svg>
+  );
+}

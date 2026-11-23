@@ -60,15 +60,32 @@ async function expectPillReadsToGoal(
   }
 }
 
+/** Size of the pill and its name, to compare the two views (one size in both). */
+async function pillLook(page: Page): Promise<{
+  height: number;
+  nameFont: string;
+  nameWidth: number;
+  nameCut: boolean;
+}> {
+  return page.getByTestId("countdown").evaluate((el) => {
+    const name = el.querySelector("[data-testid=countdown-name]");
+    return {
+      height: Math.round(el.getBoundingClientRect().height),
+      nameFont: name === null ? "" : getComputedStyle(name).fontSize,
+      nameWidth: Math.round(name?.getBoundingClientRect().width ?? 0),
+      nameCut: name !== null && name.scrollWidth > name.clientWidth,
+    };
+  });
+}
+
 test.describe("countdown", () => {
-  test("30 nights: compact on the day view, full on the week view, no overflow", async ({
+  test("30 nights: the same pill on the day and the week view, no overflow", async ({
     page,
   }, testInfo) => {
     await mockBoard(page, { agenda: withCountdown(30) });
     await page.goto("/");
 
     const countdown = page.getByRole("region", { name: "How many sleeps?" });
-    await expect(countdown).toHaveAttribute("data-variant", "compact");
     await expect(countdown).toHaveAttribute("data-nights", "30");
     await expect(countdown).toContainText(
       "30 more sleeps until Christmas party",
@@ -78,6 +95,9 @@ test.describe("countdown", () => {
     await expect(page.getByTestId("countdown-grouped")).toHaveText("🌙");
     await expect(page.getByTestId("board-ready")).toBeVisible();
     await expectNoOverflow(page);
+    const dayLook = await pillLook(page);
+    // The goal's name fits in full ("Christmas party", not "Christmas p…").
+    expect(dayLook.nameCut).toBe(false);
     if (SHOT_DIR !== undefined) {
       await page.screenshot({
         path: `${SHOT_DIR}/countdown-day-30-${testInfo.project.name}.png`,
@@ -86,7 +106,8 @@ test.describe("countdown", () => {
 
     await page.getByRole("button", { name: "Week" }).click();
     await expect(page.getByTestId("day-column")).toHaveCount(7);
-    await expect(countdown).toHaveAttribute("data-variant", "full");
+    // One pill: same height, same name font and the name as wide as on the day view.
+    expect(await pillLook(page)).toEqual(dayLook);
     await expect(countdown).toContainText(
       "30 more sleeps until Christmas party",
     );
@@ -120,7 +141,7 @@ test.describe("countdown", () => {
     await expectPillReadsToGoal(page, "14 ×", "Christmas party");
 
     await page.getByRole("button", { name: "Week" }).click();
-    await expect(countdown).toHaveAttribute("data-variant", "full");
+    await expect(page.getByTestId("day-column")).toHaveCount(7);
     expect(await moons(page)).toBe(14);
     // The target is beyond the week: each of the seven headers shows its night's moon,
     // and the pill's moons are the only ones counted in it.
@@ -139,7 +160,7 @@ test.describe("countdown", () => {
     await expect(page.getByRole("status")).toContainText("Offline");
     await expectNoOverflow(page);
     await page.getByRole("button", { name: "Today" }).click();
-    await expect(countdown).toHaveAttribute("data-variant", "compact");
+    await expect(page.getByTestId("day-column")).toHaveCount(4);
     await expectNoOverflow(page);
     if (SHOT_DIR !== undefined) {
       await page.screenshot({
@@ -148,15 +169,12 @@ test.describe("countdown", () => {
     }
   });
 
-  test("compact moons on the day view are large, and no 🎉 cue while nights are left", async ({
+  test("moons on the day view are large, and no 🎉 cue while nights are left", async ({
     page,
   }) => {
     await mockBoard(page, { agenda: withCountdown(6) });
     await page.goto("/");
-    await expect(page.getByTestId("countdown")).toHaveAttribute(
-      "data-variant",
-      "compact",
-    );
+    await expect(page.getByTestId("countdown")).toBeVisible();
     expect(await moons(page)).toBe(6);
     await expect(page.getByTestId("countdown-today")).toHaveCount(0);
     const sizes = await page.evaluate(() => {
@@ -189,7 +207,7 @@ test.describe("countdown", () => {
     expect(await moons(page)).toBe(0);
     await expectNoOverflow(page);
     await page.getByRole("button", { name: "Week" }).click();
-    await expect(countdown).toHaveAttribute("data-variant", "full");
+    await expect(page.getByTestId("day-column")).toHaveCount(7);
     await expect(page.getByTestId("countdown-today")).toContainText("🎉");
     await expect(countdown).toContainText("Today is the day: Christmas party!");
     await expectNoOverflow(page);

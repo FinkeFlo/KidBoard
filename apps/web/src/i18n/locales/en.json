@@ -66,7 +66,9 @@
     "past": {
       "label": "done",
       "list": "Already over: {{titles, list}}"
-    }
+    },
+    "done": "All done!",
+    "free": "Nothing planned"
   },
   "fullscreen": {
     "enter": "Fullscreen on (press and hold)",

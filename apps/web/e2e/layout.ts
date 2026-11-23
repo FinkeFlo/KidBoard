@@ -99,11 +99,13 @@ export async function expectNoOverflow(page: Page): Promise<void> {
 
 /**
  * Smallest emoji size (rem) of today's tile sizes: large 3.5rem, medium 3rem, dense
- * 2.75rem (the last step before "+N"); prominent tiles are larger still.
+ * 2.75rem, slim 2rem (the last step before "+N"); prominent tiles are larger still.
  */
 export function minEmojiRem(size: string): number {
   if (size === "large") return 3.5;
   if (size === "medium") return 3;
+  // Today's last step before "+N": title and time in one row, emoji as on week tiles.
+  if (size === "slim") return 2;
   return 2.75;
 }
 

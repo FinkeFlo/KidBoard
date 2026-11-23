@@ -114,6 +114,23 @@ for (let count = 1; count <= 12; count += 1) {
     }
     // Up to four events: nothing upcoming is summed up at either size.
     if (count <= 4) expect(account.hidden).toBe(0);
+    // "+N" only when the free space below could not take one more (slim) tile: with
+    // one event summed up its tile would replace the "+N" row, else come on top.
+    if (account.hidden > 0) {
+      const free = await today.getByTestId("column-events").evaluate((list) => {
+        const rem = parseFloat(
+          getComputedStyle(document.documentElement).fontSize,
+        );
+        const bottom =
+          list.getBoundingClientRect().bottom -
+          parseFloat(getComputedStyle(list).paddingBottom);
+        const last = list.lastElementChild?.getBoundingClientRect().bottom;
+        return (bottom - (last ?? bottom)) / rem;
+      });
+      // Slim tile 2.75rem, list gap 0.5rem, "+N" row 2.25rem.
+      const needed = account.hidden === 1 ? 2.75 - 2.25 : 2.75 + 0.5;
+      expect(free).toBeLessThan(needed);
+    }
     // The current event (12:00) is never folded or summed up.
     if (count >= 6) {
       await expect(
@@ -123,7 +140,7 @@ for (let count = 1; count <= 12; count += 1) {
     for (const tile of await today.getByRole("article").all()) {
       await expect(tile).toBeInViewport({ ratio: 1 });
     }
-    // Today's emoji: large tiles at least 3.5rem, medium 3rem, dense 2.75rem.
+    // Today's emoji: large tiles at least 3.5rem, medium 3rem, dense 2.75rem, slim 2rem.
     const sizes = await today
       .getByTestId("column-events")
       .getByTestId("event-tile")

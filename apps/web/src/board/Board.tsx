@@ -95,7 +95,6 @@ export function Board(): React.JSX.Element {
         models.countdown === undefined ? undefined : (
           <CountdownBadge
             countdown={models.countdown}
-            variant={view === "day" ? "compact" : "full"}
             childList={config.children}
           />
         )

@@ -384,9 +384,12 @@ decides by space alone, taking the first option whose real height fits (tiles
 gaps and the now line): 1. every event as a tile at the largest size, the prominent tile
 enlarged; 2. otherwise **all** past events fold into the "vorbei" strip (one deterministic
 rule: past events are either all tiles or all folded, never a mix) and the rest shrinks step
-by step (`TODAY_SIZES` large → medium → dense, `DAY_SIZES` compact → compact-dense), at each
-size first with, then without the enlarged prominent tile; 3. only then the latest upcoming
-events are summed up in a trailing "+N" row at the smallest size. The strip draws up to 8
+by step (`TODAY_SIZES` large → medium → dense → slim, `DAY_SIZES` compact → compact-dense),
+at each size first with, then without the enlarged prominent tile (sizes without an
+enlargement, like slim, skip that try); 3. only then the latest upcoming events are summed
+up in a trailing "+N" row at the smallest size, and only when one more tile would not fit
+there. `slim` (2.75rem, title and time in one row) is today's last step, so a whole day
+still fits where dense tiles would have needed "+N". The strip draws up to 8
 grey icons with a check mark, then counts the rest. "+N" shows the summed-up events as
 small emoji followed by the count, as plain text (no border or fill, it is not a button).
 A **current event is never hidden or folded**; `MIN_TILES` (1) is the smallest tile count,
@@ -396,10 +399,14 @@ assistive tech, so nothing is lost silently.
 **Today's markers.** `NowLine` is a named separator between started and upcoming events and
 moves only from tile to tile, never per minute: a clock disc, a thick bar and a "now" pill,
 all in the person-neutral `--color-now` ink. "Now" and "next" never use a child colour (or
-the accent, which is close to child 1): the current tile has a thick `--color-now` ring and
-a clock cue on its emoji, the next upcoming one a ring in `--color-today-ring`
-(`data-next`). The current events (else the next one) are the **prominent** tile: about
-1.3× taller with a larger emoji while space allows (`data-prominent`).
+the accent, which is close to child 1): the current tile has a thick solid `--color-now`
+ring and a filled clock cue on its emoji, the next upcoming one a dashed `--color-now`
+outline and an outlined ▶ cue (`data-next`), so it does not repeat the gold of today's
+column ring. The current events (else the next one) are the **prominent** tile: about
+1.3× taller with a larger emoji whenever a size still fits with it (`data-prominent`);
+when space is tight the ring and cue carry it alone. When every timed event of today is
+over, `DayDone` (a large check mark and "All done!", never a moon) fills the free space
+below the "vorbei" strip if at least `DONE_MIN_REM` is left (`freeRem`).
 
 **All-day banner.** `AllDayBanner` shows at most two entries as flat strips: emoji on its
 disc, a visible "All day" label with the span icon (a bar between two end marks, not the
@@ -408,7 +415,9 @@ sun) above the title, the children's tint, stripes and badges as on the tiles, t
 
 **Meal plates.** `MealPlates` sits at the bottom of every column: breakfast, lunch, dinner
 in fixed places (an empty place for a missing meal), more meals of a slot side by side,
-`unspecified` meals last. Each emoji is an image named "Lunch: Spaghetti".
+`unspecified` meals last. Each emoji is an image named "Lunch: Spaghetti". Today's captions
+use two lines, broken between words only (no automatic hyphenation); a word too long for
+the line ends in "…".
 
 **Child tint.** `resolveTileTint(children)`: no child neutral, one child its tint plus a
 4px edge, two or more neutral with one colour stripe per child (up to three, side by side
@@ -427,9 +436,11 @@ may wrap to two lines where the tile has the height (large, medium, compact, pro
 the badges sit inside the tile, side by side and overlapping by at most a quarter, floated
 at the end of the title's first line only (one line high), so a second line and the time
 run under them. One-line sizes (dense, compact-dense) keep the badges in a row beside the
-title. Today's emoji: large 3.5rem (prominent 4.5rem), medium 3rem, dense 2.75rem in a
-3.5rem tile (the last step before "+N"). Time-of-day icons are at least 1.5rem, in the
-overview and the week.
+title; `slim` puts title, badges and time in one row. Titles break between words only
+(`hyphens: manual`, no automatic hyphenation); a single word longer than the line ends in
+"…". Today's emoji: large 3.5rem (prominent 4.5rem), medium 3rem, dense 2.75rem in a
+3.5rem tile, slim 2rem in a 2.75rem tile (the last step before "+N"). Time-of-day
+icons are at least 1.5rem, in the overview and the week.
 
 **States:**
 
@@ -437,7 +448,8 @@ overview and the week.
   columns (today raised) and the rail in surface tokens, "Der Tag wird geholt ..." in the
   bottom strip. No spinner, no animation.
 * **Empty:** `DayEmpty` ("nothing planned" illustration) inside today's column; the meals
-  stay visible.
+  stay visible. Another overview day without anything planned shows the quiet `DayFree`
+  placeholder (a small kite and "Nothing planned").
 * **Error:** `ErrorCard` (full screen, 🧸, a calm line for children, one line for parents,
   a "reload now" button of at least 64px) only when there is no data at all. It shows a
   short stable `KB-*` code from `components/errorCode.ts` (`KB-NET`, `KB-TIME`, `KB-401`,
@@ -487,7 +499,8 @@ held, the sweep hidden under reduced motion; a short tap shows a "press and hold
 to bottom (`EventTile`: child tint/edge/badges via `resolveTileTint`, time-of-day emoji
 🌅 / 🌞 / 🌆, past events on the sunken surface with muted text, never opacity), today's
 `NowLine` (a named separator between started and upcoming events; the current tile has
-a `--color-now` ring and clock cue, the next upcoming one a `--color-today-ring` ring) and `MealPlates` at the
+a solid `--color-now` ring and clock cue, the next upcoming one a dashed `--color-now`
+outline and ▶ cue) and `MealPlates` at the
 bottom. How many tiles fit is measured: `useContentHeight` (a `ResizeObserver` on the
 `flex-1 min-h-0` list) gives the height in rem, `fitColumn` picks the tile size and the
 layout whose real height fits (all past events fold into the "vorbei" strip first, then the
@@ -549,9 +562,8 @@ The week uses the board's one agenda query (`AGENDA_DAYS` = 31 since T-19).
 * Rendering, read from start to goal: the number ("6 ×"), the moons (≤ 14 nights one 🌙
   each, up to 7 heading-sized in one row, 8 to 14 in two smaller rows of a week; beyond,
   a single 🌙 after the number), an arrow, the awaited event icon(s) in the child's tint
-  and the first title, short (truncated). As high as the name chips (`h-16`). Week view:
-  `full` variant in the header; day view: `compact` (smaller icon and name) in the same
-  place. Today shows 🎉 and "Today!", then the icon(s) and the title. The visuals are `aria-hidden`; a region "How many sleeps?" carries
+  and the first title, short (truncated). As high as the name chips (`h-16`), one size in
+  both views (the same pill, icon and name on the overview and the week view). Today shows 🎉 and "Today!", then the icon(s) and the title. The visuals are `aria-hidden`; a region "How many sleeps?" carries
   a localized label with i18next plurals (`countdown.nights_one/_other`). Static, no
   animation (nothing to reduce for `prefers-reduced-motion`).
 * Data: the countdown reads the board's agenda (31 days). After midnight without a new

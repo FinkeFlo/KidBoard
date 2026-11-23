@@ -77,6 +77,12 @@ describe("MealPlates", () => {
     expect(screen.getByText("Pasta")).toHaveClass(
       "line-clamp-2",
       "text-caption",
+      // Broken between words only, never hyphenated; a too long word ends in "…".
+      "hyphens-manual",
+      "text-ellipsis",
+    );
+    expect(screen.getByText("Pasta").className).not.toMatch(
+      /hyphens-auto|break-word/u,
     );
   });
 
