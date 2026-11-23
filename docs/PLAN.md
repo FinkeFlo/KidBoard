@@ -711,7 +711,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
      codes for the UI, conflict, limits, and that responses never contain Google
      descriptions or secrets.
 
-- [ ] **T-44 Web: parent gate** (risk: medium, deps: T-42)
+- [x] **T-44 Web: parent gate** (risk: medium, deps: T-42)
   Acceptance: ✏️ entry in the nav rail only when `config.editor` is true, opens after a
   2 s press and hold (≥ 64 px target, progress ring, `prefers-reduced-motion` respected,
   keyboard: Enter held 2 s), short taps do nothing visible; PIN pad (≥ 64 px keys, digits

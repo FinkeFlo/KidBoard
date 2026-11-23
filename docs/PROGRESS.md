@@ -47,6 +47,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-23 | T-41 Worker: app entries on the board | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; entries rendered with ical.js and expanded like Google feeds (`app-events`/`app-meals`), D1 change stamp so a write shows in every isolate, reserved calendar ids; nits for T-43: D1 timeout in the agenda path, KV cost per write; Context7 unreachable for subagents |
 | 2026-11-23 | T-42 Worker: parent lock | Opus (builder-opus) | Opus (reviewer-opus) | 2 | PASS after round 2 + plan text fix; round 1 found a structural lockout bypass via parallel unlocks (fixed: attempts reserved before the compare, per isolate and atomically in D1); PIN errors now 403 so the board never wipes its access token; canonical base64url MACs only; nits for T-43: release local reservation on exceptions (try/finally), count only settled failures |
 | 2026-11-23 | T-43 Worker: editor API | Opus (builder-opus) | Opus (reviewer-opus) | 2 | PASS round 2; round 1: entries the config can no longer express were invisible (now `unresolved`, fixable/deletable; import checks shape only), Google template window aligned via plan change; also D1 deadline 2.5 s on /api/agenda, unlock reservation released on every early exit; Context7 unreachable for subagents |
+| 2026-11-23 | T-44 Web: parent gate | Opus (builder-opus) | Opus (reviewer-opus) | 2 | PASS round 2; round 1: focus not returned after closing (fixed: `close()` returns focus to the entry, auto-lock does not); gate closes when `config.editor` turns false; entry is a quiet SVG pencil (low contrast per ADR-0013); parent calls bypass the board's 401 token wipe |
 | 2026-11-23 | T-36 Evening-before 🎒 "tomorrow bring" area | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; resumed from interrupted partial work; night chip token --color-chip; nit: two-digit +N width for T-37 e2e |
 | 2026-11-23 | T-38 School docs | Sonnet (builder) | Sonnet (reviewer, together with T-37) | 1 | PASS round 1; README/README.de bring-list section, subject icons, emoji baseline note, CONFIG window rows, troubleshooting |
 | 2026-11-23 | T-37 Fixtures, demo data, e2e and screenshots | Sonnet (builder) | Sonnet (reviewer, together with T-38) | 1 | PASS round 1; e2e found a two-digit +N clip in the bag area, reservation raised to 2rem with a fit fix |
@@ -76,6 +77,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-23 | T-41 | Sonnet → Opus | High-risk task (iCal rendering/recurrence, caching) |
 | 2026-11-23 | T-42 | Sonnet → Opus | High-risk task (security: PIN, sessions, lockout); reviewer reported a structural problem in round 1 |
 | 2026-11-23 | T-43 | Sonnet → Opus | High-risk task (write API, data integrity, auth) |
+| 2026-11-23 | T-44 | Sonnet → Opus | Security-adjacent UI (session handling, token wipe isolation) |
 
 ## Milestone reviews
 
