@@ -17,8 +17,9 @@ import {
  * The evening-before 🎒 area (T-36) on a fixed clock (device zone America/Los_Angeles,
  * config zone Europe/Berlin): absent before eveningStart (17:00), "Pack for tomorrow"
  * from it, "Today bring" after midnight without a reload, an event's icons gone once it
- * started; only in today's overview column, never in the week view; one row of whole
- * chips that fits the column without scrolling, light and night.
+ * started; only in today's overview column, never in the week view; a head that says
+ * the day (evening: "→ Mon Tomorrow"), then one row of whole chips per child that fits
+ * the column without scrolling, light and night.
  */
 
 const SHOT_DIR = process.env["E2E_SCREENSHOT_DIR"];
@@ -84,9 +85,9 @@ async function shot(page: Page, name: string, project: string): Promise<void> {
 }
 
 /**
- * The area lies in today's column between its event list and the meals, inside it;
- * every chip is whole and inside the groups row; each group's "+N" counts exactly the
- * icons it does not draw.
+ * The area lies in today's column between its event list and the meals, inside it and
+ * never taller than it; every chip is whole and inside its row and the area; each
+ * group's "+N" counts exactly the icons it does not draw.
  */
 async function expectAreaLayout(page: Page): Promise<void> {
   const report = await todayColumn(page).evaluate((column) => {
@@ -105,14 +106,23 @@ async function expectAreaLayout(page: Page): Promise<void> {
       rect.bottom <= outer.bottom + 0.5;
     const box = area.getBoundingClientRect();
     if (!inside(box, column.getBoundingClientRect())) problems.push("area out");
+    if (box.height > column.getBoundingClientRect().height / 2)
+      problems.push("area taller than half the column");
     if (box.top < list.getBoundingClientRect().bottom - 0.5)
       problems.push("area over the list");
     if (box.bottom > plates.getBoundingClientRect().top + 0.5)
       problems.push("area over the meals");
     const rowBox = row.getBoundingClientRect();
-    for (const chip of row.querySelectorAll("[data-testid=bring-area-chip]")) {
-      if (!inside(chip.getBoundingClientRect(), rowBox)) {
-        problems.push(`cut chip ${chip.textContent}`);
+    if (!inside(rowBox, box)) problems.push("rows out of the area");
+    for (const line of row.querySelectorAll("[data-testid=bring-area-row]")) {
+      const lineBox = line.getBoundingClientRect();
+      if (!inside(lineBox, box)) problems.push("row out of the area");
+      for (const chip of line.querySelectorAll(
+        "[data-testid=bring-area-chip]",
+      )) {
+        if (!inside(chip.getBoundingClientRect(), lineBox)) {
+          problems.push(`cut chip ${chip.textContent}`);
+        }
       }
     }
     for (const group of row.querySelectorAll<HTMLElement>(
@@ -161,7 +171,15 @@ for (const night of [false, true]) {
     await expect(area).toHaveAttribute("data-when", "tomorrow");
     await expect(page.getByTestId("bring-area")).toHaveCount(1);
     await expect(area.locator(".font-emoji").first()).toHaveText("🎒");
+    // The day it is for: an arrow, tomorrow's short weekday (Monday) and "Tomorrow".
+    await expect(area.getByTestId("bring-arrow")).toBeVisible();
+    await expect(area.getByTestId("bring-day")).toHaveText("Mon");
+    await expect(area.getByTestId("bring-cue")).toHaveText("Tomorrow");
     await expect(area.getByTestId("bring-group")).toHaveCount(2);
+    // One row per child, every icon drawn: no "+N" hides what a child needs.
+    await expect(area.getByTestId("bring-area-row")).toHaveCount(2);
+    await expect(area.getByTestId("bring-area-chip")).toHaveCount(7);
+    await expect(area.getByTestId("bring-group-more")).toHaveCount(0);
     expect(
       await area
         .getByTestId("bring-group")
@@ -199,6 +217,10 @@ for (const night of [false, true]) {
     });
     await expect(morning).toBeVisible();
     await expect(todayColumn(page)).toHaveAttribute("data-date", dateOf(1));
+    // The morning head: "Today", no arrow, no weekday.
+    await expect(morning.getByTestId("bring-cue")).toHaveText("Today");
+    await expect(morning.getByTestId("bring-arrow")).toHaveCount(0);
+    await expect(morning.getByTestId("bring-day")).toHaveCount(0);
 
     await setNow(page, at("07:00", 1));
     await expect(morning).toBeVisible();

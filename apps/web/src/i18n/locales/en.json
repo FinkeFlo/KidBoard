@@ -99,6 +99,8 @@
   "bring": {
     "tomorrow": "Pack for tomorrow: {{groups, list}}",
     "today": "Today bring: {{groups, list}}",
-    "everyone": "Everyone"
+    "everyone": "Everyone",
+    "cueTomorrow": "Tomorrow",
+    "cueToday": "Today"
   }
 }

@@ -11,6 +11,7 @@ import {
   type EventStatus,
   EventTile,
   showsBring,
+  TILE_CHIP_SIZE,
   TILE_HEIGHT_REM,
   tileClasses,
   type TileSize,
@@ -714,6 +715,78 @@ describe("EventTile bring chips", () => {
       expect(de.event.bring).toBe("Mitbringen: {{icons}}");
     } finally {
       await i18n.changeLanguage("en");
+    }
+  });
+
+  it.each(["compact", "compact-dense", "week-slim"] as const)(
+    "%s with a chip row: the title keeps the whole width, the badges end the chip row, padding keeps it off the edge",
+    (size) => {
+      render(
+        <EventTile
+          event={eventFixture({ childIds: ["mia", "ben"], bring: BRING })}
+          childList={[MIA, BEN]}
+          format={format}
+          timeOfDay="midday"
+          size={size}
+        />,
+      );
+      const row = screen.getByTestId("bring-row");
+      // Badges at the end of the chip row, after the chips, never beside the title.
+      expect(within(row).getByTestId("row-badges")).toContainElement(badges());
+      expect(screen.getAllByTestId("child-badges")).toHaveLength(1);
+      expect(screen.queryByTestId("badge-float")).toBeNull();
+      const main = screen.getByTestId("tile-main");
+      expect(main).not.toContainElement(badges());
+      expect(main).toContainElement(screen.getByTestId("tile-title"));
+      expect(main.compareDocumentPosition(row)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      // A column with vertical padding; the chip row clears the shared tile's stripes.
+      expect(tile().className).toMatch(/\bflex-col\b/u);
+      expect(tile().className).toMatch(/\b(py|pt)-/u);
+      expect(row).toHaveClass("ps-2.5");
+      // 28px chips, except the slimmest week tile (24px, see TILE_CHIP_SIZE).
+      const chip = within(row).getAllByTestId("bring-chip")[0];
+      expect(chip).toHaveClass(size === "week-slim" ? "size-6" : "size-7");
+    },
+  );
+
+  it("stacked week tiles keep the badges beside the emoji and get 28px chips", () => {
+    for (const size of ["week", "week-dense", "week-small"] as const) {
+      const { unmount } = render(
+        <EventTile
+          event={eventFixture({ childIds: ["mia"], bring: BRING })}
+          childList={[MIA]}
+          format={format}
+          size={size}
+        />,
+      );
+      expect(screen.getByTestId("tile-head")).toContainElement(badges());
+      expect(screen.queryByTestId("row-badges")).toBeNull();
+      expect(screen.getAllByTestId("bring-chip")[0]).toHaveClass("size-7");
+      unmount();
+    }
+  });
+
+  it("the narrow sizes' chips are 28px (size-7) where the tile is wide enough, today's 24px", () => {
+    expect(TILE_CHIP_SIZE.compact).toBe("large");
+    expect(TILE_CHIP_SIZE["compact-dense"]).toBe("large");
+    expect(TILE_CHIP_SIZE.week).toBe("large");
+    expect(TILE_CHIP_SIZE["week-dense"]).toBe("large");
+    expect(TILE_CHIP_SIZE["week-small"]).toBe("large");
+    expect(TILE_CHIP_SIZE["week-slim"]).toBe("regular");
+    for (const size of ["large", "medium", "dense", "slim"] as const) {
+      expect(TILE_CHIP_SIZE[size]).toBe("regular");
+    }
+    // A chip row is at least as tall as its chips (1.75rem / 1.5rem) plus a gap.
+    for (const size of [
+      "compact",
+      "compact-dense",
+      "week",
+      "week-dense",
+      "week-small",
+    ] as const) {
+      expect(BRING_EXTRA_REM[size]).toBeGreaterThanOrEqual(1.75 - 0.5);
     }
   });
 

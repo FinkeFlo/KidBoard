@@ -11,6 +11,7 @@ import {
   fitColumn,
   freeRem,
   layoutHeightRem,
+  listMinRem,
   SUMMARY_ROW_REM,
   tileHeightRem,
   TODAY_SIZES,
@@ -261,6 +262,31 @@ describe("fitColumn", () => {
   });
 });
 
+describe("listMinRem", () => {
+  it("keeps room for the strip, the now line, two slim tiles and +N", () => {
+    const reserved = 2.25;
+    expect(listMinRem(reserved)).toBeCloseTo(
+      reserved +
+        2 * TILE_HEIGHT_REM.slim +
+        2 * SUMMARY_ROW_REM +
+        3 * COLUMN_GAP_REM,
+    );
+    // In that much room a column of any length keeps the tiles of its current and its
+    // next event and folds or sums up the rest, within the room.
+    for (let count = 1; count <= 12; count += 1) {
+      const all = items("p".repeat(count - 1) + "cuuuu");
+      const current = all.filter((item) => item.status === "current");
+      const next = all.find((item) => item.status === "upcoming");
+      const fit = fitColumn(all, true, listMinRem(reserved), reserved, current);
+      expect(fit.layout.visible).toContain(current[0]);
+      expect(fit.layout.visible).toContain(next);
+      expect(
+        layoutHeightRem(fit.layout, fit.size, fit.prominent ? current : []),
+      ).toBeLessThanOrEqual(listMinRem(reserved) - reserved + 1e-6);
+    }
+  });
+});
+
 describe("fitColumn with bring lists", () => {
   it("today's tiles keep their height with chips; the other days' tiles grow by a chip row", () => {
     for (const size of TODAY_SIZES) {
@@ -295,7 +321,8 @@ describe("fitColumn with bring lists", () => {
 
   it("another day steps down sooner when its tiles carry chips, never with a +N while one more fits", () => {
     const all = items("uuu");
-    const height = rows(3, TILE_HEIGHT_REM.compact);
+    // Room for three dense tiles with chips: plenty for three plain compact ones.
+    const height = rows(3, tileHeightRem("compact-dense", false, true));
     expect(fitColumn(all, false, height).size).toBe("compact");
     const fit = fitColumn(all, false, height, 0, [], all);
     expect(fit.size).toBe("compact-dense");

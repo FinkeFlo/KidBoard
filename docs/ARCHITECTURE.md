@@ -549,9 +549,16 @@ decorative (`aria-hidden`); the tile has one accessible description listing ever
 (`aria-describedby` → `event.bring`, "Bring along: 👟 🩱" / "Mitbringen: 👟 🩱"). Where they
 go: in today's column (about twice as wide) at the end of the time row, `slim` at the end
 of its one row (at most 40 % of it), the all-day banner before the badges; these tiles keep
-their height. The narrow tiles (`compact`, `compact-dense` and every week size) have no
-room beside the time, so the chips get a row of their own and the tile grows by
-`BRING_EXTRA_REM` (1.25rem; `compact-dense` 0.75, `week-slim` 1); `tileHeightRem`,
+their height and their 24px chips. The narrow tiles (`compact`, `compact-dense` and every
+week size) have no room beside the time, so the chips (28px, `week-slim` 24px: its
+7.7rem at 1280 and its place as the last step before "+N" cannot afford more) get a row
+of their own and the tile grows by `BRING_EXTRA_REM` (the measured title lines, time row,
+chip row, gaps and a little vertical padding that keeps the title off the edge, minus the
+plain height: `compact` 2rem, `compact-dense` 1.625, `week` 1.875, `week-dense` 2,
+`week-small` 1.875, `week-slim` 1.25). Where the picture sits beside the text
+(`compact`, `compact-dense`, `week-slim`) that row spans the tile below picture and text
+and ends with the child badges, so the title keeps the tile's whole width (`compact` two
+lines); stacked week tiles keep the badges beside the emoji. `tileHeightRem`,
 `fitColumn`/`freeRem` and `fitWeekColumn` (`weekRowsRem`) count exactly those tiles taller,
 so the space rules (fold, shrink, then "+N" only when one more tile would not fit) and
 `shown + folded + summed up = n` hold with bring lists too. The chip area asks for the
@@ -589,16 +596,27 @@ other days; the week view never gets it), between the event list and `MealPlates
 einpacken: …", morning "Today bring: …" / "Heute mitbringen: …", the name lists every
 child and icon via the locale's list format; not a live region, nothing interactive): 🎒,
 then per group a pill (the child's tint, edge ring and avatar badge; the neutral group a
-raised pill) with the icons as `CHIP_DISC` chips through `<Emoji>` (dimmed at night). One
-row of fixed height (`h-11`, `BRING_AREA_REM` 2.75rem) that never wraps: it measures the
-width of its groups row (`useContentWidth`; the row is `flex-1 basis-0`, so the width
-never depends on what is drawn) and `bringGroupsThatFit` draws whole chips only, shared
-out one chip per group in turn, each group's rest as a plain-text "+N"; only when not
-even every badge fits, the last groups are counted in a trailing "+N" (`shown + counted`
-= every icon). The area is a `shrink-0` sibling outside the `flex-1 min-h-0` list, so
-the list's measured height (`useContentHeight`) is simply shorter by it and `fitColumn`
+raised pill) with the icons as `CHIP_DISC` chips through `<Emoji>` (dimmed at night).
+A head at the start says the day (decorative; the region's name says it in words): 🎒,
+below it in the evening "→" with tomorrow's short weekday (`formatWeekdayShort` of
+`reminder.date` in the config zone: "Mo" / "Mon") and "Morgen" / "Tomorrow", in the
+morning "Heute" / "Today" (never 🌙, rule 1). Beside it **one row per group**, so every
+child's icons show side by side, not behind a "+N". The height is fixed by the row count
+and the variant (`bringAreaRem`: padding plus the taller of the rows of `h-9` and the
+head's stack; two rows are as tall as the evening head). **Budget:** list and area share the column's body
+(`column-body`, measured with `useContentHeight`; its height does not depend on the
+area's rows, so the measurement is stable); the area gets as many rows as fit what the
+list does not need for its minimum (`listMinRem`: the "vorbei" strip, the now line, two
+slim tiles and "+N", so the current and the next event always keep their tiles), at least
+one (`bringAreaRows`). With fewer rows than groups the last row holds the rest side by side
+(`bringRowsOf`). Each row measures its width (`useContentWidth`) and `bringGroupsThatFit`
+draws whole chips only, in event order (a cut row keeps the earliest event's icons), the
+rest of a group as a plain-text "+N", and in a shared last row groups without room for
+their badge as a trailing "+N" (`shown + counted` = every icon): a last resort, e.g. more
+than eight icons for one child at 1280. The area is a `shrink-0` sibling outside the
+`flex-1 min-h-0` list, so the list's measured height is shorter by it and `fitColumn`
 folds, shrinks and sums up around it by the usual space rules: no "+N" while space is
-free, nothing lost, nothing scrolls. 🎒 means only this area (rule 1): defined once
+free, nothing lost, nothing scrolls, never taller than the column. 🎒 means only this area (rule 1): defined once
 (`BRING_BAG`), drawn only by `BringArea`, in no locale, built-in table or fallback keyword
 (`bringBag.test.ts`, shared fallback-table tests).
 

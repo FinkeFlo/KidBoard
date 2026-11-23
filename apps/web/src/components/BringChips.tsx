@@ -6,11 +6,13 @@ import { Emoji } from "./Emoji";
 import { type IconRowMetrics, iconRowRem, iconsThatFit } from "./iconsThatFit";
 
 /**
- * Chip sizes: `regular` for every overview tile, the all-day banner and the larger week
- * tiles (`week`, `week-dense`), as tall as the time-of-day icon of their time row (1.5rem),
- * so the row and the tile keep their height; `small` for `week-small` and `week-slim`.
+ * Chip sizes: `regular` (24px) where the chips share the time row (today's tiles, the
+ * all-day banner), as tall as its time-of-day icon (1.5rem), so the row and the tile keep
+ * their height; `large` (28px, as in the 🎒 area) in the chip row of its own of the narrow
+ * tiles (`compact`, `compact-dense` and every week size), so the icons stay distinct
+ * across the room.
  */
-export type ChipSize = "regular" | "small";
+export type ChipSize = "regular" | "large";
 
 interface ChipClasses extends IconRowMetrics {
   chip: string;
@@ -30,14 +32,14 @@ const CHIP_SIZES: Record<ChipSize, ChipClasses> = {
     gapRem: 0.125,
     moreRem: 1.5,
   },
-  small: {
-    chip: "size-5",
-    emoji: "text-[0.875rem]",
-    more: "text-caption",
+  large: {
+    chip: "size-7",
+    emoji: "text-[1.125rem]",
+    more: "text-meta",
     gap: "gap-0.5",
-    slotRem: 1.25,
+    slotRem: 1.75,
     gapRem: 0.125,
-    moreRem: 1.25,
+    moreRem: 1.5,
   },
 };
 

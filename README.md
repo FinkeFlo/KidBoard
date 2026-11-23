@@ -167,14 +167,16 @@ Bring: 👟 🩱 🧴
   ignore bring lines.
 - **On the tile:** the emoji appear as small chips on the event's tile (overview and week
   view) until the event is over.
-- **The 🎒 area:** from the evening before, as soon as the evening begins (`bands.eveningStart`,
-  default 17:00, see [docs/CONFIG.md](docs/CONFIG.md)), today's card shows a 🎒 row "Pack for
-  tomorrow" with the icons of tomorrow's events, one pill per child (events for everyone
-  first). After midnight it turns into "Today bring" and every event's icons disappear when
-  that event starts. For all-day events (for example a school day without a start time) the
-  icons stay until midday (`bands.middayStart`, default 11:00). When nothing is left to pack
-  the row disappears. It is only shown in today's column of the overview, not in the week
-  view.
+- **The 🎒 area:** from the evening before, as soon as the evening begins
+  (`bands.eveningStart`, default 17:00, see [docs/CONFIG.md](docs/CONFIG.md)), today's card
+  shows a 🎒 area with the icons of tomorrow's events, one row per child (events for everyone
+  first); beside the 🎒 it shows an arrow, tomorrow's short weekday and "Tomorrow", so it
+  does not look like the morning. After midnight it says "Today" and every event's icons
+  disappear when that event starts. The area uses up to one row per child; the events above it
+  fold or shrink to make room, while now and next always stay visible. For all-day events (for example a school day without a start
+  time) the icons stay until midday (`bands.middayStart`, default 11:00). When nothing is
+  left to pack the area disappears. It is only shown in today's column of the overview, not
+  in the week view.
 - **Weekly subjects:** create the lesson as a recurring event (for example every Tuesday
   `Mia: 🏊 Swimming lessons`) and put the bring line into the description once; it applies to
   every occurrence. For one single day choose "This event" when saving and write a different

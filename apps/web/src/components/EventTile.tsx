@@ -77,20 +77,32 @@ export const PROMINENT_EXTRA_REM: Record<TileSize, number> = {
 /**
  * Extra height in rem of a tile that shows a bring list in a chip row of its own (ADR-0010):
  * the narrow tiles of the other overview days and the week, whose time row has no room
- * for chips. 0: the chips sit in the time row (today's column, which is about twice as
- * wide), and the tile keeps its height. Past tiles show no chips and never grow.
+ * for chips. The row holds 28px chips (`large`, plus the badges at its end where the
+ * picture sits beside the text) below the picture and the text, and the tile gets a
+ * little vertical padding, so its title keeps clear of the edge: each value is the
+ * measured content (title lines, time row, chip row, gaps, padding) minus the plain
+ * tile's height, rounded up. 0: the chips sit in the time row (today's column, which is
+ * about twice as wide), and the tile keeps its height. Past tiles show no chips and never
+ * grow.
  */
 export const BRING_EXTRA_REM: Record<TileSize, number> = {
   large: 0,
   medium: 0,
   dense: 0,
   slim: 0,
-  compact: 1.25,
-  "compact-dense": 0.75,
-  week: 1.25,
-  "week-dense": 1.25,
-  "week-small": 1.25,
-  "week-slim": 1,
+  // 0.625 padding + two title lines 2.73 + time row 1.5 + 0.125 gap + chips 1.75.
+  compact: 2,
+  // 0.625 padding + one title line 1.37 + time row 1.5 + 0.125 gap + chips 1.75.
+  "compact-dense": 1.625,
+  // 0.5 padding + emoji 2.5 + two title lines 2.5 + time row 1.5 + 3 gaps + chips 1.75.
+  week: 1.875,
+  // 0.5 padding + emoji 2 + title 1.09 + time row 1.5 + 3 gaps + chips 1.75.
+  "week-dense": 2,
+  // 0.5 padding + emoji 1.75 + title 1.09 + time row 1.13 + 3 gaps + chips 1.75.
+  "week-small": 1.875,
+  // 0.5 padding + title 1.09 and time 1 beside the emoji + 0.125 gap + chips 1.5 (24px:
+  // the narrowest tile and the last step before "+N", see TILE_CHIP_SIZE).
+  "week-slim": 1.25,
 };
 
 /**
@@ -370,18 +382,54 @@ const PROMINENT: Partial<Record<TileSize, Partial<SizeClasses>>> = {
   },
 };
 
-/** Bring chip size per tile size: smaller on the two smallest week tiles. */
+/**
+ * Bring chip size per tile size: `regular` (24px) in today's time row, `large` (28px) in
+ * the chip row of its own of the narrow tiles.
+ */
 export const TILE_CHIP_SIZE: Record<TileSize, ChipSize> = {
   large: "regular",
   medium: "regular",
   dense: "regular",
   slim: "regular",
-  compact: "regular",
-  "compact-dense": "regular",
-  week: "regular",
-  "week-dense": "regular",
-  "week-small": "small",
-  "week-slim": "small",
+  compact: "large",
+  "compact-dense": "large",
+  week: "large",
+  "week-dense": "large",
+  "week-small": "large",
+  // The last week step before "+N", about 7.7rem wide at 1280: 28px chips would cost a
+  // whole tile on a school day (5 tiles with chips) and leave room for only two chips
+  // beside the badges, so it keeps 24px (up from 20px).
+  "week-slim": "regular",
+};
+
+/**
+ * Tile classes of the narrow sizes when they show a chip row of their own (replacing
+ * `tile`; the height comes from the style): a column with vertical padding, so the title
+ * keeps clear of the tile's edge. `row` is the gap of the picture-and-text row above the
+ * chips (sizes whose picture sits beside the text).
+ */
+const BRING_TILE: Partial<Record<TileSize, { tile: string; row: string }>> = {
+  compact: {
+    tile: "flex-col justify-center gap-0.5 px-1.5 pt-1.5 pb-1",
+    row: "gap-1.5",
+  },
+  "compact-dense": {
+    tile: "flex-col justify-center gap-0.5 px-1.5 pt-1.5 pb-1",
+    row: "gap-1.5",
+  },
+  week: { tile: "flex-col justify-center gap-0.5 px-1.5 py-1", row: "" },
+  "week-dense": {
+    tile: "flex-col justify-center gap-0.5 px-1.5 py-1",
+    row: "",
+  },
+  "week-small": {
+    tile: "flex-col justify-center gap-0.5 px-1.5 py-1",
+    row: "",
+  },
+  "week-slim": {
+    tile: "flex-col justify-center gap-0.5 ps-1.5 pe-1.25 py-1",
+    row: "gap-1.5",
+  },
 };
 
 /** Classes of `size`, with the prominent variant applied when asked for and defined. */
@@ -521,7 +569,9 @@ export interface EventTileProps {
  * says title, time, children and state ("Ballett, 15:30, Für Mia"); emoji and badges are
  * decorative. A bring list (ADR-0010) shows as emoji chips: in today's column at the end
  * of the time row (slim: of the one row), elsewhere in a row of their own below the time
- * (the tile is {@link BRING_EXTRA_REM} taller); only whole chips plus "+N". The chips are
+ * (the tile is {@link BRING_EXTRA_REM} taller, with a little vertical padding; where the
+ * picture sits beside the text the row spans the tile and ends with the badges, so the
+ * title keeps the whole width); only whole chips plus "+N". The chips are
  * decorative; the tile's accessible description lists every icon ("Bring along: 👟 🩱").
  * Past tiles show no chips. Not interactive.
  */
@@ -548,6 +598,11 @@ export function EventTile({
   const bringId = useId();
   // Narrow tiles give the chips a row of their own (and grow); today's sit in the time row.
   const bringRow = bring.length > 0 && BRING_EXTRA_REM[size] > 0;
+  const bringTile = bringRow ? BRING_TILE[size] : undefined;
+  // A tile whose picture sits beside its text moves the badges to the end of its chip
+  // row: the title keeps the tile's whole width (stacked week tiles keep the badges
+  // beside the emoji, off the title anyway).
+  const rowBadges = bringRow && !sizes.stacked;
   const chips =
     bring.length > 0 ? (
       <BringChips
@@ -557,14 +612,6 @@ export function EventTile({
         className={sizes.inline ? "max-w-[40%]" : ""}
       />
     ) : null;
-  const chipRow = bringRow ? (
-    <div
-      data-testid="bring-row"
-      className={`flex w-full min-w-0 ${sizes.stacked ? "justify-center" : ""}`}
-    >
-      {chips}
-    </div>
-  ) : null;
   const tileStyle: React.CSSProperties | undefined = past
     ? undefined
     : {
@@ -603,9 +650,22 @@ export function EventTile({
       overlap={sizes.badgeOverlap}
     />
   );
+  const chipRow = bringRow ? (
+    <div
+      data-testid="bring-row"
+      className={`flex w-full min-w-0 items-center gap-1 ${sizes.stacked ? "justify-center" : tint.stripes.length > 0 ? "ps-2.5" : ""}`}
+    >
+      {chips}
+      {rowBadges && tint.badges.length > 0 && (
+        <span data-testid="row-badges" className="ms-auto flex shrink-0">
+          {badges}
+        </span>
+      )}
+    </div>
+  ) : null;
   // Slimmest week tile, all day: the badges move to the time row (only an icon there), so
   // the title keeps the width of its row.
-  const allDayBadges = sizes.weekRow && event.allDay;
+  const allDayBadges = sizes.weekRow && event.allDay && !rowBadges;
   const meta = (
     <p
       className={`${sizes.metaText} text-text-muted flex min-w-0 items-center ${sizes.weekRow ? "gap-1" : "gap-1.5"} ${sizes.stacked ? "justify-center" : ""}`}
@@ -630,6 +690,129 @@ export function EventTile({
       className={`${sizes.emoji} ${past ? "grayscale" : ""}`}
     />
   );
+  const disc =
+    sizes.disc === null ? null : (
+      <EmojiDisc
+        emoji={event.icon}
+        disc={`${sizes.disc} ${stripeRoom}`}
+        className={sizes.emoji}
+        past={past}
+      >
+        {status === "current" && (
+          <span
+            data-testid="now-cue"
+            className={`bg-now text-surface rounded-pill absolute start-0 top-0 grid place-items-center ${sizes.cue}`}
+          >
+            <ClockIcon className="size-[75%]" />
+          </span>
+        )}
+        {status === "upcoming" && next && (
+          <span
+            data-testid="next-cue"
+            className={`bg-surface text-now ring-now rounded-pill absolute start-0 top-0 grid place-items-center ring-2 ${sizes.cue}`}
+          >
+            <NextIcon className="size-[70%]" />
+          </span>
+        )}
+      </EmojiDisc>
+    );
+  const main = sizes.stacked ? (
+    <>
+      {/* Week tiles are picture-first. The badges sit beside the emoji in their own
+         grid column (side by side, a gap to the emoji, never on top of it); the
+         emoji stays centred while there is room. */}
+      <div
+        data-testid="tile-head"
+        className="grid w-full min-w-0 grid-cols-[1fr_auto_1fr] items-start gap-1"
+      >
+        <span className="col-start-2 flex">{plainEmoji}</span>
+        {tint.badges.length > 0 && (
+          <span className="col-start-3 justify-self-end">{badges}</span>
+        )}
+      </div>
+      {/* The title follows where the column is wide enough (`@container` on the
+         week column's list), else it is only in the accessible name. */}
+      <p
+        className={`${sizes.title} ${tint.stripes.length > 0 ? "ps-2" : ""} hidden w-full min-w-0 text-center font-extrabold hyphens-manual @min-[5.5rem]:block`}
+      >
+        <span data-testid="tile-title" className={sizes.titleCut}>
+          {event.title}
+        </span>
+      </p>
+      {/* Full width, so a long word ("Ganztägig") is cut, not pushed out. */}
+      <div className="w-full min-w-0">{meta}</div>
+    </>
+  ) : sizes.weekRow ? (
+    // Slimmest week tile: emoji beside the title (badges at its end) and the time.
+    <>
+      {/* The time-of-day icon sits on the emoji's corner (as on the meal plates),
+         so the time row has the width for "10:30 PM". */}
+      <span
+        className={`relative inline-flex shrink-0 ${tint.stripes.length > 0 ? "ms-2" : ""}`}
+      >
+        {plainEmoji}
+        {!event.allDay && timeOfDay !== null && (
+          <span
+            data-testid="tile-time-of-day"
+            className="absolute -end-1 -bottom-1"
+          >
+            <TimeOfDayIcon timeOfDay={timeOfDay} className={sizes.timeIcon} />
+          </span>
+        )}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
+        <div className="flex min-w-0 items-center justify-end gap-1">
+          <p
+            className={`${sizes.title} hidden min-w-0 flex-1 font-extrabold hyphens-manual @min-[7rem]:block`}
+          >
+            <span data-testid="tile-title" className={sizes.titleCut}>
+              {event.title}
+            </span>
+          </p>
+          {!allDayBadges && !rowBadges && badges}
+        </div>
+        {meta}
+      </div>
+    </>
+  ) : sizes.inline ? (
+    // Slim: one row (title cut with an ellipsis, badges, time), so a full day fits.
+    <div className="flex min-w-0 flex-1 items-center gap-2">
+      <p className={`${sizes.title} min-w-0 flex-1 truncate`}>
+        <span data-testid="tile-title">{event.title}</span>
+      </p>
+      {badges}
+      <div className="shrink-0">{meta}</div>
+      {chips}
+    </div>
+  ) : (
+    <div className="flex min-w-0 flex-1 flex-col">
+      {sizes.badgeFloat ? (
+        // The badges float at the end of the first line only (one line high), so a
+        // second line and the time run under them; a word that does not fit beside
+        // them starts on the next line instead of being cut.
+        <p
+          className={`${sizes.title} max-h-[2lh] min-w-0 text-ellipsis hyphens-manual`}
+        >
+          {tint.badges.length > 0 && !rowBadges && (
+            <span data-testid="badge-float" className="float-end ms-2 h-[1lh]">
+              {badges}
+            </span>
+          )}
+          <span data-testid="tile-title">{event.title}</span>
+        </p>
+      ) : (
+        <div className="flex min-w-0 items-start gap-2">
+          <p
+            className={`${sizes.title} min-w-0 flex-1 text-ellipsis hyphens-manual`}
+          >
+            <span data-testid="tile-title">{event.title}</span>
+          </p>
+          {!rowBadges && badges}
+        </div>
+      )}
+      {meta}
+    </div>
+  );
   return (
     <article
       aria-label={name}
@@ -643,7 +826,7 @@ export function EventTile({
       data-tint={past ? "past" : tint.kind}
       data-bring={bring.length > 0 ? (bringRow ? "row" : "inline") : undefined}
       style={tileStyle}
-      className={`${statusClasses(status, next, tint)} ${sizes.tile} rounded-tile relative flex min-w-0 items-center`}
+      className={`${statusClasses(status, next, tint)} ${bringTile?.tile ?? sizes.tile} rounded-tile relative flex min-w-0 ${rowBadges ? "items-stretch" : "items-center"}`}
     >
       {/* The stripes are clipped to the tile's rounded start edge by their own wrapper. */}
       {!past && tint.stripes.length > 0 && (
@@ -654,136 +837,24 @@ export function EventTile({
           <TileStripes tint={tint} />
         </span>
       )}
-      {sizes.disc !== null && (
-        <EmojiDisc
-          emoji={event.icon}
-          disc={`${sizes.disc} ${stripeRoom}`}
-          className={sizes.emoji}
-          past={past}
-        >
-          {status === "current" && (
-            <span
-              data-testid="now-cue"
-              className={`bg-now text-surface rounded-pill absolute start-0 top-0 grid place-items-center ${sizes.cue}`}
-            >
-              <ClockIcon className="size-[75%]" />
-            </span>
-          )}
-          {status === "upcoming" && next && (
-            <span
-              data-testid="next-cue"
-              className={`bg-surface text-now ring-now rounded-pill absolute start-0 top-0 grid place-items-center ring-2 ${sizes.cue}`}
-            >
-              <NextIcon className="size-[70%]" />
-            </span>
-          )}
-        </EmojiDisc>
-      )}
-      {sizes.stacked ? (
+      {rowBadges ? (
+        // A chip row of its own below the picture and the text, the badges at its end.
         <>
-          {/* Week tiles are picture-first. The badges sit beside the emoji in their own
-              grid column (side by side, a gap to the emoji, never on top of it); the
-              emoji stays centred while there is room. */}
           <div
-            data-testid="tile-head"
-            className="grid w-full min-w-0 grid-cols-[1fr_auto_1fr] items-start gap-1"
+            data-testid="tile-main"
+            className={`flex w-full min-w-0 flex-1 items-center ${bringTile?.row ?? ""}`}
           >
-            <span className="col-start-2 flex">{plainEmoji}</span>
-            {tint.badges.length > 0 && (
-              <span className="col-start-3 justify-self-end">{badges}</span>
-            )}
+            {disc}
+            {main}
           </div>
-          {/* The title follows where the column is wide enough (`@container` on the
-              week column's list), else it is only in the accessible name. */}
-          <p
-            className={`${sizes.title} ${tint.stripes.length > 0 ? "ps-2" : ""} hidden w-full min-w-0 text-center font-extrabold hyphens-manual @min-[5.5rem]:block`}
-          >
-            <span data-testid="tile-title" className={sizes.titleCut}>
-              {event.title}
-            </span>
-          </p>
-          {/* Full width, so a long word ("Ganztägig") is cut, not pushed out. */}
-          <div className="w-full min-w-0">{meta}</div>
           {chipRow}
         </>
-      ) : sizes.weekRow ? (
-        // Slimmest week tile: emoji beside the title (badges at its end) and the time.
-        <>
-          {/* The time-of-day icon sits on the emoji's corner (as on the meal plates),
-              so the time row has the width for "10:30 PM". */}
-          <span
-            className={`relative inline-flex shrink-0 ${tint.stripes.length > 0 ? "ms-2" : ""}`}
-          >
-            {plainEmoji}
-            {!event.allDay && timeOfDay !== null && (
-              <span
-                data-testid="tile-time-of-day"
-                className="absolute -end-1 -bottom-1"
-              >
-                <TimeOfDayIcon
-                  timeOfDay={timeOfDay}
-                  className={sizes.timeIcon}
-                />
-              </span>
-            )}
-          </span>
-          <div className="flex min-w-0 flex-1 flex-col justify-center">
-            <div className="flex min-w-0 items-center justify-end gap-1">
-              <p
-                className={`${sizes.title} hidden min-w-0 flex-1 font-extrabold hyphens-manual @min-[7rem]:block`}
-              >
-                <span data-testid="tile-title" className={sizes.titleCut}>
-                  {event.title}
-                </span>
-              </p>
-              {!allDayBadges && badges}
-            </div>
-            {meta}
-            {chipRow}
-          </div>
-        </>
-      ) : sizes.inline ? (
-        // Slim: one row (title cut with an ellipsis, badges, time), so a full day fits.
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <p className={`${sizes.title} min-w-0 flex-1 truncate`}>
-            <span data-testid="tile-title">{event.title}</span>
-          </p>
-          {badges}
-          <div className="shrink-0">{meta}</div>
-          {chips}
-        </div>
       ) : (
-        <div className="flex min-w-0 flex-1 flex-col">
-          {sizes.badgeFloat ? (
-            // The badges float at the end of the first line only (one line high), so a
-            // second line and the time run under them; a word that does not fit beside
-            // them starts on the next line instead of being cut.
-            <p
-              className={`${sizes.title} max-h-[2lh] min-w-0 text-ellipsis hyphens-manual`}
-            >
-              {tint.badges.length > 0 && (
-                <span
-                  data-testid="badge-float"
-                  className="float-end ms-2 h-[1lh]"
-                >
-                  {badges}
-                </span>
-              )}
-              <span data-testid="tile-title">{event.title}</span>
-            </p>
-          ) : (
-            <div className="flex min-w-0 items-start gap-2">
-              <p
-                className={`${sizes.title} min-w-0 flex-1 text-ellipsis hyphens-manual`}
-              >
-                <span data-testid="tile-title">{event.title}</span>
-              </p>
-              {badges}
-            </div>
-          )}
-          {meta}
+        <>
+          {disc}
+          {main}
           {chipRow}
-        </div>
+        </>
       )}
       {bring.length > 0 && (
         <span id={bringId} hidden>

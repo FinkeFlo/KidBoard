@@ -11,10 +11,11 @@ import {
 } from "../components/fixtures.test-utils";
 import type { FormatContext } from "../i18n/format";
 import en from "../i18n/locales/en.json";
+import { bringAreaRem } from "./BringArea";
 import type { BringReminder } from "./buildBringReminder";
 import type { DayModelConfig } from "./buildDayModel";
 import { buildOverviewModel, type OverviewDay } from "./buildOverviewModel";
-import { COLUMN_GAP_REM, SUMMARY_ROW_REM } from "./columnCapacity";
+import { COLUMN_GAP_REM, listMinRem, SUMMARY_ROW_REM } from "./columnCapacity";
 import { MORE_ICONS_MAX } from "./ColumnSummaries";
 import { DayColumn } from "./DayColumn";
 import { NOW_LINE_REM } from "./NowLine";
@@ -511,6 +512,7 @@ describe("DayColumn", () => {
   it("the 🎒 area: today only, between the event list and the meals, outside the measured list", () => {
     const reminder: BringReminder = {
       when: "tomorrow",
+      date: "2026-11-23",
       groups: [{ child: MIA, icons: ["🩱", "🧴"] }],
     };
     const meals = [mealFixture()];
@@ -527,8 +529,11 @@ describe("DayColumn", () => {
     const area = within(column).getByTestId("bring-area");
     const list = within(column).getByTestId("column-events");
     const plates = within(column).getByTestId("meal-plates");
-    // A direct child of the column (not inside the flex-1 list): list, area, meals.
-    expect(area.parentElement).toBe(column);
+    // Beside the flex-1 list (not inside it), in the column's body: list, area, meals.
+    const body = within(column).getByTestId("column-body");
+    expect(area.parentElement).toBe(body);
+    expect(list.parentElement).toBe(body);
+    expect(body.parentElement).toBe(column);
     expect(list.contains(area)).toBe(false);
     expect(list.compareDocumentPosition(area)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
@@ -554,10 +559,73 @@ describe("DayColumn", () => {
         childList={[MIA, BEN]}
         format={format}
         nowTime="12:00 PM"
-        reminder={{ when: "today", groups: [] }}
+        reminder={{ when: "today", date: "2026-11-22", groups: [] }}
       />,
     );
     expect(screen.queryByTestId("bring-area")).toBeNull();
+  });
+
+  it("the 🎒 area gets one row per child while the list keeps its minimum, else the rest share the last row", () => {
+    const LEO = { id: "leo", name: "Leo", color: "child-3", avatar: "🦁" };
+    const reminder: BringReminder = {
+      when: "tomorrow",
+      date: "2026-11-23",
+      groups: [
+        { child: MIA, icons: ["🩱", "🧴"] },
+        { child: BEN, icons: ["👟"] },
+        { child: LEO, icons: ["🧦"] },
+      ],
+    };
+    // The list and the area share the body; the list keeps room for the strip, the now
+    // line, two slim tiles and "+N" (`listMinRem`), its padding and the gap to the area.
+    const shared = (bodyRem: number): HTMLElement => {
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(
+            private readonly callback: (
+              entries: { contentRect: { height: number; width: number } }[],
+            ) => void,
+          ) {}
+          observe(element: HTMLElement): void {
+            const height =
+              element.dataset["testid"] === "column-body"
+                ? bodyRem
+                : bodyRem / 2;
+            this.callback([
+              { contentRect: { height: height * 16, width: 40 * 16 } },
+            ]);
+          }
+          disconnect(): void {}
+        },
+      );
+      render(
+        <DayColumn
+          day={day(hourly(2, 13))}
+          childList={[MIA, BEN, LEO]}
+          format={format}
+          nowTime="12:00 PM"
+          reminder={reminder}
+        />,
+      );
+      return screen.getByTestId("bring-area");
+    };
+    const fixed = 0.625 + 0.875 + listMinRem(NOW_LINE_REM + COLUMN_GAP_REM);
+    expect(shared(fixed + bringAreaRem(3, "tomorrow"))).toHaveAttribute(
+      "data-rows",
+      "3",
+    );
+    cleanup();
+    const two = shared(fixed + bringAreaRem(3, "tomorrow") - 0.1);
+    expect(two).toHaveAttribute("data-rows", "2");
+    // Nothing lost: Ben and Leo share the last row.
+    expect(within(two).getAllByTestId("bring-group")).toHaveLength(3);
+    expect(within(two).getAllByTestId("bring-area-row")[1]).toHaveTextContent(
+      "🐻👟🦁🧦",
+    );
+    cleanup();
+    // A tiny column still gets the one-row area.
+    expect(shared(2)).toHaveAttribute("data-rows", "1");
   });
 
   it("renders titles as text, never as markup", () => {

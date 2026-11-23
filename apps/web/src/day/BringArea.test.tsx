@@ -3,12 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BEN, MIA } from "../components/fixtures.test-utils";
 import { applyLocale } from "../i18n";
+import type { FormatContext } from "../i18n/format";
 import {
+  BRING_AREA_LAYOUT,
   BRING_AREA_METRICS,
   BringArea,
+  bringAreaRem,
+  bringAreaRows,
   type BringGroupSize,
   bringGroupsThatFit,
   bringRowRem,
+  bringRowsOf,
 } from "./BringArea";
 import type { BringReminder } from "./buildBringReminder";
 
@@ -30,8 +35,13 @@ function stubWidth(widthRem: number): void {
   );
 }
 
+const format: FormatContext = { locale: "en", timeZone: "Europe/Berlin" };
+const formatDe: FormatContext = { locale: "de", timeZone: "Europe/Berlin" };
+
+/** Sunday evening, packing for Monday 2026-11-23. */
 const REMINDER: BringReminder = {
   when: "tomorrow",
+  date: "2026-11-23",
   groups: [
     { child: null, icons: ["🧺"] },
     { child: MIA, icons: ["🩱", "🧴", "🥽"] },
@@ -157,9 +167,75 @@ describe("bringGroupsThatFit", () => {
   });
 });
 
+describe("bringAreaRem / bringAreaRows / bringRowsOf", () => {
+  const l = BRING_AREA_LAYOUT;
+  const stack = (rows: number): number =>
+    rows * l.rowRem + (rows - 1) * l.rowGapRem;
+
+  it("the height is the padding plus the taller of the rows and the head beside them", () => {
+    // Evening: the head (🎒, arrow and weekday, label) is taller than one row …
+    expect(l.headTomorrowRem).toBeGreaterThan(stack(1));
+    expect(bringAreaRem(1, "tomorrow")).toBeCloseTo(
+      2 * l.padRem + l.headTomorrowRem,
+    );
+    // … but no taller than two, so two children cost no more than the head.
+    expect(l.headTomorrowRem).toBeLessThanOrEqual(stack(2));
+    expect(bringAreaRem(2, "tomorrow")).toBeCloseTo(2 * l.padRem + stack(2));
+    expect(
+      bringAreaRem(3, "tomorrow") - bringAreaRem(2, "tomorrow"),
+    ).toBeCloseTo(l.rowGapRem + l.rowRem);
+    // Morning: a shorter head (no arrow, no weekday).
+    expect(bringAreaRem(1, "today")).toBeLessThan(bringAreaRem(1, "tomorrow"));
+    expect(bringAreaRem(2, "today")).toBe(bringAreaRem(2, "tomorrow"));
+    // Never less than one row.
+    expect(bringAreaRem(0, "today")).toBe(bringAreaRem(1, "today"));
+  });
+
+  it("one row per group while the budget allows, at least one, all when unmeasured", () => {
+    expect(bringAreaRows(0, 100, "tomorrow")).toBe(0);
+    expect(bringAreaRows(3, null, "tomorrow")).toBe(3);
+    const three = bringAreaRem(3, "tomorrow");
+    expect(bringAreaRows(3, three, "tomorrow")).toBe(3);
+    expect(bringAreaRows(3, three - 0.01, "tomorrow")).toBe(2);
+    expect(bringAreaRows(3, bringAreaRem(2, "tomorrow"), "tomorrow")).toBe(2);
+    expect(bringAreaRows(3, bringAreaRem(1, "tomorrow"), "tomorrow")).toBe(1);
+    expect(bringAreaRows(3, 0, "today")).toBe(1);
+    expect(bringAreaRows(2, 1000, "today")).toBe(2);
+    // Never taller than the budget, unless even one row does not fit.
+    for (const when of ["tomorrow", "today"] as const) {
+      for (let tenths = 0; tenths <= 200; tenths += 1) {
+        const budget = tenths / 10;
+        const rows = bringAreaRows(4, budget, when);
+        expect(rows).toBeGreaterThanOrEqual(1);
+        if (rows > 1) {
+          expect(bringAreaRem(rows, when)).toBeLessThanOrEqual(budget);
+        }
+        if (rows < 4) {
+          expect(bringAreaRem(rows + 1, when)).toBeGreaterThan(budget);
+        }
+      }
+    }
+  });
+
+  it("splits groups into rows, the last row holding the rest, nothing lost", () => {
+    expect(bringRowsOf(3, 3)).toEqual([[0], [1], [2]]);
+    expect(bringRowsOf(3, 5)).toEqual([[0], [1], [2]]);
+    expect(bringRowsOf(4, 2)).toEqual([[0], [1, 2, 3]]);
+    expect(bringRowsOf(4, 1)).toEqual([[0, 1, 2, 3]]);
+    expect(bringRowsOf(0, 2)).toEqual([]);
+    for (let groups = 1; groups <= 6; groups += 1) {
+      for (let rows = 1; rows <= 6; rows += 1) {
+        expect(bringRowsOf(groups, rows).flat()).toEqual(
+          Array.from({ length: groups }, (_, index) => index),
+        );
+      }
+    }
+  });
+});
+
 describe("BringArea", () => {
   it("is a labelled region (not a live region) naming every child and icon", () => {
-    render(<BringArea reminder={REMINDER} />);
+    render(<BringArea reminder={REMINDER} format={format} />);
     const area = screen.getByRole("region", {
       name: "Pack for tomorrow: Everyone 🧺, Mia 🩱 🧴 🥽, and Ben 👟",
     });
@@ -173,7 +249,7 @@ describe("BringArea", () => {
 
   it("the morning variant and German", () => {
     const { rerender } = render(
-      <BringArea reminder={{ ...REMINDER, when: "today" }} />,
+      <BringArea reminder={{ ...REMINDER, when: "today" }} format={format} />,
     );
     expect(
       screen.getByRole("region", {
@@ -181,13 +257,15 @@ describe("BringArea", () => {
       }),
     ).toBeInTheDocument();
     applyLocale("de");
-    rerender(<BringArea reminder={REMINDER} />);
+    rerender(<BringArea reminder={REMINDER} format={formatDe} />);
     expect(
       screen.getByRole("region", {
         name: "Für morgen einpacken: Alle 🧺, Mia 🩱 🧴 🥽 und Ben 👟",
       }),
     ).toBeInTheDocument();
-    rerender(<BringArea reminder={{ ...REMINDER, when: "today" }} />);
+    rerender(
+      <BringArea reminder={{ ...REMINDER, when: "today" }} format={formatDe} />,
+    );
     expect(
       screen.getByRole("region", {
         name: "Heute mitbringen: Alle 🧺, Mia 🩱 🧴 🥽 und Ben 👟",
@@ -196,7 +274,7 @@ describe("BringArea", () => {
   });
 
   it("leads with 🎒, then one group per child (badge, tint, edge), the neutral one first", () => {
-    render(<BringArea reminder={REMINDER} />);
+    render(<BringArea reminder={REMINDER} format={format} />);
     const area = screen.getByTestId("bring-area");
     const first = area.querySelector(".font-emoji");
     expect(first?.textContent).toBe("🎒");
@@ -236,47 +314,111 @@ describe("BringArea", () => {
     expect(within(area).queryByTestId("bring-area-more")).toBeNull();
   });
 
-  it("one row of fixed height that never wraps", () => {
-    render(<BringArea reminder={REMINDER} />);
-    expect(screen.getByTestId("bring-area")).toHaveClass("h-11", "shrink-0");
-    expect(screen.getByTestId("bring-groups")).toHaveClass(
-      "overflow-hidden",
-      "min-w-0",
-    );
-    expect(screen.getByTestId("bring-groups")).not.toHaveClass("flex-wrap");
+  it("one row per group, each child's icons side by side; height fixed by the row count", () => {
+    render(<BringArea reminder={REMINDER} format={format} />);
+    const area = screen.getByTestId("bring-area");
+    expect(area).toHaveClass("shrink-0", "overflow-hidden");
+    expect(area).toHaveAttribute("data-rows", "3");
+    expect(area.style.height).toBe(`${String(bringAreaRem(3, "tomorrow"))}rem`);
+    const rows = within(area).getAllByTestId("bring-area-row");
+    expect(
+      rows.map((row) =>
+        within(row)
+          .getAllByTestId("bring-group")
+          .map((group) => group.dataset["child"]),
+      ),
+    ).toEqual([[""], ["mia"], ["ben"]]);
+    for (const row of rows) {
+      expect(row).toHaveClass("h-9", "overflow-hidden", "min-w-0");
+      expect(row).not.toHaveClass("flex-wrap");
+    }
   });
 
-  it("draws whole chips only and counts the rest in a plain-text +N per group", () => {
-    const m = BRING_AREA_METRICS;
-    const sizes = REMINDER.groups.map((group) => ({
-      icons: group.icons.length,
-      badge: group.child !== null,
-    }));
-    // Every group's minimum plus room for one chip: the single-icon groups complete for
-    // free (their chip replaces their "+N"), Mia gets one chip and "+2".
-    stubWidth(
-      bringRowRem(sizes, [0, 0, 0], false) + (m.chipRem + m.itemGapRem),
+  it("the head says which day: evening an arrow, tomorrow's short weekday and Tomorrow; morning Today", () => {
+    const { rerender } = render(
+      <BringArea reminder={REMINDER} format={format} />,
     );
-    render(<BringArea reminder={REMINDER} />);
+    const head = screen.getByTestId("bring-head");
+    expect(head).toHaveAttribute("aria-hidden", "true");
+    expect(head.querySelector(".font-emoji")?.textContent).toBe("🎒");
+    expect(within(head).getByTestId("bring-arrow")).toBeInTheDocument();
+    // Monday 2026-11-23, in the config zone.
+    expect(within(head).getByTestId("bring-day")).toHaveTextContent("Mon");
+    expect(within(head).getByTestId("bring-cue")).toHaveTextContent("Tomorrow");
+    // Never a moon: 🌙 only counts sleeps (merge rule 1).
+    expect(screen.getByTestId("bring-area").textContent).not.toMatch(/🌙/u);
+    rerender(
+      <BringArea
+        reminder={{ ...REMINDER, when: "today", date: "2026-11-22" }}
+        format={format}
+      />,
+    );
+    expect(screen.queryByTestId("bring-arrow")).toBeNull();
+    expect(screen.queryByTestId("bring-day")).toBeNull();
+    expect(screen.getByTestId("bring-cue")).toHaveTextContent("Today");
+    applyLocale("de");
+    rerender(<BringArea reminder={REMINDER} format={formatDe} />);
+    expect(screen.getByTestId("bring-day")).toHaveTextContent("Mo");
+    expect(screen.getByTestId("bring-cue")).toHaveTextContent("Morgen");
+    rerender(
+      <BringArea
+        reminder={{ ...REMINDER, when: "today", date: "2026-11-22" }}
+        format={formatDe}
+      />,
+    );
+    expect(screen.getByTestId("bring-cue")).toHaveTextContent("Heute");
+  });
+
+  it("with fewer rows than groups, the last row holds the rest side by side", () => {
+    render(<BringArea reminder={REMINDER} format={format} maxRows={2} />);
+    const area = screen.getByTestId("bring-area");
+    expect(area).toHaveAttribute("data-rows", "2");
+    expect(area.style.height).toBe(`${String(bringAreaRem(2, "tomorrow"))}rem`);
+    const rows = within(area).getAllByTestId("bring-area-row");
+    expect(
+      rows.map((row) =>
+        within(row)
+          .getAllByTestId("bring-group")
+          .map((group) => group.dataset["child"]),
+      ),
+    ).toEqual([[""], ["mia", "ben"]]);
+    // Still every icon, and the name lists them all.
+    expect(within(area).getAllByTestId("bring-area-chip")).toHaveLength(5);
+    expect(area).toHaveAccessibleName(
+      "Pack for tomorrow: Everyone 🧺, Mia 🩱 🧴 🥽, and Ben 👟",
+    );
+  });
+
+  it("a row too short for a long list draws its first (earliest) icons whole and counts the rest", () => {
+    const m = BRING_AREA_METRICS;
+    // Room for a badge, one chip and a "+N": Mia's row draws 🩱 and "+2"; the single-icon
+    // groups complete (their chip is narrower than a "+N").
+    stubWidth(
+      bringRowRem([{ icons: 3, badge: true }], [0], false) +
+        m.chipRem +
+        m.itemGapRem,
+    );
+    render(<BringArea reminder={REMINDER} format={format} />);
     const groups = screen.getAllByTestId("bring-group");
     expect(groups.map((group) => group.dataset["drawn"])).toEqual([
       "1",
       "1",
       "1",
     ]);
+    const mia = groups[1] as HTMLElement;
     expect(
-      within(groups[1] as HTMLElement).getAllByTestId("bring-area-chip"),
-    ).toHaveLength(1);
-    expect(
-      within(groups[1] as HTMLElement).getByTestId("bring-group-more"),
-    ).toHaveTextContent("+2");
+      within(mia)
+        .getAllByTestId("bring-area-chip")
+        .map((chip) => chip.textContent),
+    ).toEqual(["🩱"]);
+    expect(within(mia).getByTestId("bring-group-more")).toHaveTextContent("+2");
     // The name still lists every icon.
     expect(screen.getByRole("region")).toHaveAccessibleName(
       "Pack for tomorrow: Everyone 🧺, Mia 🩱 🧴 🥽, and Ben 👟",
     );
   });
 
-  it("counts groups without room in a trailing +N", () => {
+  it("in a single shared row, counts groups without room in a trailing +N", () => {
     const sizes = REMINDER.groups.map((group) => ({
       icons: group.icons.length,
       badge: group.child !== null,
@@ -284,7 +426,9 @@ describe("BringArea", () => {
     // Room for the neutral group and Mia's badge with their "+N" (the neutral icon then
     // fits whole, as a chip is narrower than a "+N"), but not Ben's badge.
     stubWidth(bringRowRem(sizes, [0, 0], true) + 0.05);
-    const { unmount } = render(<BringArea reminder={REMINDER} />);
+    const { unmount } = render(
+      <BringArea reminder={REMINDER} format={format} maxRows={1} />,
+    );
     expect(
       screen.getAllByTestId("bring-group").map((g) => g.dataset["child"]),
     ).toEqual(["", "mia"]);
@@ -293,14 +437,17 @@ describe("BringArea", () => {
     unmount();
     // Too narrow for any group: one "+N" counts every icon.
     stubWidth(1);
-    render(<BringArea reminder={REMINDER} />);
+    render(<BringArea reminder={REMINDER} format={format} maxRows={1} />);
     expect(screen.queryAllByTestId("bring-group")).toEqual([]);
     expect(screen.getByTestId("bring-area-more")).toHaveTextContent("+5");
   });
 
   it("renders nothing when there is nothing to pack", () => {
     const { container } = render(
-      <BringArea reminder={{ when: "tomorrow", groups: [] }} />,
+      <BringArea
+        reminder={{ when: "tomorrow", date: "2026-11-23", groups: [] }}
+        format={format}
+      />,
     );
     expect(container).toBeEmptyDOMElement();
   });

@@ -66,6 +66,14 @@ export function formatWeekday(value: DateInput, ctx: FormatContext): string {
   return fmt(value, "EEEE", ctx);
 }
 
+/** Short weekday for a small cue, e.g. "Di" / "Tue". */
+export function formatWeekdayShort(
+  value: DateInput,
+  ctx: FormatContext,
+): string {
+  return fmt(value, ctx.locale === "de" ? "EEEEEE" : "EEE", ctx);
+}
+
 /** Long date, e.g. "26. Oktober 2025" / "October 26, 2025". */
 export function formatLongDate(value: DateInput, ctx: FormatContext): string {
   return fmt(value, ctx.locale === "de" ? "d. MMMM yyyy" : "MMMM d, yyyy", ctx);

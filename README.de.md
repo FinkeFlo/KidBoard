@@ -171,13 +171,16 @@ Mitbringen: 👟 🩱 🧴
 - **Auf der Kachel:** die Emoji erscheinen als kleine Chips auf der Kachel des Termins
   (Übersicht und Wochenansicht), bis der Termin vorbei ist.
 - **Der 🎒-Bereich:** ab dem Vorabend, sobald der Abend beginnt (`bands.eveningStart`,
-  Standard 17:00, siehe [docs/CONFIG.md](docs/CONFIG.md)), zeigt die heutige Karte eine
-  🎒-Zeile "Für morgen einpacken" mit den Icons der Termine von morgen, eine Pille pro Kind
-  (Termine für alle zuerst). Nach Mitternacht wird daraus "Heute mitbringen", und die Icons
-  eines Termins verschwinden, sobald er beginnt. Bei ganztägigen Terminen (zum Beispiel ein
-  Schultag ohne Startzeit) bleiben die Icons bis zum Mittag (`bands.middayStart`, Standard
-  11:00). Ist nichts mehr einzupacken, verschwindet die Zeile. Sie erscheint nur in der
-  heutigen Spalte der Übersicht, nicht in der Wochenansicht.
+  Standard 17:00, siehe [docs/CONFIG.md](docs/CONFIG.md)), zeigt die heutige Karte einen
+  🎒-Bereich mit den Icons der Termine von morgen, eine Zeile pro Kind (Termine für alle
+  zuerst); vorne neben dem 🎒 stehen ein Pfeil, der kurze Wochentag von morgen und "Morgen",
+  damit er nicht wie am Morgen aussieht. Nach Mitternacht steht dort "Heute", und die Icons
+  eines Termins verschwinden, sobald er beginnt. Der Bereich nutzt bis zu eine Zeile pro Kind;
+  die Termine darüber falten oder verkleinern sich dafür, Jetzt und Als-Nächstes bleiben immer sichtbar. Bei ganztägigen Terminen
+  (zum Beispiel ein Schultag ohne Startzeit) bleiben die Icons bis zum Mittag
+  (`bands.middayStart`, Standard 11:00). Ist nichts mehr einzupacken, verschwindet der
+  Bereich. Er erscheint nur in der heutigen Spalte der Übersicht, nicht in der
+  Wochenansicht.
 - **Wöchentliche Fächer:** die Stunde als Serientermin anlegen (zum Beispiel jeden Dienstag
   `Mia: 🏊 Schwimmunterricht`) und die Mitbringen-Zeile einmal in die Beschreibung schreiben;
   sie gilt für jeden Termin der Serie. Für einen einzelnen Tag beim Speichern "Nur dieser

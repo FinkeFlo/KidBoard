@@ -99,6 +99,8 @@
   "bring": {
     "tomorrow": "Für morgen einpacken: {{groups, list}}",
     "today": "Heute mitbringen: {{groups, list}}",
-    "everyone": "Alle"
+    "everyone": "Alle",
+    "cueTomorrow": "Morgen",
+    "cueToday": "Heute"
   }
 }

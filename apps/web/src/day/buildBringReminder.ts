@@ -34,6 +34,8 @@ export interface BringGroup {
 
 export interface BringReminder {
   when: BringWhen;
+  /** The day the icons are for (`YYYY-MM-DD` in the config zone): tomorrow or today. */
+  date: string;
   /** The neutral group first, then one per child in config order. Empty: no area. */
   groups: BringGroup[];
 }
@@ -43,7 +45,7 @@ export type BringReminderConfig = Pick<
   "timeZone" | "bands" | "children"
 >;
 
-const VS16 = /️/gu;
+const VS16 = /\uFE0F/gu;
 
 /** Whether `event` still counts at `now` for the window's `date` (see {@link BringWhen}). */
 function counts(
@@ -145,5 +147,5 @@ export function buildBringReminder(
     const entry = icons.get(child.id);
     if (entry !== undefined) groups.push({ child, icons: entry.list });
   }
-  return { when, groups };
+  return { when, date, groups };
 }

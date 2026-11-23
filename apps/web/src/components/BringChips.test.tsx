@@ -58,7 +58,7 @@ describe("iconsThatFit / chipsThatFit", () => {
   });
 
   it("never draws a partial chip, a negative count or more than there are, at any width", () => {
-    for (const size of ["regular", "small"] as const) {
+    for (const size of ["regular", "large"] as const) {
       const metrics = chipMetrics(size);
       for (let count = 0; count <= 8; count += 1) {
         for (let width = 0; width <= 14; width += 0.0625) {
@@ -135,12 +135,12 @@ describe("BringChips", () => {
 
   it("shows at least the +N in a row too short for one chip", () => {
     stubWidth(1);
-    render(<BringChips bring={["🩱", "🧴"]} size="small" />);
+    render(<BringChips bring={["🩱", "🧴"]} size="large" />);
     expect(screen.queryAllByTestId("bring-chip")).toHaveLength(0);
     expect(screen.getByTestId("bring-chips-more")).toHaveTextContent("+2");
     // Never narrower than the "+N" room.
     expect(screen.getByTestId("bring-chips").style.minWidth).toBe(
-      `${String(chipMetrics("small").moreRem)}rem`,
+      `${String(chipMetrics("large").moreRem)}rem`,
     );
   });
 

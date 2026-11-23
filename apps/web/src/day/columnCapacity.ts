@@ -30,6 +30,21 @@ export interface ColumnFit<T> {
 }
 
 /**
+ * The least height in rem today's event list keeps when something else in the column
+ * (the 🎒 area) asks for room: the "vorbei" strip, the now line (`reservedRem`), two
+ * tiles at the smallest size and the "+N" row, with their gaps. So the current event and
+ * the next one (or the next two) always keep their tiles.
+ */
+export function listMinRem(reservedRem: number): number {
+  return (
+    reservedRem +
+    2 * TILE_HEIGHT_REM.slim +
+    2 * SUMMARY_ROW_REM +
+    3 * COLUMN_GAP_REM
+  );
+}
+
+/**
  * Height in rem of one tile of `size` (larger when it is a prominent one, and when it shows
  * a bring list in a chip row of its own, `BRING_EXTRA_REM`).
  */

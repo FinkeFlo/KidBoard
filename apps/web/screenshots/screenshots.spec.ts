@@ -6,7 +6,8 @@ import { SCREENSHOT_DIR } from "./paths";
 
 /*
  * README screenshots: day and week view, light and night, with the synthetic demo data
- * (Mia 🦊 / Ben 🐻). Deterministic: the clock is fixed (Sunday 12:00 / 20:00 Berlin), the
+ * (Mia 🦊 / Ben 🐻). Deterministic: the clock is fixed (Sunday 12:00, the plain night
+ * overview 16:45 with the night look forced, the bring area at 18:30 / 20:00 Berlin), the
  * burn-in shift is pinned to its centre (`?burnin=0`), animations are off (reduced motion).
  * Run with `pnpm screenshots` after `pnpm build`.
  */
@@ -17,6 +18,15 @@ type Theme = "light" | "night";
 
 /** Evening before a school day, still light (night mode starts at 19:30). */
 const EVENING_NOW = at("18:30");
+
+/**
+ * The plain night overview (no 🎒 area, which is in its own shots): every night hour of
+ * the demo has something to pack (tomorrow's swimming, this morning's zoo trip), so the
+ * night look is forced (`?night=1`) at a late afternoon clock where nothing is left to
+ * pack: the all-day trip is past midday, football has started, eveningStart (17:00) is
+ * still ahead.
+ */
+const PLAIN_NIGHT_NOW = at("16:45");
 
 async function openBoard(
   page: Page,
@@ -59,11 +69,17 @@ async function shoot(page: Page, name: string, size: string): Promise<void> {
 for (const theme of ["light", "night"] as const) {
   test(`day and week view, ${theme}`, async ({ page }, testInfo) => {
     const size = testInfo.project.name.replace("tablet-", "");
-    await openBoard(page, theme);
+    await openBoard(page, theme, {
+      now: theme === "light" ? NOW : PLAIN_NIGHT_NOW,
+    });
     await expect(page.getByTestId("countdown")).toHaveAttribute(
       "data-nights",
       "6",
     );
+    // The plain night overview: the 🎒 area at night has a shot of its own.
+    if (theme === "night") {
+      await expect(page.getByTestId("bring-area")).toHaveCount(0);
+    }
     await shoot(page, `day-${theme}`, size);
 
     await page.getByRole("button", { name: "Week" }).click();

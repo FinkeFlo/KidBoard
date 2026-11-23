@@ -288,6 +288,27 @@ describe("buildBringReminder: time zones and DST (Europe/Berlin)", () => {
     ).toEqual({ when: "tomorrow", groups: [["everyone", ["🎨"]]] });
   });
 
+  it("names the day the icons are for in the config zone: tomorrow in the evening, today after midnight", () => {
+    vi.stubEnv("TZ", "America/Los_Angeles");
+    const none: CalendarEvent[] = [];
+    const reminder = (now: string, config: PublicConfig = CONFIG) =>
+      buildBringReminder({ events: none }, config, at(now));
+    // 16:59 Berlin: today (the 22nd); 17:00: tomorrow (the 23rd); midnight: the 23rd.
+    expect(reminder("2026-11-22T15:59:00Z").date).toBe("2026-11-22");
+    expect(reminder("2026-11-22T16:00:00Z").date).toBe("2026-11-23");
+    expect(reminder("2026-11-22T23:00:00Z")).toMatchObject({
+      when: "today",
+      date: "2026-11-23",
+    });
+    // Across the spring-forward night (Saturday 17:00 CET → Sunday the 29th) and the
+    // last evening of a month.
+    expect(reminder("2026-03-28T16:00:00Z").date).toBe("2026-03-29");
+    expect(reminder("2026-11-30T16:30:00Z").date).toBe("2026-12-01");
+    // Tokyo: 17:00 there is 08:00Z, the next day is already its 23rd.
+    const tokyo = configFixture({ children: [MIA], timeZone: "Asia/Tokyo" });
+    expect(reminder("2026-11-22T08:00:00Z", tokyo).date).toBe("2026-11-23");
+  });
+
   // Spring forward: Sunday 2026-03-29, 02:00 CET → 03:00 CEST.
   it("spring-forward evening: eveningStart on the wall clock, tomorrow's events after the gap", () => {
     const events = [

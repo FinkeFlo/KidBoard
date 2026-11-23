@@ -57,16 +57,21 @@ fixed per size, so a column can compute how many tiles fit.
   time below; an all-day `week-slim` tile shows the span icon and the badges in that row,
   "Ganztägig" stays in the accessible name. The title shows wherever the column's list is
   wide enough (5.5rem, `week-slim` 7rem; CSS container query), on today's column too.
-- **Bring chips** (an event's `bring` list, up to 8 emoji): 24px discs
-  (`--color-chip`: the emoji disc colour by day, lighter than the tile at night; 1px
-  `--color-border` ring) with a 16px emoji, 2px apart; on
-  `week-small` and `week-slim` 20px discs with a 14px emoji. Today's sizes put them at the
-  end of the time row (`slim`: at the end of its one row, at most 40 %) and keep their
-  height; `compact`, `compact-dense` and the week sizes give them a row of their own below
-  the time (centred on stacked week tiles) and grow: +20px (`compact`, `week`,
-  `week-dense`, `week-small`), +12px (`compact-dense`), +16px (`week-slim`). Only whole
-  chips are drawn; the rest is a plain-text "+N" (`--text-meta` / `--text-caption`, 900,
-  `--color-text-muted`, no fill). Past tiles show none. Decorative; the tile's accessible
+- **Bring chips** (an event's `bring` list, up to 8 emoji): discs in `--color-chip` (the
+  emoji disc colour by day, lighter than the tile at night; 1px `--color-border` ring),
+  2px apart. Today's sizes put 24px chips (16px emoji) at the end of the time row
+  (`slim`: at the end of its one row, at most 40 %) and keep their height. `compact`,
+  `compact-dense` and the week sizes give them a row of their own below the time, with
+  28px chips (18px emoji) so they stay distinct across the room; `week-slim`, the last
+  step before "+N" at about 123px wide, keeps 24px. These tiles get 6px padding at the
+  top (week 4px) and grow by the measured row: +32px (`compact`, two title lines),
+  +26px (`compact-dense`), +30px (`week`, `week-small`), +32px (`week-dense`), +20px
+  (`week-slim`). On `compact`, `compact-dense` and `week-slim` (picture beside the
+  text) the chip row spans the tile below picture and text and ends with the child
+  badges, so the title keeps the whole width (`compact` two lines); stacked week tiles
+  centre the row and keep the badges beside the emoji. Only whole chips are drawn; the
+  rest is a plain-text "+N" (`--text-meta`, 900, `--color-text-muted`, no fill). Past
+  tiles show none. Decorative; the tile's accessible
   description lists every icon ("Mitbringen: 👟 🩱" / "Bring along: 👟 🩱"). Now/next
   cues, tint, edge and badges are unchanged.
 - **Night:** avatar discs, child edges and stripes are dimmed a quarter towards the page
@@ -134,15 +139,27 @@ event's icons leave when it starts, the area disappears when nothing is left.
 - **Place:** today's overview column, between the events (or "+N") and the meal plates;
   never in the other columns or the week view. The list above gives way by the space rule
   (fold, shrink, then "+N"), the area itself never scrolls or wraps.
-- **Anatomy (44px high, one row):** `--color-surface-sunken` with a 1px `--color-border`
-  ring, radius `--radius-tile`; 🎒 (28px) first, then one pill (36px high) per group: the
-  group for everyone first (`--color-surface-raised`, 1px ring, no badge), then one per child
-  in config order (the child's tint, a 2px ring in the child's colour, its 32px avatar
-  badge). Icons as 28px chips (`--color-chip`, 1px `--color-border` ring, 18px emoji), 4px
-  apart, deduplicated per child; an event for several children appears with each.
-- **Overflow:** only whole chips; each group's rest as a plain-text "+N" (`--text-meta`,
-  900, `--color-text-muted`), chips shared out one per child in turn; if not even every
-  badge fits, the last groups are counted in one trailing "+N".
+- **Anatomy:** `--color-surface-sunken` with a 1px `--color-border` ring, radius
+  `--radius-tile`, 6px padding. At the start a head (72px wide, centred) says the day,
+  so evening and morning never look alike: 🎒 (24px); in the evening below it an arrow
+  (16px, `--color-text-muted`, as in the countdown) with tomorrow's short weekday in a
+  small raised pill ("Di" / "Tue", `--text-meta`, 900), then "Morgen" / "Tomorrow"
+  (`--text-caption`, muted); in the morning only "Heute" / "Today" below the 🎒. Never 🌙
+  (moons count sleeps only). Beside the head **one row per group** (36px high, 4px
+  apart): the group for everyone first (`--color-surface-raised` pill, 1px ring, no
+  badge), then one per child in config order (the child's tint, a 2px ring in the
+  child's colour, its 32px avatar badge). Icons as 28px chips (`--color-chip`, 1px
+  `--color-border` ring, 18px emoji), 4px apart, in event order, deduplicated per child;
+  an event for several children appears with each. Height = padding + the taller of the
+  rows and the head (two children: 88px).
+- **Space:** the area takes one row per group as long as today's list keeps room for
+  the "vorbei" strip, the now line, two slim tiles (now and next) and "+N"; the list
+  folds, shrinks and sums up around it. With less room, the last row holds the remaining
+  groups side by side.
+- **Overflow (last resort):** only whole chips, the earliest event's first; a group's rest
+  as a plain-text "+N" (`--text-meta`, 900, `--color-text-muted`), e.g. more than eight
+  icons for one child at 1280px; in a shared last row, groups without room for their
+  badge are counted in one trailing "+N".
 - **Night:** stays visible (night tokens, dimmed emoji, the lighter `--color-chip` disc).
 - **Rules:** a labelled region whose name lists every child and icon ("Für morgen
   einpacken: Mia 🩱 🧴 und Ben 👟"); not a live region; not interactive. 🎒 appears nowhere
