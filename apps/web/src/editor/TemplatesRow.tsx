@@ -37,9 +37,13 @@ export function TemplatesRow({
       <h3 id="editor-again" className="text-title">
         {t("editor.templates.title")}
       </h3>
-      {/* One row that scrolls sideways (padded for the focus ring), so the list stays in view. */}
+      {/*
+        One row that scrolls sideways (padded for the focus ring), so the list stays in
+        view. The end fades out (and has room to scroll clear of the fade), so a chip at
+        the edge is read as "more to the side", not as cut off.
+      */}
       <ul
-        className="-m-2 flex gap-3 overflow-x-auto p-2"
+        className="-m-2 flex gap-3 overflow-x-auto [mask-image:linear-gradient(to_right,black_calc(100%-3rem),transparent)] p-2 pe-14"
         data-testid={TID.templatesList}
       >
         {events.map((template, index) => {

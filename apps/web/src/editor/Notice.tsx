@@ -32,14 +32,19 @@ export function FailureNotice({
       className="bg-notice text-on-notice rounded-tile flex flex-wrap items-center gap-3 px-4 py-3"
     >
       <Emoji emoji="🧸" className="text-[1.75rem]" />
-      <p className="text-body min-w-0 flex-1 font-bold">
+      <p className="text-body min-w-0 flex-1 basis-48 font-bold">
         {t(`editor.error.${failure.kind}`)}{" "}
         <span className="text-caption whitespace-nowrap">
           {t("error.code", { code: failure.code })}
         </span>
       </p>
       {failure.kind === "locked" && onUnlock !== undefined && (
-        <EditorButton tone="primary" onClick={onUnlock}>
+        <EditorButton
+          large
+          tone="primary"
+          className="w-full"
+          onClick={onUnlock}
+        >
           {t("editor.action.unlockAgain")}
         </EditorButton>
       )}

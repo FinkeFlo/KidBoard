@@ -11,12 +11,14 @@ import {
 import { applyLocale } from "../i18n";
 import de from "../i18n/locales/de.json";
 import en from "../i18n/locales/en.json";
+import { EditorScreen } from "./EditorScreen";
 import { fakeGate, renderWithGate } from "./gate.test-utils";
 import { IdleWarning } from "./IdleWarning";
 import { PARENT_HOLD_MS, ParentEntry } from "./ParentEntry";
 import {
   PARENT_IDLE_LOCK_MS,
   PARENT_IDLE_WARNING_MS,
+  ParentGateContext,
   useParentGate,
 } from "./parentGate";
 import { ParentGateProvider } from "./ParentGateProvider";
@@ -153,7 +155,11 @@ describe("IdleWarning", () => {
   });
 
   it("is a calm banner with a large Keep editing button, translated", () => {
-    const gate = fakeGate({ stage: "editor", idleWarning: true });
+    const gate = fakeGate({
+      stage: "editor",
+      idleWarning: true,
+      idleSecondsLeft: 30,
+    });
     renderWithGate(<IdleWarning />, gate);
     expect(screen.getByTestId("idle-warning")).toHaveTextContent(
       "Without input the parent area locks in 30 seconds.",
@@ -174,5 +180,150 @@ describe("IdleWarning", () => {
     expect(
       screen.getByRole("button", { name: de.parent.idle.stay }),
     ).toBeInTheDocument();
+  });
+
+  it("counts the real seconds down visibly but announces one static sentence", () => {
+    const gate = fakeGate({
+      stage: "editor",
+      idleWarning: true,
+      idleSecondsLeft: 30,
+    });
+    const { rerender } = renderWithGate(<IdleWarning />, gate);
+    const countdown = (): HTMLElement => {
+      const element = screen
+        .getByTestId("idle-warning")
+        .querySelector<HTMLElement>("[aria-hidden='true']");
+      if (element === null) throw new Error("no visible countdown");
+      return element;
+    };
+    const announced = (): string =>
+      screen.getByTestId("idle-warning").querySelector(".sr-only")
+        ?.textContent ?? "";
+    const before = announced();
+    expect(before).toBe(
+      "Locking soon. Without input the parent area locks in about 30 seconds. Choose Keep editing to stay.",
+    );
+    expect(countdown()).toHaveTextContent("in 30 seconds");
+    rerender(
+      <ParentGateContext value={{ ...gate, idleSecondsLeft: 1 }}>
+        <IdleWarning />
+      </ParentGateContext>,
+    );
+    expect(countdown()).toHaveTextContent("in 1 second.");
+    // The announced sentence did not change, so the live region says nothing new.
+    expect(announced()).toBe(before);
+    // The ticking text is hidden from assistive tech.
+    expect(countdown()).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("returns the focus to where it was when the warning goes away", () => {
+    const gate = fakeGate({
+      stage: "editor",
+      idleWarning: true,
+      idleSecondsLeft: 20,
+    });
+    const view = (g: typeof gate): React.JSX.Element => (
+      <ParentGateContext value={g}>
+        <div role="dialog" aria-label="host" tabIndex={-1}>
+          <input aria-label="name" />
+          <IdleWarning />
+        </div>
+      </ParentGateContext>
+    );
+    const { rerender } = render(view(gate));
+    const input = screen.getByRole("textbox", { name: "name" });
+    input.focus();
+    // The button takes the focus when pressed, then the banner is gone (any input
+    // restarts the idle time).
+    screen.getByRole("button", { name: en.parent.idle.stay }).focus();
+    rerender(view({ ...gate, idleWarning: false, idleSecondsLeft: 0 }));
+    expect(input).toHaveFocus();
+  });
+
+  it("falls back to the dialog around the banner when nothing had the focus", () => {
+    const gate = fakeGate({
+      stage: "editor",
+      idleWarning: true,
+      idleSecondsLeft: 20,
+    });
+    const view = (g: typeof gate): React.JSX.Element => (
+      <ParentGateContext value={g}>
+        <div role="dialog" aria-label="host" tabIndex={-1}>
+          <IdleWarning />
+        </div>
+      </ParentGateContext>
+    );
+    const { rerender } = render(view(gate));
+    screen.getByRole("button", { name: en.parent.idle.stay }).focus();
+    rerender(view({ ...gate, idleWarning: false, idleSecondsLeft: 0 }));
+    expect(screen.getByRole("dialog", { name: "host" })).toHaveFocus();
+  });
+
+  it("leaves the focus alone when it moved elsewhere on its own", () => {
+    const gate = fakeGate({
+      stage: "editor",
+      idleWarning: true,
+      idleSecondsLeft: 20,
+    });
+    const view = (g: typeof gate): React.JSX.Element => (
+      <ParentGateContext value={g}>
+        <div role="dialog" aria-label="host" tabIndex={-1}>
+          <input aria-label="first" />
+          <input aria-label="second" />
+          <IdleWarning />
+        </div>
+      </ParentGateContext>
+    );
+    const { rerender } = render(view(gate));
+    screen.getByRole("textbox", { name: "first" }).focus();
+    screen.getByRole("textbox", { name: "second" }).focus();
+    rerender(view({ ...gate, idleWarning: false, idleSecondsLeft: 0 }));
+    expect(screen.getByRole("textbox", { name: "second" })).toHaveFocus();
+  });
+});
+
+describe("one idle banner at a time", () => {
+  it("the editor screen drops its banner while a re-lock PIN pad is open, and the pad's sits beside its card", () => {
+    const gate = fakeGate({
+      stage: "editor",
+      idleWarning: true,
+      idleSecondsLeft: 12,
+    });
+    const { rerender } = renderWithGate(
+      <EditorScreen>
+        <p>{"form"}</p>
+      </EditorScreen>,
+      gate,
+    );
+    expect(screen.getAllByTestId("idle-warning")).toHaveLength(1);
+    expect(
+      screen.getByRole("dialog", { name: en.parent.editor.title }),
+    ).toContainElement(screen.getByTestId("idle-warning"));
+    rerender(
+      <ParentGateContext value={gate}>
+        <EditorScreen>
+          <PinPad />
+        </EditorScreen>
+      </ParentGateContext>,
+    );
+    const banners = screen.getAllByTestId("idle-warning");
+    expect(banners).toHaveLength(1);
+    const pad = screen.getByTestId("pin-pad");
+    expect(pad).toContainElement(banners[0] as HTMLElement);
+    // In the flow of the pad, not fixed over its buttons.
+    expect(banners[0]).not.toHaveClass("fixed");
+    const cancel = screen.getByRole("button", { name: en.parent.pin.cancel });
+    expect(banners[0]).not.toContainElement(cancel);
+
+    // Closing the pad brings the editor's own banner back.
+    rerender(
+      <ParentGateContext value={gate}>
+        <EditorScreen>
+          <p>{"form"}</p>
+        </EditorScreen>
+      </ParentGateContext>,
+    );
+    expect(screen.getAllByTestId("idle-warning")).toHaveLength(1);
+    expect(screen.getByTestId("idle-warning")).toHaveClass("fixed");
   });
 });

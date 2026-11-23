@@ -39,18 +39,19 @@ type GateState =
  * hidden. Idle time and expiry are compared with `Date.now()` on a short tick instead of
  * one long timer, so a tablet whose timers were suspended (screen off) still locks at
  * once when it wakes up. From {@link PARENT_IDLE_WARNING_MS} before the idle lock,
- * `warn(true)` shows the "locking soon" warning; any input (or `stayActive`) hides it.
+ * `warn(secondsLeft)` shows the "locking soon" warning with the real seconds left;
+ * any input (or `stayActive`) hides it (`warn(null)`).
  */
 function useAutoLock(
   open: boolean,
   lockAt: number | undefined,
   lock: () => void,
-  warn: (show: boolean) => void,
+  warn: (secondsLeft: number | null) => void,
 ): { stayActive: () => void } {
   const lastActivity = useRef(0);
   const stayActive = useCallback(() => {
     lastActivity.current = Date.now();
-    warn(false);
+    warn(null);
   }, [warn]);
   useEffect(() => {
     if (!open) return undefined;
@@ -66,7 +67,11 @@ function useAutoLock(
         lock();
         return;
       }
-      warn(idle >= PARENT_IDLE_LOCK_MS - PARENT_IDLE_WARNING_MS);
+      warn(
+        idle >= PARENT_IDLE_LOCK_MS - PARENT_IDLE_WARNING_MS
+          ? Math.max(1, Math.ceil((PARENT_IDLE_LOCK_MS - idle) / 1000))
+          : null,
+      );
     };
     const onVisibility = (): void => {
       if (document.visibilityState === "hidden") {
@@ -105,13 +110,14 @@ export function ParentGateProvider({
   const api = useApiClient();
   const [state, setState] = useState<GateState>({ stage: "closed" });
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
-  const [idleWarning, setIdleWarning] = useState(false);
-  // Mirrors `idleWarning`, so frequent input (pointermove) re-renders nothing.
-  const idleWarningShown = useRef(false);
-  const warn = useCallback((show: boolean) => {
-    if (idleWarningShown.current === show) return;
-    idleWarningShown.current = show;
-    setIdleWarning(show);
+  // Seconds until the idle lock while the warning shows, else `null`.
+  const [idleSecondsLeft, setIdleSecondsLeft] = useState<number | null>(null);
+  // Mirrors `idleSecondsLeft`, so frequent input (pointermove) re-renders nothing.
+  const idleShown = useRef<number | null>(null);
+  const warn = useCallback((secondsLeft: number | null) => {
+    if (idleShown.current === secondsLeft) return;
+    idleShown.current = secondsLeft;
+    setIdleSecondsLeft(secondsLeft);
   }, []);
   // Bumped on every lock: an unlock answer that arrives later is discarded.
   const generation = useRef(0);
@@ -121,7 +127,7 @@ export function ParentGateProvider({
     generation.current += 1;
     inFlight.current?.abort();
     inFlight.current = null;
-    warn(false);
+    warn(null);
     setState({ stage: "closed" });
   }, [warn]);
 
@@ -217,7 +223,11 @@ export function ParentGateProvider({
       stage: state.stage,
       session,
       lockoutUntil,
-      idleWarning: state.stage !== "closed" && idleWarning,
+      idleWarning: state.stage !== "closed" && idleSecondsLeft !== null,
+      idleSecondsLeft:
+        state.stage !== "closed" && idleSecondsLeft !== null
+          ? idleSecondsLeft
+          : 0,
       stayActive,
       openPin,
       unlock,
@@ -229,7 +239,7 @@ export function ParentGateProvider({
       state.stage,
       session,
       lockoutUntil,
-      idleWarning,
+      idleSecondsLeft,
       stayActive,
       openPin,
       unlock,

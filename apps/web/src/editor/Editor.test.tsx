@@ -1728,3 +1728,99 @@ describe("Editor: meals (M11 click test)", () => {
     expect(screen.getByTestId("meal-taken")).toBeEmptyDOMElement();
   });
 });
+
+describe("Editor: click test round 2", () => {
+  it("deleting a day changed on its own names that day, not the series", async () => {
+    renderEditor({
+      setup: (editor) => {
+        editor.seed(SWIM, {
+          overrides: {
+            "2026-11-29": {
+              ...SWIM,
+              title: "Swim gala",
+              repeat: "none" as const,
+              date: "2026-11-29",
+            },
+          },
+        });
+      },
+    });
+    await home();
+    await user.click(screen.getByRole("button", { name: "Change Swim gala" }));
+    await user.click(
+      screen.getByRole("button", { name: en.editor.action.delete }),
+    );
+    expect(
+      screen.getByRole("alertdialog", { name: "Delete “Swim gala”?" }),
+    ).toBeInTheDocument();
+  });
+
+  it("the toast also waits while a form's discard question is open", async () => {
+    renderEditor({
+      setup: (editor) => {
+        editor.seed(DENTIST);
+      },
+    });
+    await home();
+    await user.click(screen.getByRole("button", { name: "Change Dentist" }));
+    await save();
+    const toast = screen.getByTestId("editor-toast");
+    await waitFor(() => {
+      expect(toast).toHaveTextContent(en.editor.toast.saved);
+    });
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newEntry }),
+    );
+    await user.click(screen.getByRole("radio", { name: "Swimming" }));
+    await user.click(
+      screen.getByRole("button", { name: en.editor.action.cancel }),
+    );
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(toast).toBeEmptyDOMElement();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.discard.keep }),
+    );
+    expect(toast).toHaveTextContent(en.editor.toast.saved);
+  });
+
+  it("the section heading is named like its jump link, and 'back to top' returns to the first action", async () => {
+    renderEditor();
+    await home();
+    const bar = screen.getByRole("navigation", { name: en.editor.jump.label });
+    const link = within(bar).getByRole("button", { name: en.editor.jump.data });
+    expect(
+      screen.getByRole("heading", { name: link.textContent }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByTestId("back-to-top"));
+    expect(
+      screen.getByRole("button", { name: en.editor.home.newEntry }),
+    ).toHaveFocus();
+  });
+
+  it("a fresh entry made seconds after 15:00 starts at 16:00 without the past hint", async () => {
+    vi.setSystemTime(Date.parse("2026-11-22T15:00:30+01:00"));
+    renderEditor();
+    await home();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newEntry }),
+    );
+    expect(screen.getByLabelText(en.editor.form.start)).toHaveValue("16:00");
+    expect(screen.getByTestId("when-notice")).toBeEmptyDOMElement();
+  });
+
+  it("the re-lock notice has a full-width, child-size PIN button", async () => {
+    const h = renderEditor();
+    await home();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.templates.quick.dentist }),
+    );
+    h.sessions.delete(SESSION);
+    await save();
+    const alert = await screen.findByRole("alert");
+    const button = within(alert).getByRole("button", {
+      name: en.editor.action.unlockAgain,
+    });
+    expect(button).toHaveClass("min-h-touch", "w-full");
+    expect(button).not.toHaveClass("min-h-touch-parent");
+  });
+});

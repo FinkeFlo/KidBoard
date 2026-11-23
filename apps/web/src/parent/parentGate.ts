@@ -52,6 +52,8 @@ export interface ParentGate {
    * lock: the "locking soon" warning shows.
    */
   idleWarning: boolean;
+  /** Real seconds until the idle lock while {@link idleWarning} shows, else 0. */
+  idleSecondsLeft: number;
   /** Counts as input: restarts the idle time and hides the warning. */
   stayActive: () => void;
   /** Shows the PIN pad (after the hold on the entry). */
@@ -113,4 +115,17 @@ export function sessionLockAt(receivedAt: number, expiresAt: number): number {
     receivedAt +
     (ttl > 0 && ttl <= PARENT_SESSION_TTL_MS ? ttl : PARENT_SESSION_TTL_MS)
   );
+}
+
+/**
+ * Lets a PIN pad that opens inside the editor (re-lock) tell the editor screen to drop
+ * its own "locking soon" banner: only the pad's banner shows, placed so it covers none
+ * of the pad's buttons. `register` returns the cleanup.
+ */
+export const PadHostContext = createContext<(() => () => void) | null>(null);
+
+/** Registers the calling PIN pad with the editor screen above it (no-op outside one). */
+export function useRegisterPad(): void {
+  const register = useContext(PadHostContext);
+  useEffect(() => register?.(), [register]);
 }

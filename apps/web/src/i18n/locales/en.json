@@ -126,6 +126,7 @@
       "demo": "Demo: the PIN is {{pin}}"
     },
     "idle": {
+      "announce": "Locking soon. Without input the parent area locks in about {{seconds}} seconds. Choose Keep editing to stay.",
       "title": "Locking soon",
       "text_one": "Without input the parent area locks in {{count}} second.",
       "text_other": "Without input the parent area locks in {{count}} seconds.",
@@ -413,7 +414,7 @@
       "select": "The link is selected – copy it now"
     },
     "data": {
-      "title": "Data",
+      "title": "Backup & phone",
       "export": "Download backup",
       "choose": "Choose backup file",
       "hint": "The backup holds the entries made here (not the Google entries).",
@@ -442,6 +443,7 @@
       "keep": "Keep editing"
     },
     "jump": {
+      "top": "Back to top",
       "label": "Jump to",
       "list": "Entries",
       "data": "Backup & phone"

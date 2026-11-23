@@ -1,4 +1,11 @@
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+} from "react";
 
 import { TID } from "./testIds";
 
@@ -119,22 +126,34 @@ const BUTTON_TONES: Record<ButtonTone, string> = {
   quiet: "text-text-muted underline-offset-4 hover:underline",
 };
 
-/** A text button of the editor (≥ 48 px). */
+/** A text button of the editor (≥ 48 px, ≥ 64 px with `large`). */
 export function EditorButton({
   tone = "secondary",
   className = "",
+  large = false,
   ...props
 }: React.ComponentProps<"button"> & {
   tone?: ButtonTone;
+  /** A child-size target (`--spacing-touch`, 64 px) instead of the parent size (48 px). */
+  large?: boolean;
 }): React.JSX.Element {
   return (
     <button
       type="button"
       {...props}
-      className={`min-h-touch-parent rounded-pill text-body inline-flex items-center justify-center gap-2 px-6 font-extrabold disabled:opacity-100 ${BUTTON_TONES[tone]} ${FOCUS_RING} disabled:bg-surface-sunken disabled:text-text-muted disabled:cursor-default ${className}`}
+      className={`${large ? "min-h-touch" : "min-h-touch-parent"} rounded-pill text-body inline-flex items-center justify-center gap-2 px-6 font-extrabold disabled:opacity-100 ${BUTTON_TONES[tone]} ${FOCUS_RING} disabled:bg-surface-sunken disabled:text-text-muted disabled:cursor-default ${className}`}
     />
   );
 }
+
+/**
+ * One shared "a dialog is open" signal: the editor provides a `track` function (it
+ * returns the cleanup), every {@link ConfirmDialog} reports itself while mounted, and the
+ * toast stays hidden meanwhile, whichever component owns the dialog.
+ */
+export const DialogTrackerContext = createContext<(() => () => void) | null>(
+  null,
+);
 
 export interface ConfirmAction {
   label: string;
@@ -170,6 +189,8 @@ export function ConfirmDialog({
   useEffect(() => {
     cancel.current = onCancel;
   });
+  const track = useContext(DialogTrackerContext);
+  useEffect(() => track?.(), [track]);
   useEffect(() => {
     const previous =
       document.activeElement instanceof HTMLElement

@@ -450,8 +450,10 @@ describe("defaultStart", () => {
 
   it.each([
     ["2026-11-22T12:00:00+01:00", TODAY, "15:00"],
-    // 15:00 has not passed yet at 15:00 sharp.
-    ["2026-11-22T15:00:00+01:00", TODAY, "15:00"],
+    ["2026-11-22T14:59:59+01:00", TODAY, "15:00"],
+    // From the minute of the default start on it is not ahead any more.
+    ["2026-11-22T15:00:00+01:00", TODAY, "16:00"],
+    ["2026-11-22T15:00:30+01:00", TODAY, "16:00"],
     ["2026-11-22T15:01:00+01:00", TODAY, "16:00"],
     ["2026-11-22T15:59:00+01:00", TODAY, "16:00"],
     ["2026-11-22T16:00:00+01:00", TODAY, "17:00"],
@@ -475,6 +477,31 @@ describe("defaultStart", () => {
 describe("startsInPast", () => {
   const NOON = Date.parse("2026-11-22T12:00:00+01:00");
   const BERLIN = "Europe/Berlin";
+
+  it("compares at minute resolution: the current minute is not past", () => {
+    const within = NOON + 45_000;
+    expect(
+      startsInPast(draft({ startTime: "12:00" }), TODAY, within, BERLIN),
+    ).toBe(false);
+    expect(
+      startsInPast(draft({ startTime: "11:59" }), TODAY, within, BERLIN),
+    ).toBe(true);
+  });
+
+  it("never flags what defaultStart proposes, whatever the second", () => {
+    for (let offset = 0; offset < 24 * 3600; offset += 37) {
+      const now = Date.parse("2026-11-22T00:00:00+01:00") + offset * 1000;
+      const start = defaultStart(TODAY, now, BERLIN);
+      expect(
+        startsInPast(
+          draft({ date: start.date, startTime: start.startTime }),
+          TODAY,
+          now,
+          BERLIN,
+        ),
+      ).toBe(false);
+    }
+  });
 
   it("is true for a one-off start before now in the configured zone", () => {
     expect(

@@ -321,6 +321,27 @@ describe("ParentGateProvider", () => {
       expect(result.current.idleWarning).toBe(false);
     });
 
+    it("counts the real seconds left down while the warning shows", async () => {
+      const result = await unlocked();
+      expect(result.current.idleSecondsLeft).toBe(0);
+      act(() => {
+        vi.advanceTimersByTime(PARENT_IDLE_LOCK_MS - PARENT_IDLE_WARNING_MS);
+      });
+      expect(result.current.idleSecondsLeft).toBe(30);
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(result.current.idleSecondsLeft).toBe(29);
+      act(() => {
+        vi.advanceTimersByTime(27_000);
+      });
+      expect(result.current.idleSecondsLeft).toBe(2);
+      act(() => {
+        result.current.stayActive();
+      });
+      expect(result.current.idleSecondsLeft).toBe(0);
+    });
+
     it("drops the warning when the tab is hidden (locks at once) and on reopening", async () => {
       const result = await unlocked();
       act(() => {

@@ -12,6 +12,7 @@ export function fakeGate(overrides: Partial<ParentGate> = {}): ParentGate {
     session: null,
     lockoutUntil: null,
     idleWarning: false,
+    idleSecondsLeft: 0,
     stayActive: vi.fn(),
     openPin: vi.fn(),
     unlock: vi.fn(() => Promise.resolve({ kind: "unlocked" as const })),

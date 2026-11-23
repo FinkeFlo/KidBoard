@@ -55,7 +55,12 @@ import { PhoneFeed } from "./PhoneFeed";
 import { jumpTo } from "./reveal";
 import { TemplatesRow } from "./TemplatesRow";
 import { TID } from "./testIds";
-import { ConfirmDialog, EditorButton, FOCUS_RING } from "./ui";
+import {
+  ConfirmDialog,
+  DialogTrackerContext,
+  EditorButton,
+  FOCUS_RING,
+} from "./ui";
 import { useEditorData } from "./useEditorData";
 
 /** The jump bar: section headings of the home view and their labels. */
@@ -63,6 +68,9 @@ const JUMP_TARGETS = [
   { id: "editor-list", label: "editor.jump.list" },
   { id: "editor-data", label: "editor.jump.data" },
 ] as const;
+
+/** The first action of the home view: where "Back to top" lands. */
+const TOP_ANCHOR = "editor-top";
 
 /** What an edit form changes: the stored entry and which of its days was opened. */
 export interface EditTarget {
@@ -223,6 +231,14 @@ function EditorBody({
   const [relockFor, setRelockFor] = useState<string | null>(null);
   const clearToast = useCallback(() => {
     setToast(null);
+  }, []);
+  // Dialogs open anywhere in the editor (also those of the forms): the toast waits.
+  const [dialogs, setDialogs] = useState(0);
+  const trackDialog = useCallback(() => {
+    setDialogs((count) => count + 1);
+    return () => {
+      setDialogs((count) => count - 1);
+    };
   }, []);
 
   const refreshBoard = (): void => {
@@ -691,7 +707,7 @@ function EditorBody({
             : () => {
                 setPending({
                   kind: "delete",
-                  title: target.master.title,
+                  title: view.draft.title.trim() || target.master.title,
                   target,
                 });
               }
@@ -731,7 +747,7 @@ function EditorBody({
             : () => {
                 setPending({
                   kind: "delete",
-                  title: target.master.title,
+                  title: view.draft.title.trim() || target.master.title,
                   target,
                 });
               }
@@ -799,6 +815,7 @@ function EditorBody({
           <div className="flex flex-wrap gap-3">
             <EditorButton
               tone="primary"
+              id={TOP_ANCHOR}
               className="text-title"
               data-testid={TID.newEntry}
               onClick={() => {
@@ -921,6 +938,10 @@ function EditorBody({
               void exportBackup();
             }}
             onImport={importBackup}
+            onTop={() => {
+              const top = document.getElementById(TOP_ANCHOR);
+              if (top !== null) jumpTo(top);
+            }}
           >
             <PhoneFeed key={token} api={api} token={token} />
           </DataSection>
@@ -930,123 +951,131 @@ function EditorBody({
   }
 
   return (
-    <div className="h-full min-h-0" data-testid={TID.editor}>
-      {content}
-      {pending?.kind === "scope" && (
-        <ConfirmDialog
-          title={t("editor.scope.title", { title: pending.title })}
-          text={
-            pending.hasOverride
-              ? `${t("editor.scope.text")} ${t("editor.scope.overrideText")}`
-              : t("editor.scope.text")
-          }
-          cancelLabel={t("editor.action.cancel")}
-          onCancel={() => {
-            setPending(null);
-          }}
-          actions={[
-            {
-              label: t("editor.scope.one", {
-                day: dateLabel(pending.date, format, t),
-              }),
-              "data-testid": TID.scopeOne,
-              onSelect: () => {
-                setPending(null);
-                pending.save({ scope: "one", date: pending.date });
+    <DialogTrackerContext value={trackDialog}>
+      <div className="h-full min-h-0" data-testid={TID.editor}>
+        {content}
+        {pending?.kind === "scope" && (
+          <ConfirmDialog
+            title={t("editor.scope.title", { title: pending.title })}
+            text={
+              pending.hasOverride
+                ? `${t("editor.scope.text")} ${t("editor.scope.overrideText")}`
+                : t("editor.scope.text")
+            }
+            cancelLabel={t("editor.action.cancel")}
+            onCancel={() => {
+              setPending(null);
+            }}
+            actions={[
+              {
+                label: t("editor.scope.one", {
+                  day: dateLabel(pending.date, format, t),
+                }),
+                "data-testid": TID.scopeOne,
+                onSelect: () => {
+                  setPending(null);
+                  pending.save({ scope: "one", date: pending.date });
+                },
               },
-            },
-            {
-              label: t("editor.scope.series"),
-              "data-testid": TID.scopeSeries,
-              onSelect: () => {
-                setPending(null);
-                pending.save({ scope: "series" });
+              {
+                label: t("editor.scope.series"),
+                "data-testid": TID.scopeSeries,
+                onSelect: () => {
+                  setPending(null);
+                  pending.save({ scope: "series" });
+                },
               },
-            },
-          ]}
-        />
-      )}
-      {pending?.kind === "delete" && (
-        <ConfirmDialog
-          title={t("editor.delete.title", { title: pending.title })}
-          text={
-            pending.target.occurrenceDate === null
-              ? t("editor.delete.text")
-              : t("editor.delete.seriesText")
-          }
-          cancelLabel={t("editor.delete.keep")}
-          onCancel={() => {
-            setPending(null);
-          }}
-          actions={
-            pending.target.occurrenceDate === null
-              ? [
-                  {
-                    label: t("editor.action.delete"),
-                    tone: "danger",
-                    "data-testid": TID.confirmDelete,
-                    onSelect: () => {
-                      setPending(null);
-                      remove(pending.target, { scope: "series" });
+            ]}
+          />
+        )}
+        {pending?.kind === "delete" && (
+          <ConfirmDialog
+            title={t("editor.delete.title", { title: pending.title })}
+            text={
+              pending.target.occurrenceDate === null
+                ? t("editor.delete.text")
+                : t("editor.delete.seriesText")
+            }
+            cancelLabel={t("editor.delete.keep")}
+            onCancel={() => {
+              setPending(null);
+            }}
+            actions={
+              pending.target.occurrenceDate === null
+                ? [
+                    {
+                      label: t("editor.action.delete"),
+                      tone: "danger",
+                      "data-testid": TID.confirmDelete,
+                      onSelect: () => {
+                        setPending(null);
+                        remove(pending.target, { scope: "series" });
+                      },
                     },
-                  },
-                ]
-              : [
-                  {
-                    label: t("editor.scope.one", {
-                      day: dateLabel(pending.target.occurrenceDate, format, t),
-                    }),
-                    "data-testid": TID.deleteOne,
-                    onSelect: () => {
-                      const date = pending.target.occurrenceDate ?? today;
-                      setPending(null);
-                      remove(pending.target, { scope: "one", date });
+                  ]
+                : [
+                    {
+                      label: t("editor.scope.one", {
+                        day: dateLabel(
+                          pending.target.occurrenceDate,
+                          format,
+                          t,
+                        ),
+                      }),
+                      "data-testid": TID.deleteOne,
+                      onSelect: () => {
+                        const date = pending.target.occurrenceDate ?? today;
+                        setPending(null);
+                        remove(pending.target, { scope: "one", date });
+                      },
                     },
-                  },
-                  {
-                    label: t("editor.delete.series"),
-                    tone: "danger",
-                    "data-testid": TID.deleteSeries,
-                    onSelect: () => {
-                      setPending(null);
-                      remove(pending.target, { scope: "series" });
+                    {
+                      label: t("editor.delete.series"),
+                      tone: "danger",
+                      "data-testid": TID.deleteSeries,
+                      onSelect: () => {
+                        setPending(null);
+                        remove(pending.target, { scope: "series" });
+                      },
                     },
-                  },
-                ]
-          }
-        />
-      )}
-      {pending?.kind === "copy" && (
-        <ConfirmDialog
-          title={t("editor.copy.confirmTitle", { count: pending.plan.length })}
-          text={t("editor.copy.confirmText", {
-            from: dayLabel(today, today, format, t),
-            to: dayLabel(addCalendarDays(today, 6), today, format, t),
-          })}
-          cancelLabel={t("editor.action.cancel")}
-          onCancel={() => {
-            setPending(null);
-          }}
-          actions={[
-            {
-              label: t("editor.copy.confirmAction"),
-              tone: "primary",
-              "data-testid": TID.confirmCopy,
-              onSelect: () => {
-                const plan = pending.plan;
-                setPending(null);
-                void runCopy(plan);
+                  ]
+            }
+          />
+        )}
+        {pending?.kind === "copy" && (
+          <ConfirmDialog
+            title={t("editor.copy.confirmTitle", {
+              count: pending.plan.length,
+            })}
+            text={t("editor.copy.confirmText", {
+              from: dayLabel(today, today, format, t),
+              to: dayLabel(addCalendarDays(today, 6), today, format, t),
+            })}
+            cancelLabel={t("editor.action.cancel")}
+            onCancel={() => {
+              setPending(null);
+            }}
+            actions={[
+              {
+                label: t("editor.copy.confirmAction"),
+                tone: "primary",
+                "data-testid": TID.confirmCopy,
+                onSelect: () => {
+                  const plan = pending.plan;
+                  setPending(null);
+                  void runCopy(plan);
+                },
               },
-            },
-          ]}
+            ]}
+          />
+        )}
+        <Toast
+          message={toast}
+          onDone={clearToast}
+          hidden={dialogs > 0 || relockFor === token}
         />
-      )}
-      <Toast
-        message={toast}
-        onDone={clearToast}
-        hidden={pending !== null || relockFor === token}
-      />
-      {relockFor === token && <PinPad />}
-    </div>
+        {relockFor === token && <PinPad />}
+      </div>
+    </DialogTrackerContext>
   );
 }

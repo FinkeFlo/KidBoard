@@ -1,6 +1,7 @@
 /** Stable test hooks (`data-testid`) of the editor, for component and e2e tests. */
 export const TID = {
   activityIcons: "activity-icons",
+  backToTop: "back-to-top",
   changedTag: "changed-tag",
   confirmCopy: "confirm-copy",
   confirmDelete: "confirm-delete",

@@ -126,6 +126,7 @@
       "demo": "Demo: Die PIN ist {{pin}}"
     },
     "idle": {
+      "announce": "Gleich wird gesperrt. Ohne Eingabe sperrt sich der Eltern-Bereich in etwa {{seconds}} Sekunden. Wähle Weiter bearbeiten, um zu bleiben.",
       "title": "Gleich wird gesperrt",
       "text_one": "Ohne Eingabe sperrt sich der Eltern-Bereich in {{count}} Sekunde.",
       "text_other": "Ohne Eingabe sperrt sich der Eltern-Bereich in {{count}} Sekunden.",
@@ -413,7 +414,7 @@
       "select": "Der Link ist markiert – jetzt kopieren"
     },
     "data": {
-      "title": "Daten",
+      "title": "Sicherung & Handy",
       "export": "Sicherung herunterladen",
       "choose": "Sicherungsdatei wählen",
       "hint": "Die Sicherung enthält die hier gemachten Einträge (nicht die aus Google).",
@@ -442,6 +443,7 @@
       "keep": "Weiter bearbeiten"
     },
     "jump": {
+      "top": "Nach oben",
       "label": "Springen zu",
       "list": "Termine",
       "data": "Sicherung & Handy"

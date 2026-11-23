@@ -2,6 +2,7 @@ import { ImportModeSchema, type ImportModeValue } from "@kidboard/shared";
 import { type ReactNode, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Emoji } from "../components/Emoji";
 import type { EditorFailure } from "./failure";
 import { FailureNotice } from "./Notice";
 import { TID } from "./testIds";
@@ -37,7 +38,7 @@ export function readBackup(name: string, text: string): ChosenBackup | null {
 }
 
 /**
- * The small "Data" section (T-45 criterion 6): export downloads the backup as a JSON
+ * The small "Backup & phone" section (T-45 criterion 6): export downloads the backup as a JSON
  * file; import reads a chosen backup and, after one confirmation that names the mode,
  * adds it to the entries (merge) or replaces all of them.
  */
@@ -46,6 +47,7 @@ export function DataSection({
   failure,
   onExport,
   onImport,
+  onTop,
   children,
 }: {
   busy: boolean;
@@ -53,6 +55,8 @@ export function DataSection({
   onExport: () => void;
   /** Resolves `true` once imported. */
   onImport: (backup: ChosenBackup, mode: ImportModeValue) => Promise<boolean>;
+  /** "Back to top": the home view jumps back to its first action. */
+  onTop: () => void;
   /** More blocks of the section (the phone feed link), shown after the heading. */
   children?: ReactNode;
 }): React.JSX.Element {
@@ -71,9 +75,15 @@ export function DataSection({
       className="bg-surface-sunken rounded-column flex flex-col gap-4 p-4"
       data-testid={TID.dataSection}
     >
-      <h3 id="editor-data" className="text-title">
-        {t("editor.data.title")}
-      </h3>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 id="editor-data" className="text-title">
+          {t("editor.data.title")}
+        </h3>
+        <EditorButton tone="quiet" onClick={onTop} data-testid={TID.backToTop}>
+          <Emoji emoji="🔝" className="text-[1.5rem]" />
+          {t("editor.jump.top")}
+        </EditorButton>
+      </div>
       {children}
       <div className="flex flex-wrap items-center gap-3">
         <EditorButton

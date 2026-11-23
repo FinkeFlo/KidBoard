@@ -317,9 +317,41 @@ test.describe("parent gate (ADR-0013)", () => {
     );
     await expect(warning).toBeVisible();
     await expect(warning).toContainText("Locking soon");
+    // The real seconds left, not a fixed 30.
+    await expect(warning).toContainText("in 25 seconds");
     await warning.getByRole("button", { name: "Keep editing" }).click();
     await expect(warning).toHaveCount(0);
     await expect(editor(page)).toBeVisible();
+  });
+
+  test("the idle warning on the PIN pad covers none of its buttons", async ({
+    page,
+  }) => {
+    await openBoard(page);
+    await holdEntry(page);
+    await setNow(
+      page,
+      new Date(Date.parse(NOW) + 2 * 60_000 + 35_000).toISOString(),
+      { wake: false },
+    );
+    const warning = page.getByTestId("idle-warning");
+    await expect(warning).toBeVisible();
+    await expect(page.getByTestId("idle-warning")).toHaveCount(1);
+    const banner = await warning.boundingBox();
+    if (banner === null) throw new Error("banner has no box");
+    const buttons = pinPad(page).getByRole("button");
+    for (let index = 0; index < (await buttons.count()); index += 1) {
+      const button = buttons.nth(index);
+      if ((await button.innerText()) === "Keep editing") continue;
+      const box = await button.boundingBox();
+      if (box === null) continue;
+      const overlaps =
+        box.x < banner.x + banner.width &&
+        box.x + box.width > banner.x &&
+        box.y < banner.y + banner.height &&
+        box.y + box.height > banner.y;
+      expect(overlaps, await button.innerText()).toBe(false);
+    }
   });
 
   test("auto-lock: after 3 minutes without a touch and when the tab is hidden", async ({

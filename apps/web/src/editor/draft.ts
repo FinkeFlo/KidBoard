@@ -115,9 +115,10 @@ export function newMealDraft(date: string, slot: MealSlot): MealDraft {
 }
 
 /**
- * Day and start of a new entry made at `nowMs`: today at {@link DEFAULT_START_TIME},
- * or, once that has passed in the configured zone, today at the next full hour (from
- * 23:00 on, tomorrow at the default start, as no full hour of today is left).
+ * Day and start of a new entry made at `nowMs`: today at {@link DEFAULT_START_TIME}
+ * while that is strictly ahead, or, from that minute on, today at the next full hour
+ * (from 23:00 on, tomorrow at the default start, as no full hour of today is left). So
+ * a fresh entry never starts in the past (see {@link startsInPast}).
  */
 export function defaultStart(
   today: string,
@@ -125,7 +126,7 @@ export function defaultStart(
   timeZone: string,
 ): { date: string; startTime: string } {
   const minutes = minuteOfDay(nowMs, timeZone);
-  if (minutes <= minutesOfTime(DEFAULT_START_TIME)) {
+  if (minutes < minutesOfTime(DEFAULT_START_TIME)) {
     return { date: today, startTime: DEFAULT_START_TIME };
   }
   const hour = Math.floor(minutes / 60) + 1;
@@ -137,7 +138,8 @@ export function defaultStart(
 
 /**
  * Whether a one-off draft starts before `nowMs` (an all-day one: before `today`), for
- * a gentle hint; series are never "past" as their later days still come.
+ * a gentle hint; series are never "past" as their later days still come. Compared at
+ * minute resolution: a start in the current minute is not past.
  */
 export function startsInPast(
   draft: EventDraft,
@@ -151,7 +153,7 @@ export function startsInPast(
     { date: draft.date, startTime: draft.startTime, ...timedEnd(draft) },
     timeZone,
   );
-  return range.startMs < nowMs;
+  return range.startMs < nowMs - (nowMs % 60_000);
 }
 
 /**

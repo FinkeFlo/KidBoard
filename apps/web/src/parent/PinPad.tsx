@@ -7,6 +7,7 @@ import {
   PIN_MIN_LENGTH,
   type UnlockFailure,
   useParentGate,
+  useRegisterPad,
 } from "./parentGate";
 
 /**
@@ -110,6 +111,7 @@ function DigitKey({
 export function PinPad(): React.JSX.Element {
   const { t } = useTranslation();
   const gate = useParentGate();
+  useRegisterPad();
   const titleId = useId();
   const dialog = useRef<HTMLDivElement>(null);
   const [digits, setDigits] = useState("");
@@ -242,118 +244,120 @@ export function PinPad(): React.JSX.Element {
   }
 
   return (
-    <div className="bg-surface text-text p-page fixed inset-0 z-20 flex items-center justify-center">
-      <div
-        ref={dialog}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        data-testid="pin-pad"
-        className="bg-surface-raised rounded-column shadow-raised p-page gap-gutter flex w-full max-w-[32rem] flex-col items-stretch outline-none"
-      >
-        <div className="flex items-center justify-center gap-3">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="text-control-quiet size-7"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="5" y="11" width="14" height="10" rx="2" />
-            <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-          </svg>
-          <h2 id={titleId} className="text-heading">
-            {t("parent.pin.title")}
-          </h2>
-        </div>
-        <p className="text-body text-text-muted text-center">
-          {pending ? t("parent.pin.checking") : t("parent.pin.prompt")}
-        </p>
-        {DEMO_PIN !== null && (
-          <p
-            className="text-meta text-text-muted text-center"
-            data-testid="demo-pin"
-          >
-            {t("parent.pin.demo", { pin: DEMO_PIN })}
-          </p>
-        )}
-        <div
-          key={errorCount}
-          data-testid="pin-dots-row"
-          className={
-            errorCount > 0
-              ? "motion-safe:animate-[kb-shake_var(--duration-slow)_ease-in-out]"
-              : undefined
-          }
-        >
-          <PinDots count={digits.length} />
-        </div>
-        <p
-          aria-live="polite"
-          data-testid="pin-feedback"
-          className={`text-body min-h-[1.4em] text-center ${
-            locked ? "text-text" : "text-danger"
-          }`}
-        >
-          {message}
-        </p>
-        <div className="grid grid-cols-3 gap-3">
-          {TOP_DIGITS.map((digit) => (
-            <DigitKey
-              key={digit}
-              digit={digit}
-              disabled={disabled || full}
-              onPress={press}
-            />
-          ))}
-          <button
-            type="button"
-            aria-label={t("parent.pin.erase")}
-            disabled={disabled || digits.length === 0}
-            onClick={erase}
-            className={KEY_CLASS}
-          >
+    <div
+      ref={dialog}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      tabIndex={-1}
+      data-testid="pin-pad"
+      className="bg-surface text-text p-page fixed inset-0 z-20 overflow-y-auto outline-none"
+    >
+      <div className="flex min-h-full flex-col items-center justify-center lg:flex-row">
+        <div className="bg-surface-raised rounded-column shadow-raised p-page gap-gutter flex w-full max-w-[32rem] flex-col items-stretch">
+          <div className="flex items-center justify-center gap-3">
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
-              className="size-8"
+              className="text-control-quiet size-7"
               fill="none"
               stroke="currentColor"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M9 5h11v14H9l-6-7 6-7zM12 9l5 6M17 9l-5 6" />
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
             </svg>
-          </button>
-          <DigitKey
-            digit={BOTTOM_DIGIT}
-            disabled={disabled || full}
-            onPress={press}
-          />
+            <h2 id={titleId} className="text-heading">
+              {t("parent.pin.title")}
+            </h2>
+          </div>
+          <p className="text-body text-text-muted text-center">
+            {pending ? t("parent.pin.checking") : t("parent.pin.prompt")}
+          </p>
+          {DEMO_PIN !== null && (
+            <p
+              className="text-meta text-text-muted text-center"
+              data-testid="demo-pin"
+            >
+              {t("parent.pin.demo", { pin: DEMO_PIN })}
+            </p>
+          )}
+          <div
+            key={errorCount}
+            data-testid="pin-dots-row"
+            className={
+              errorCount > 0
+                ? "motion-safe:animate-[kb-shake_var(--duration-slow)_ease-in-out]"
+                : undefined
+            }
+          >
+            <PinDots count={digits.length} />
+          </div>
+          <p
+            aria-live="polite"
+            data-testid="pin-feedback"
+            className={`text-body min-h-[1.4em] text-center ${
+              locked ? "text-text" : "text-danger"
+            }`}
+          >
+            {message}
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {TOP_DIGITS.map((digit) => (
+              <DigitKey
+                key={digit}
+                digit={digit}
+                disabled={disabled || full}
+                onPress={press}
+              />
+            ))}
+            <button
+              type="button"
+              aria-label={t("parent.pin.erase")}
+              disabled={disabled || digits.length === 0}
+              onClick={erase}
+              className={KEY_CLASS}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="size-8"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M9 5h11v14H9l-6-7 6-7zM12 9l5 6M17 9l-5 6" />
+              </svg>
+            </button>
+            <DigitKey
+              digit={BOTTOM_DIGIT}
+              disabled={disabled || full}
+              onPress={press}
+            />
+            <button
+              type="button"
+              disabled={disabled || digits.length < PIN_MIN_LENGTH}
+              onClick={() => {
+                void submit();
+              }}
+              className="min-h-touch rounded-tile bg-accent text-on-accent text-title focus-visible:outline-text disabled:bg-surface-sunken disabled:text-text-muted flex items-center justify-center select-none focus-visible:outline-4 focus-visible:outline-offset-2"
+            >
+              {t("parent.pin.submit")}
+            </button>
+          </div>
           <button
             type="button"
-            disabled={disabled || digits.length < PIN_MIN_LENGTH}
-            onClick={() => {
-              void submit();
-            }}
-            className="min-h-touch rounded-tile bg-accent text-on-accent text-title focus-visible:outline-text disabled:bg-surface-sunken disabled:text-text-muted flex items-center justify-center select-none focus-visible:outline-4 focus-visible:outline-offset-2"
+            onClick={gate.close}
+            className="min-h-touch text-body text-text-muted focus-visible:outline-accent rounded-pill self-center px-6 font-extrabold focus-visible:outline-4"
           >
-            {t("parent.pin.submit")}
+            {t("parent.pin.cancel")}
           </button>
         </div>
-        <button
-          type="button"
-          onClick={gate.close}
-          className="min-h-touch text-body text-text-muted focus-visible:outline-accent rounded-pill self-center px-6 font-extrabold focus-visible:outline-4"
-        >
-          {t("parent.pin.cancel")}
-        </button>
-        <IdleWarning />
+        <IdleWarning placement="flow" />
       </div>
     </div>
   );

@@ -1,8 +1,15 @@
-import { type ReactNode, useEffect, useId, useRef } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { IdleWarning } from "./IdleWarning";
-import { useParentGate } from "./parentGate";
+import { PadHostContext, useParentGate } from "./parentGate";
 
 export interface EditorScreenProps {
   /** The editor's content (T-45); a short placeholder until then. */
@@ -21,6 +28,14 @@ export function EditorScreen({
   const { close } = useParentGate();
   const titleId = useId();
   const root = useRef<HTMLElement>(null);
+  // PIN pads open above the editor (re-lock) carry the "locking soon" banner themselves.
+  const [pads, setPads] = useState(0);
+  const registerPad = useCallback(() => {
+    setPads((count) => count + 1);
+    return () => {
+      setPads((count) => count - 1);
+    };
+  }, []);
 
   useEffect(() => {
     root.current?.focus();
@@ -48,14 +63,16 @@ export function EditorScreen({
           {t("parent.editor.done")}
         </button>
       </header>
-      <div data-testid="editor-content" className="min-h-0 flex-1">
-        {children ?? (
-          <p className="text-body text-text-muted">
-            {t("parent.editor.placeholder")}
-          </p>
-        )}
-      </div>
-      <IdleWarning />
+      <PadHostContext value={registerPad}>
+        <div data-testid="editor-content" className="min-h-0 flex-1">
+          {children ?? (
+            <p className="text-body text-text-muted">
+              {t("parent.editor.placeholder")}
+            </p>
+          )}
+        </div>
+      </PadHostContext>
+      {pads === 0 && <IdleWarning />}
     </section>
   );
 }

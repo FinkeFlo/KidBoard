@@ -562,8 +562,12 @@ test.describe("parent editor (T-45)", () => {
       .getByRole("navigation", { name: "Jump to" })
       .getByRole("button", { name: "Backup & phone" })
       .click();
-    await expect(page.getByRole("heading", { name: "Data" })).toBeFocused();
-    await expect(page.getByRole("heading", { name: "Data" })).toBeInViewport();
+    await expect(
+      page.getByRole("heading", { name: "Backup & phone" }),
+    ).toBeFocused();
+    await expect(
+      page.getByRole("heading", { name: "Backup & phone" }),
+    ).toBeInViewport();
 
     await page.getByTestId("new-entry").click();
     const form = page.getByTestId("event-form");
