@@ -15,7 +15,8 @@
     "forEveryone": "For everyone",
     "continues": "Continues",
     "forChildren": "For {{names, list}}",
-    "moreChildren": "+{{count}}"
+    "moreChildren": "+{{count}}",
+    "bring": "Bring along: {{icons}}"
   },
   "meal": {
     "slot": {

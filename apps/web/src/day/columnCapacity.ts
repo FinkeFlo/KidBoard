@@ -1,4 +1,5 @@
 import {
+  BRING_EXTRA_REM,
   type EventStatus,
   PROMINENT_EXTRA_REM,
   TILE_HEIGHT_REM,
@@ -28,26 +29,40 @@ export interface ColumnFit<T> {
   layout: ColumnLayout<T>;
 }
 
-/** Height in rem of one tile of `size` (larger when it is a prominent one). */
-export function tileHeightRem(size: TileSize, prominent: boolean): number {
-  return TILE_HEIGHT_REM[size] + (prominent ? PROMINENT_EXTRA_REM[size] : 0);
+/**
+ * Height in rem of one tile of `size` (larger when it is a prominent one, and when it shows
+ * a bring list in a chip row of its own, `BRING_EXTRA_REM`).
+ */
+export function tileHeightRem(
+  size: TileSize,
+  prominent: boolean,
+  bring = false,
+): number {
+  return (
+    TILE_HEIGHT_REM[size] +
+    (prominent ? PROMINENT_EXTRA_REM[size] : 0) +
+    (bring ? BRING_EXTRA_REM[size] : 0)
+  );
 }
 
 /**
  * Height in rem that `layout` takes with tiles of `size` (rows plus gaps); the tiles in
- * `prominent` are counted at their larger height.
+ * `prominent` are counted at their larger height, those in `bring` (tiles that show a
+ * bring list) with their chip row where the size has one.
  */
 export function layoutHeightRem<T>(
   layout: ColumnLayout<T>,
   size: TileSize,
   prominent: readonly T[] = [],
+  bring: readonly T[] = [],
 ): number {
   const strip = layout.pastStrip.length > 0 ? 1 : 0;
   const more = layout.hiddenLater > 0 ? 1 : 0;
   const rows = layout.visible.length + strip + more;
   if (rows === 0) return 0;
   const tiles = layout.visible.reduce(
-    (sum, item) => sum + tileHeightRem(size, prominent.includes(item)),
+    (sum, item) =>
+      sum + tileHeightRem(size, prominent.includes(item), bring.includes(item)),
     0,
   );
   return tiles + (strip + more) * SUMMARY_ROW_REM + (rows - 1) * COLUMN_GAP_REM;
@@ -57,7 +72,8 @@ export function layoutHeightRem<T>(
  * Tile size and layout of a day column whose list is `heightRem` high (`null`: not
  * measured yet, then everything is shown). `reservedRem` is space other rows take (the
  * now line plus its gap); `prominent` are the events that get a larger tile when space
- * allows (today: the current ones, else the next one). Decided by space alone, in this
+ * allows (today: the current ones, else the next one); `bring` are the events whose tile
+ * shows a bring list (taller at sizes with a chip row). Decided by space alone, in this
  * order, taking the first that fits:
  *
  * 1. every event as a tile at the largest size, prominent ones enlarged (past events
@@ -75,6 +91,7 @@ export function fitColumn<T extends { status: EventStatus }>(
   heightRem: number | null,
   reservedRem = 0,
   prominent: readonly T[] = [],
+  bring: readonly T[] = [],
 ): ColumnFit<T> {
   const ladder = today ? TODAY_SIZES : DAY_SIZES;
   const largest = ladder[0] ?? "large";
@@ -94,7 +111,8 @@ export function fitColumn<T extends { status: EventStatus }>(
     size: TileSize,
     enlarged: boolean,
   ): boolean =>
-    layoutHeightRem(layout, size, enlarged ? prominent : []) <= available;
+    layoutHeightRem(layout, size, enlarged ? prominent : [], bring) <=
+    available;
 
   // 1. Everything as tiles at the largest size.
   if (fits(all, largest, true)) {
@@ -138,12 +156,14 @@ export function freeRem<T>(
   heightRem: number | null,
   reservedRem = 0,
   prominent: readonly T[] = [],
+  bring: readonly T[] = [],
 ): number | null {
   if (heightRem === null) return null;
   const used = layoutHeightRem(
     fit.layout,
     fit.size,
     fit.prominent ? prominent : [],
+    bring,
   );
   return Math.max(0, heightRem - reservedRem - used);
 }

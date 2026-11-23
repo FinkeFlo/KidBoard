@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { ChildAvatar } from "../components/ChildAvatar";
 import { resolveTileTint, tileTintStyle } from "../components/childTint";
 import { Emoji } from "../components/Emoji";
-import { childrenOf, EventTile } from "../components/EventTile";
+import { childrenOf, EventTile, showsBring } from "../components/EventTile";
 import {
   MoreLater,
   PastStrip,
@@ -49,6 +49,8 @@ function WeekColumn({
   const fit = fitWeekColumn(
     day.events,
     measured === null ? null : measured.height / measured.rem,
+    // Tiles with bring chips are taller (a chip row of their own).
+    day.events.filter((item) => showsBring(item.event, item.status)),
   );
   const shown = chronological(fit.visible);
   // The strip lists the finished events oldest first.

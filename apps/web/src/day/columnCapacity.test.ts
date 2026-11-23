@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { PROMINENT_EXTRA_REM, TILE_HEIGHT_REM } from "../components/EventTile";
+import {
+  BRING_EXTRA_REM,
+  PROMINENT_EXTRA_REM,
+  TILE_HEIGHT_REM,
+} from "../components/EventTile";
 import {
   COLUMN_GAP_REM,
   DAY_SIZES,
@@ -248,6 +252,115 @@ describe("fitColumn", () => {
                 expect(layoutHeightRem(oneMore, size)).toBeGreaterThan(
                   height - 2 + 1e-6,
                 );
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe("fitColumn with bring lists", () => {
+  it("today's tiles keep their height with chips; the other days' tiles grow by a chip row", () => {
+    for (const size of TODAY_SIZES) {
+      expect(tileHeightRem(size, false, true)).toBe(tileHeightRem(size, false));
+      expect(tileHeightRem(size, true, true)).toBe(tileHeightRem(size, true));
+    }
+    for (const size of DAY_SIZES) {
+      expect(BRING_EXTRA_REM[size]).toBeGreaterThan(0);
+      expect(tileHeightRem(size, false, true)).toBe(
+        TILE_HEIGHT_REM[size] + BRING_EXTRA_REM[size],
+      );
+    }
+    // Every step of the other days still gets smaller, also with chips.
+    expect(tileHeightRem("compact-dense", false, true)).toBeLessThan(
+      tileHeightRem("compact", false, true),
+    );
+  });
+
+  it("counts a chip row only for the tiles that show one", () => {
+    const all = items("uuu");
+    const layout = columnLayout(all, 3);
+    const plain = layoutHeightRem(layout, "compact");
+    const one = layoutHeightRem(layout, "compact", [], all.slice(1, 2));
+    expect(one - plain).toBeCloseTo(BRING_EXTRA_REM.compact);
+    expect(layoutHeightRem(layout, "compact", [], all) - plain).toBeCloseTo(
+      3 * BRING_EXTRA_REM.compact,
+    );
+    expect(layoutHeightRem(layout, "large", [], all)).toBe(
+      layoutHeightRem(layout, "large"),
+    );
+  });
+
+  it("another day steps down sooner when its tiles carry chips, never with a +N while one more fits", () => {
+    const all = items("uuu");
+    const height = rows(3, TILE_HEIGHT_REM.compact);
+    expect(fitColumn(all, false, height).size).toBe("compact");
+    const fit = fitColumn(all, false, height, 0, [], all);
+    expect(fit.size).toBe("compact-dense");
+    expect(fit.layout.hiddenLater).toBe(0);
+  });
+
+  it("sweep with bring lists: fits from a minimum height on, never loses an event, +N only when one more tile would not fit", () => {
+    // Which events carry a bring list: none, all, every other one, the first only.
+    const masks: ((index: number) => boolean)[] = [
+      () => false,
+      () => true,
+      (index) => index % 2 === 0,
+      (index) => index === 0,
+    ];
+    for (let count = 0; count <= 14; count += 1) {
+      for (let pastCount = 0; pastCount <= count; pastCount += 2) {
+        const pattern =
+          "p".repeat(pastCount) +
+          (count > pastCount ? "c" : "") +
+          "u".repeat(Math.max(0, count - pastCount - 1));
+        const all = items(pattern);
+        for (const mask of masks) {
+          // Past tiles never show chips (the caller passes only the others).
+          const bring = all.filter(
+            (item, index) => mask(index) && item.status !== "past",
+          );
+          for (let height = 6; height <= 40; height += 0.75) {
+            for (const today of [true, false]) {
+              const prominent = all.filter((i) => i.status === "current");
+              const fit = fitColumn(all, today, height, 2, prominent, bring);
+              const { size, layout } = fit;
+              const used = layoutHeightRem(
+                layout,
+                size,
+                fit.prominent ? prominent : [],
+                bring,
+              );
+              const minimum = tileHeightRem(size, false, true) + 2 * STRIP + 2;
+              if (height >= minimum) {
+                expect(used).toBeLessThanOrEqual(height - 2 + 1e-6);
+              }
+              // No loss: shown + folded + hidden = n.
+              expect(
+                layout.visible.length +
+                  layout.pastStrip.length +
+                  layout.hiddenLater,
+              ).toBe(count);
+              for (const item of prominent) {
+                expect(layout.visible).toContain(item);
+              }
+              // Today's column decides exactly as without chips (they sit in the time row).
+              if (today) {
+                expect(fit).toEqual(
+                  fitColumn(all, today, height, 2, prominent),
+                );
+              }
+              const ladder = today ? TODAY_SIZES : DAY_SIZES;
+              if (layout.hiddenLater > 0) {
+                expect(size).toBe(ladder[ladder.length - 1]);
+                const oneMore = columnLayout(all, layout.visible.length + 1);
+                if (layout.visible.length + 1 <= count - pastCount) {
+                  expect(
+                    layoutHeightRem(oneMore, size, [], bring),
+                  ).toBeGreaterThan(height - 2 + 1e-6);
+                }
               }
             }
           }

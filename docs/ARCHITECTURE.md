@@ -422,6 +422,27 @@ A **current event is never hidden or folded**; `MIN_TILES` (1) is the smallest t
 so a tiny column may overflow rather than hide. Strip and "+N" name all their titles for
 assistive tech, so nothing is lost silently.
 
+**Bring chips (T-35, ADR-0010).** An event's `bring` list shows on its tile as small emoji
+chips (`BringChips`: each icon through `<Emoji>` on a `--color-surface-sunken` disc with a
+`--color-border` ring, as the tile's own emoji; React text only). Only tiles that are not
+over show them (`showsBring`); past tiles and the "vorbei"/"done" strip never do. Chips are
+decorative (`aria-hidden`); the tile has one accessible description listing every icon
+(`aria-describedby` → `event.bring`, "Bring along: 👟 🩱" / "Mitbringen: 👟 🩱"). Where they
+go: in today's column (about twice as wide) at the end of the time row, `slim` at the end
+of its one row (at most 40 % of it), the all-day banner before the badges; these tiles keep
+their height. The narrow tiles (`compact`, `compact-dense` and every week size) have no
+room beside the time, so the chips get a row of their own and the tile grows by
+`BRING_EXTRA_REM` (1.25rem; `compact-dense` 0.75, `week-slim` 1); `tileHeightRem`,
+`fitColumn`/`freeRem` and `fitWeekColumn` (`weekRowsRem`) count exactly those tiles taller,
+so the space rules (fold, shrink, then "+N" only when one more tile would not fit) and
+`shown + folded + summed up = n` hold with bring lists too. The chip area asks for the
+width of all chips and shrinks first (`shrink-999`) down to the room of a "+N"; it measures
+the width it got (`useContentWidth`) and `chipsThatFit` (the strip's `iconsThatFit`) draws
+only whole chips, the rest is a plain-text "+N". Its width never depends on how many it
+draws, so the measurement is stable. No new colour token: the chip reuses the emoji disc
+tokens, its "+N" is `--color-text-muted` on the tile (contrast-tested on every tint, both
+themes).
+
 **Today's markers.** `NowLine` is a named separator between started and upcoming events and
 moves only from tile to tile, never per minute: a clock disc, a thick bar and a "now" pill,
 all in the person-neutral `--color-now` ink. "Now" and "next" never use a child colour (or
@@ -561,7 +582,8 @@ the span icon, with the badges, the word stays in the name). Every size keeps th
 where the column is wide enough (CSS container query on the column's list: 5.5rem,
 `week-slim` 7rem), so today's column reads like the others. Tinted by the child
 (`resolveTileTint`) with edge or stripes and badges per child, so colour is never the only
-cue; events without a child are neutral.
+cue; events without a child are neutral. A tile with a bring list gets a chip row below
+the time (`BRING_EXTRA_REM` taller, counted by `fitWeekColumn`; see "Bring chips").
 **Countdown day:** every header has the same slot right of the date (so all dates align):
 one 🌙 on each day before the awaited day (the night still to sleep), the awaited event's
 icon on that day, empty after it. The awaited day gets a ring in the countdown colour

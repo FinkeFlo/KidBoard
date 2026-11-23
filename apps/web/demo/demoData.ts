@@ -63,6 +63,8 @@ interface Slot {
   childIds?: string[];
   /** Length in minutes (default 60). */
   minutes?: number;
+  /** Bring list (as parsed from a `Mitbringen:` line, ADR-0010). */
+  bring?: string[];
   /** Takes place Monday to Friday only; on Saturday and Sunday {@link Slot.weekend} replaces it. */
   weekend?: Omit<Slot, "weekend">;
 }
@@ -82,10 +84,19 @@ function isWeekend(date: string): boolean {
  * One entry per day of a repeating week, indexed by `offset % 7` from today (so today is
  * always the busy day). Weekday-only slots (kindergarten) carry a weekend replacement.
  */
+/** What Mia packs for swimming (a school lesson in the demo week). */
+const SWIM_BRING = ["🩱", "🧴", "🥽"];
+
 const WEEK: Slot[][] = [
   // Today: events in every band; the early ones are over by midday.
   [
-    { title: "Swimming", icon: "🏊", time: "07:30", childIds: ["mia"] },
+    {
+      title: "Swimming",
+      icon: "🏊",
+      time: "07:30",
+      childIds: ["mia"],
+      bring: SWIM_BRING,
+    },
     {
       title: "Kindergarten",
       icon: "🏫",
@@ -99,14 +110,32 @@ const WEEK: Slot[][] = [
       },
     },
     { title: "Lunch with Grandma", icon: "👵", time: "12:30" },
-    { title: "Football", icon: "⚽", time: "15:00", childIds: ["ben"] },
+    {
+      title: "Football",
+      icon: "⚽",
+      time: "15:00",
+      childIds: ["ben"],
+      bring: ["👟", "🧦"],
+    },
     { title: "Piano", icon: "🎹", time: "16:30", childIds: ["mia"] },
     { title: "Bath time", icon: "🛁", time: "18:00" },
     { title: "Story time", icon: "📖", time: "20:15", minutes: 30 },
-    { title: "Zoo trip", icon: "🦁", time: null, childIds: ["mia", "ben"] },
+    {
+      title: "Zoo trip",
+      icon: "🦁",
+      time: null,
+      childIds: ["mia", "ben"],
+      bring: ["🧢", "🥪"],
+    },
   ],
   [
-    { title: "Swimming", icon: "🏊", time: "07:30", childIds: ["mia"] },
+    {
+      title: "Swimming",
+      icon: "🏊",
+      time: "07:30",
+      childIds: ["mia"],
+      bring: SWIM_BRING,
+    },
     { title: "Library", icon: "📚", time: "15:30", childIds: ["ben", "mia"] },
   ],
   [
@@ -117,8 +146,20 @@ const WEEK: Slot[][] = [
   ],
   [{ title: "Playdate", icon: "🧸", time: "15:00", childIds: ["ben"] }],
   [
-    { title: "Swimming", icon: "🏊", time: "07:30", childIds: ["mia"] },
-    { title: "Football", icon: "⚽", time: "15:00", childIds: ["ben"] },
+    {
+      title: "Swimming",
+      icon: "🏊",
+      time: "07:30",
+      childIds: ["mia"],
+      bring: SWIM_BRING,
+    },
+    {
+      title: "Football",
+      icon: "⚽",
+      time: "15:00",
+      childIds: ["ben"],
+      bring: ["👟", "🧦"],
+    },
     { title: "Piano", icon: "🎹", time: "16:30", childIds: ["mia"] },
     { title: "Pizza night", icon: "🍕", time: "18:00" },
   ],
@@ -247,6 +288,7 @@ export function demoAgenda(
         weekend && template.weekend !== undefined ? template.weekend : template;
       const id = `demo-${String(offset)}-${String(index)}`;
       const childIds = slot.childIds ?? [];
+      const bring = slot.bring === undefined ? {} : { bring: slot.bring };
       if (slot.time === null) {
         events.push({
           ...base,
@@ -254,6 +296,7 @@ export function demoAgenda(
           title: slot.title,
           icon: slot.icon,
           childIds,
+          ...bring,
           allDay: true,
           start: date,
           end: addCalendarDays(date, 1),
@@ -267,6 +310,7 @@ export function demoAgenda(
         title: slot.title,
         icon: slot.icon,
         childIds,
+        ...bring,
         allDay: false,
         start: isoInZone(date, slot.time, DEMO_TIME_ZONE),
         end: isoInZone(

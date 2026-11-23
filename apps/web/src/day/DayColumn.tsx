@@ -2,7 +2,7 @@ import type { Child } from "@kidboard/shared";
 import { useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import { EventTile } from "../components/EventTile";
+import { EventTile, showsBring } from "../components/EventTile";
 import {
   type FormatContext,
   formatDayMonth,
@@ -53,12 +53,17 @@ export function DayColumn({
     day.current.length > 0 ? day.current : day.next === null ? [] : [day.next];
   const heightRem = measured === null ? null : measured.height / measured.rem;
   const reservedRem = showNow ? NOW_LINE_REM + COLUMN_GAP_REM : 0;
+  // Tiles with bring chips: taller where the chips need a row of their own.
+  const bring = day.events.filter((item) =>
+    showsBring(item.event, item.status),
+  );
   const plan = fitColumn(
     day.events,
     day.isToday,
     heightRem,
     reservedRem,
     prominent,
+    bring,
   );
   const { layout } = plan;
   const started = new Set(day.events.slice(0, day.nowIndex ?? 0));
@@ -67,7 +72,7 @@ export function DayColumn({
   const hiddenLater = layout.later;
   const empty = day.events.length === 0 && day.allDay.length === 0;
   // Every timed event of today is over: "All done" in the free space, if it fits there.
-  const free = freeRem(plan, heightRem, reservedRem, prominent);
+  const free = freeRem(plan, heightRem, reservedRem, prominent, bring);
   const allDone =
     day.isToday &&
     day.events.length > 0 &&

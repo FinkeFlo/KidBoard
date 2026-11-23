@@ -71,6 +71,8 @@ export interface MockEvent {
   /** Days after today (default 0). */
   day?: number;
   countdown?: boolean;
+  /** Bring list (ADR-0010), omitted when absent. */
+  bring?: string[];
 }
 
 export function agenda(
@@ -93,6 +95,7 @@ export function agenda(
         iconIsFallback: false,
         childIds: event.childIds ?? [],
         countdown: event.countdown ?? false,
+        ...(event.bring === undefined ? {} : { bring: event.bring }),
       };
       const day = dateOf(event.day ?? 0);
       if (event.time === null) {

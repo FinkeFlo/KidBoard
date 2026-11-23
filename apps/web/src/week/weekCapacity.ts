@@ -1,9 +1,9 @@
+import { type EventStatus, type TileSize } from "../components/EventTile";
 import {
-  type EventStatus,
-  TILE_HEIGHT_REM,
-  type TileSize,
-} from "../components/EventTile";
-import { COLUMN_GAP_REM, SUMMARY_ROW_REM } from "../day/columnCapacity";
+  COLUMN_GAP_REM,
+  SUMMARY_ROW_REM,
+  tileHeightRem,
+} from "../day/columnCapacity";
 import { DENSE_FROM } from "../day/columnLayout";
 
 /** Tile sizes of a week column, largest first: the steps it shrinks through. */
@@ -27,19 +27,31 @@ export interface WeekFit<T> {
   hidden: T[];
 }
 
-/** Height in rem of `tiles` tile rows plus the summary rows ("done" strip, "+N"). */
-function rowsRem(tiles: number, tileRem: number, summaries: number): number {
-  const rows = tiles + summaries;
+/**
+ * Height in rem of a week column showing `tiles` at `size` plus `summaries` summary rows
+ * ("done" strip, "+N"), with the gaps between the rows; tiles in `bring` (those showing
+ * a bring list) are counted with their chip row.
+ */
+export function weekRowsRem<T>(
+  tiles: readonly T[],
+  size: TileSize,
+  summaries: number,
+  bring: readonly T[] = [],
+): number {
+  const rows = tiles.length + summaries;
   if (rows === 0) return 0;
-  return (
-    tiles * tileRem + summaries * SUMMARY_ROW_REM + (rows - 1) * COLUMN_GAP_REM
+  const tileRem = tiles.reduce(
+    (sum, item) => sum + tileHeightRem(size, false, bring.includes(item)),
+    0,
   );
+  return tileRem + summaries * SUMMARY_ROW_REM + (rows - 1) * COLUMN_GAP_REM;
 }
 
 /**
  * How many tiles a week column can show, decided by its measured height (`heightRem`,
- * `null` until measured: show everything). `items` come most important first. The same
- * steps as the overview's columns (`fitColumn`), taking the first that fits:
+ * `null` until measured: show everything). `items` come most important first; `bring`
+ * are the ones whose tile shows a bring list (taller by its chip row). The same steps as
+ * the overview's columns (`fitColumn`), taking the first that fits:
  *
  * 1. every event as a tile at the normal size (past ones receded);
  * 2. otherwise *all* past events fold into the "done" strip (so a finished event never
@@ -58,6 +70,7 @@ function rowsRem(tiles: number, tileRem: number, summaries: number): number {
 export function fitWeekColumn<T extends { status: EventStatus }>(
   items: readonly T[],
   heightRem: number | null,
+  bring: readonly T[] = [],
 ): WeekFit<T> {
   const largest = WEEK_SIZES[0] ?? "week";
   const smallest = WEEK_SIZES[WEEK_SIZES.length - 1] ?? "week-slim";
@@ -73,7 +86,7 @@ export function fitWeekColumn<T extends { status: EventStatus }>(
   }
   const available = heightRem + 1e-6;
   // 1. Everything as tiles at the normal size.
-  if (rowsRem(count, TILE_HEIGHT_REM[largest], 0) <= available) {
+  if (weekRowsRem(items, largest, 0, bring) <= available) {
     return { size: largest, visible: [...items], past: [], hidden: [] };
   }
   // 2. All past events fold into the strip; the upcoming ones shrink step by step.
@@ -81,14 +94,18 @@ export function fitWeekColumn<T extends { status: EventStatus }>(
   const upcoming = items.filter((item) => item.status !== "past");
   const strip = past.length > 0 ? 1 : 0;
   for (const size of WEEK_SIZES) {
-    if (rowsRem(upcoming.length, TILE_HEIGHT_REM[size], strip) <= available) {
+    if (weekRowsRem(upcoming, size, strip, bring) <= available) {
       return { size, visible: upcoming, past, hidden: [] };
     }
   }
   // 3. Sum up the least important upcoming events, keeping room for the "+N" row.
-  const tile = TILE_HEIGHT_REM[smallest];
   let tiles = Math.max(0, upcoming.length - 1);
-  while (tiles > 0 && rowsRem(tiles, tile, strip + 1) > available) tiles -= 1;
+  while (
+    tiles > 0 &&
+    weekRowsRem(upcoming.slice(0, tiles), smallest, strip + 1, bring) >
+      available
+  )
+    tiles -= 1;
   return {
     size: smallest,
     visible: upcoming.slice(0, tiles),

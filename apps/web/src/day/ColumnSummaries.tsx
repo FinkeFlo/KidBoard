@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Emoji } from "../components/Emoji";
+import { iconsThatFit } from "../components/iconsThatFit";
 import { CheckIcon } from "../components/TimeOfDayIcon";
 import { useContentWidth } from "./useContentWidth";
 
@@ -65,17 +66,12 @@ export function stripIconsThatFit(
   widthRem: number | null,
   variant: SummaryVariant,
 ): number {
-  if (widthRem === null || icons === 0) return icons;
   const { iconRem, gapRem } = STRIP_METRICS[variant];
-  const slot = iconRem * SLOT_EM;
-  const available = widthRem + 1e-6;
-  const all =
-    icons * slot +
-    (icons - 1) * gapRem +
-    (hidden > 0 ? gapRem + STRIP_MORE_REM : 0);
-  if (all <= available) return icons;
-  const fit = Math.floor((available - STRIP_MORE_REM) / (slot + gapRem));
-  return Math.max(0, Math.min(icons, fit));
+  return iconsThatFit(icons, hidden, widthRem, {
+    slotRem: iconRem * SLOT_EM,
+    gapRem,
+    moreRem: STRIP_MORE_REM,
+  });
 }
 
 /**

@@ -1,8 +1,10 @@
 import type { CalendarEvent, Child } from "@kidboard/shared";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type FormatContext, formatTime } from "../i18n/format";
 import type { DayBand } from "../time";
+import { BringChips, type ChipSize } from "./BringChips";
 import { ChildBadges } from "./ChildBadges";
 import { CHILD_EDGE_AFTER } from "./childColor";
 import {
@@ -71,6 +73,36 @@ export const PROMINENT_EXTRA_REM: Record<TileSize, number> = {
   "week-small": 0,
   "week-slim": 0,
 };
+
+/**
+ * Extra height in rem of a tile that shows a bring list in a chip row of its own (ADR-0010):
+ * the narrow tiles of the other overview days and the week, whose time row has no room
+ * for chips. 0: the chips sit in the time row (today's column, which is about twice as
+ * wide), and the tile keeps its height. Past tiles show no chips and never grow.
+ */
+export const BRING_EXTRA_REM: Record<TileSize, number> = {
+  large: 0,
+  medium: 0,
+  dense: 0,
+  slim: 0,
+  compact: 1.25,
+  "compact-dense": 0.75,
+  week: 1.25,
+  "week-dense": 1.25,
+  "week-small": 1.25,
+  "week-slim": 1,
+};
+
+/**
+ * Whether `event` with `status` shows bring chips (a non-empty list, not over yet). The
+ * capacity steps count such a tile at its taller height ({@link BRING_EXTRA_REM}).
+ */
+export function showsBring(
+  event: Pick<CalendarEvent, "bring">,
+  status: EventStatus,
+): boolean {
+  return status !== "past" && (event.bring?.length ?? 0) > 0;
+}
 
 export interface SizeClasses {
   tile: string;
@@ -338,6 +370,20 @@ const PROMINENT: Partial<Record<TileSize, Partial<SizeClasses>>> = {
   },
 };
 
+/** Bring chip size per tile size: smaller on the two smallest week tiles. */
+export const TILE_CHIP_SIZE: Record<TileSize, ChipSize> = {
+  large: "regular",
+  medium: "regular",
+  dense: "regular",
+  slim: "regular",
+  compact: "regular",
+  "compact-dense": "regular",
+  week: "regular",
+  "week-dense": "regular",
+  "week-small": "small",
+  "week-slim": "small",
+};
+
 /** Classes of `size`, with the prominent variant applied when asked for and defined. */
 export function tileClasses(size: TileSize, prominent: boolean): SizeClasses {
   const base = SIZES[size];
@@ -473,7 +519,11 @@ export interface EventTileProps {
  * The fill is the child's tint (one child, with an edge), or neutral with a colour stripe
  * per child on the start edge (two and more) or plain neutral (none). The accessible name
  * says title, time, children and state ("Ballett, 15:30, Für Mia"); emoji and badges are
- * decorative. Not interactive.
+ * decorative. A bring list (ADR-0010) shows as emoji chips: in today's column at the end
+ * of the time row (slim: of the one row), elsewhere in a row of their own below the time
+ * (the tile is {@link BRING_EXTRA_REM} taller); only whole chips plus "+N". The chips are
+ * decorative; the tile's accessible description lists every icon ("Bring along: 👟 🩱").
+ * Past tiles show no chips. Not interactive.
  */
 export function EventTile({
   event,
@@ -494,6 +544,40 @@ export function EventTile({
   // Shared tiles: the disc moves off the start-edge stripes.
   const stripeRoom = tint.stripes.length > 0 ? "ms-2.5" : "";
   const past = status === "past";
+  const bring = showsBring(event, status) ? (event.bring ?? []) : [];
+  const bringId = useId();
+  // Narrow tiles give the chips a row of their own (and grow); today's sit in the time row.
+  const bringRow = bring.length > 0 && BRING_EXTRA_REM[size] > 0;
+  const chips =
+    bring.length > 0 ? (
+      <BringChips
+        bring={bring}
+        size={TILE_CHIP_SIZE[size]}
+        align={bringRow ? "start" : "end"}
+        className={sizes.inline ? "max-w-[40%]" : ""}
+      />
+    ) : null;
+  const chipRow = bringRow ? (
+    <div
+      data-testid="bring-row"
+      className={`flex w-full min-w-0 ${sizes.stacked ? "justify-center" : ""}`}
+    >
+      {chips}
+    </div>
+  ) : null;
+  const tileStyle: React.CSSProperties | undefined = past
+    ? undefined
+    : {
+        ...tileTintStyle(tint),
+        // The taller height the capacity steps count for this tile.
+        ...(bringRow
+          ? {
+              height: `${String(
+                TILE_HEIGHT_REM[size] + BRING_EXTRA_REM[size],
+              )}rem`,
+            }
+          : {}),
+      };
   const time = event.allDay
     ? t("event.allDay")
     : continues
@@ -536,6 +620,7 @@ export function EventTile({
       {!(sizes.weekRow && event.allDay) && (
         <span className="min-w-0 truncate">{time}</span>
       )}
+      {!sizes.inline && !bringRow && chips}
       {allDayBadges && <span className="ms-auto flex shrink-0">{badges}</span>}
     </p>
   );
@@ -548,6 +633,7 @@ export function EventTile({
   return (
     <article
       aria-label={name}
+      aria-describedby={bring.length > 0 ? bringId : undefined}
       data-testid="event-tile"
       data-status={status}
       data-next={next}
@@ -555,7 +641,8 @@ export function EventTile({
       data-all-day={event.allDay}
       data-size={size}
       data-tint={past ? "past" : tint.kind}
-      style={past ? undefined : tileTintStyle(tint)}
+      data-bring={bring.length > 0 ? (bringRow ? "row" : "inline") : undefined}
+      style={tileStyle}
       className={`${statusClasses(status, next, tint)} ${sizes.tile} rounded-tile relative flex min-w-0 items-center`}
     >
       {/* The stripes are clipped to the tile's rounded start edge by their own wrapper. */}
@@ -617,6 +704,7 @@ export function EventTile({
           </p>
           {/* Full width, so a long word ("Ganztägig") is cut, not pushed out. */}
           <div className="w-full min-w-0">{meta}</div>
+          {chipRow}
         </>
       ) : sizes.weekRow ? (
         // Slimmest week tile: emoji beside the title (badges at its end) and the time.
@@ -651,6 +739,7 @@ export function EventTile({
               {!allDayBadges && badges}
             </div>
             {meta}
+            {chipRow}
           </div>
         </>
       ) : sizes.inline ? (
@@ -661,6 +750,7 @@ export function EventTile({
           </p>
           {badges}
           <div className="shrink-0">{meta}</div>
+          {chips}
         </div>
       ) : (
         <div className="flex min-w-0 flex-1 flex-col">
@@ -692,7 +782,13 @@ export function EventTile({
             </div>
           )}
           {meta}
+          {chipRow}
         </div>
+      )}
+      {bring.length > 0 && (
+        <span id={bringId} hidden>
+          {t("event.bring", { icons: bring.join(" ") })}
+        </span>
       )}
     </article>
   );

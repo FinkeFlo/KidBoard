@@ -364,6 +364,57 @@ describe("DayColumn", () => {
     ).toBeTruthy();
   });
 
+  it("bring lists: chips on upcoming tiles and all-day entries, none on past tiles or in the 'vorbei' strip", () => {
+    const BRING = ["🩱", "🧴"];
+    const trip = eventFixture({
+      id: "trip",
+      title: "Trip",
+      allDay: true,
+      start: TODAY,
+      end: "2026-11-23",
+      childIds: ["mia"],
+      bring: ["🧢", "🥪"],
+    });
+    const timed = hourly(12, 6).map((event) => ({ ...event, bring: BRING }));
+    // Room for the strip, the now line and three dense tiles plus "+N": the past fold.
+    stubListHeight(ROW + NOW_ROW + 3 * DENSE + 2 * GAP + ROW);
+    const column = renderColumn(day([trip, ...timed]));
+    const banner = within(column).getByTestId("all-day");
+    const entry = within(banner).getByRole("article", {
+      name: "Trip, All day, For Mia",
+    });
+    expect(entry).toHaveAccessibleDescription("Bring along: 🧢 🥪");
+    expect(
+      within(entry)
+        .getAllByTestId("bring-chip")
+        .map((chip) => chip.textContent),
+    ).toEqual(["🧢", "🥪"]);
+    // Folded past events: no chips in the strip, its name stays the titles only.
+    const strip = within(column).getByTestId("past-strip");
+    expect(within(strip).queryByTestId("bring-chips")).toBeNull();
+    expect(strip.getAttribute("aria-label")).not.toMatch(/Bring along/);
+    // Upcoming tiles (current one included) carry chips; today's height is unchanged.
+    for (const tile of timedTiles(column)) {
+      expect(tile).toHaveAccessibleDescription("Bring along: 🩱 🧴");
+      expect(within(tile).getAllByTestId("bring-chip")).toHaveLength(2);
+      expect(tile.style.height).toBe("");
+    }
+    expect(timedTiles(column)).toHaveLength(3);
+  });
+
+  it("bring lists: past tiles that stay tiles show no chips", () => {
+    const events = hourly(3, 9).map((event) => ({ ...event, bring: ["👟"] }));
+    const column = renderColumn(day(events));
+    const past = timedTiles(column).filter(
+      (tile) => tile.dataset["status"] === "past",
+    );
+    expect(past.length).toBeGreaterThan(0);
+    for (const tile of past) {
+      expect(within(tile).queryByTestId("bring-chips")).toBeNull();
+      expect(tile).not.toHaveAttribute("aria-describedby");
+    }
+  });
+
   it("an empty today shows the friendly note and keeps the meals", () => {
     const column = renderColumn(day([], [mealFixture()]));
     expect(within(column).getByTestId("day-empty")).toHaveTextContent(

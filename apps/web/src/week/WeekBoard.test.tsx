@@ -1,12 +1,14 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { BRING_EXTRA_REM, TILE_HEIGHT_REM } from "../components/EventTile";
 import {
   BEN,
   eventFixture,
   mealFixture,
   MIA,
 } from "../components/fixtures.test-utils";
+import { COLUMN_GAP_REM } from "../day/columnCapacity";
 import type { FormatContext } from "../i18n/format";
 import { buildWeekModel } from "./buildWeekModel";
 import { WeekBoard, type WeekCountdown } from "./WeekBoard";
@@ -276,6 +278,27 @@ describe("WeekBoard", () => {
       "data-count",
       "5",
     );
+  });
+
+  it("bring lists: week tiles get a chip row and are counted taller, nothing is lost", () => {
+    const events = hourly("2026-11-23", 3).map((event) => ({
+      ...event,
+      bring: ["🩱", "🧴", "🥽"],
+    }));
+    // Exactly three normal week tiles high: with their chip rows they step down a size.
+    stubListHeight(3 * TILE_HEIGHT_REM.week + 2 * COLUMN_GAP_REM);
+    const column = renderWeek(events)[1];
+    if (column === undefined) throw new Error("no column");
+    expect(tilesOf(column)).toHaveLength(3);
+    expect(within(column).queryByTestId("column-more")).toBeNull();
+    for (const tile of tilesOf(column)) {
+      expect(tile).toHaveAttribute("data-size", "week-dense");
+      expect(tile).toHaveAttribute("data-bring", "row");
+      expect(tile).toHaveAccessibleDescription("Bring along: 🩱 🧴 🥽");
+      expect(tile.style.height).toBe(
+        `${String(TILE_HEIGHT_REM["week-dense"] + BRING_EXTRA_REM["week-dense"])}rem`,
+      );
+    }
   });
 
   it("hides only upcoming events after the strip, the least important last", () => {

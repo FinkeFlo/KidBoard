@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { type EventStatus, TILE_HEIGHT_REM } from "../components/EventTile";
+import {
+  BRING_EXTRA_REM,
+  type EventStatus,
+  TILE_HEIGHT_REM,
+} from "../components/EventTile";
 import { COLUMN_GAP_REM, SUMMARY_ROW_REM } from "../day/columnCapacity";
-import { fitWeekColumn, WEEK_SIZES } from "./weekCapacity";
+import { fitWeekColumn, WEEK_SIZES, weekRowsRem } from "./weekCapacity";
 
 const WEEK = TILE_HEIGHT_REM.week;
 const DENSE = TILE_HEIGHT_REM["week-dense"];
@@ -214,5 +218,88 @@ describe("fitWeekColumn", () => {
     const fit = fitWeekColumn(list(4, "past"), SUMMARY_ROW_REM + 0.5);
     expect(fit).toMatchObject({ visible: [], hidden: [] });
     expect(fit.past).toHaveLength(4);
+  });
+});
+
+describe("fitWeekColumn with bring lists", () => {
+  it("every week size grows by a chip row for a tile with a bring list, and keeps its order", () => {
+    const withChips = WEEK_SIZES.map(
+      (size) => TILE_HEIGHT_REM[size] + BRING_EXTRA_REM[size],
+    );
+    for (const size of WEEK_SIZES) {
+      expect(BRING_EXTRA_REM[size]).toBeGreaterThan(0);
+    }
+    expect(withChips).toEqual([...withChips].sort((a, b) => b - a));
+  });
+
+  it("counts the chip row of exactly the tiles that show one", () => {
+    const items = list(3);
+    const plain = weekRowsRem(items, "week", 0);
+    expect(plain).toBe(rows(3, WEEK));
+    expect(weekRowsRem(items, "week", 0, items.slice(0, 1)) - plain).toBe(
+      BRING_EXTRA_REM.week,
+    );
+    expect(weekRowsRem([], "week", 2)).toBe(rows(0, WEEK, 2));
+  });
+
+  it("steps down sooner when tiles carry chips, without a +N while they fit", () => {
+    const items = list(3);
+    const height = rows(3, WEEK);
+    expect(fitWeekColumn(items, height).size).toBe("week");
+    const fit = fitWeekColumn(items, height, items);
+    expect(fit.size).toBe("week-dense");
+    expect(fit.hidden).toEqual([]);
+  });
+
+  it("sweep with bring lists: never loses an event, never exceeds the height, +N only when one more tile would not fit", () => {
+    const masks: ((index: number) => boolean)[] = [
+      () => true,
+      (index) => index % 2 === 1,
+      (index) => index === 0,
+    ];
+    for (let count = 0; count <= 12; count += 1) {
+      for (let pastCount = 0; pastCount <= count; pastCount += 3) {
+        const items = today(count - pastCount, pastCount);
+        for (const mask of masks) {
+          const bring = items.filter(
+            (item, index) => mask(index) && item.status !== "past",
+          );
+          for (let height = 0; height <= 40; height += 0.25) {
+            const fit = fitWeekColumn(items, height, bring);
+            expect(
+              ids([...fit.visible, ...fit.past, ...fit.hidden]).sort(
+                (a, b) => a - b,
+              ),
+            ).toEqual(ids(items));
+            const summaries =
+              (fit.past.length > 0 ? 1 : 0) + (fit.hidden.length > 0 ? 1 : 0);
+            const used = weekRowsRem(fit.visible, fit.size, summaries, bring);
+            const slimWithChips = SLIM + BRING_EXTRA_REM["week-slim"];
+            if (
+              height >=
+              slimWithChips + 2 * SUMMARY_ROW_REM + 2 * COLUMN_GAP_REM
+            ) {
+              expect(used).toBeLessThanOrEqual(height + 1e-6);
+            }
+            if (fit.hidden.length > 0) {
+              expect(fit.size).toBe("week-slim");
+              // One more tile (the next hidden one) would not have fitted.
+              const more = [...fit.visible, fit.hidden[0]].flatMap((item) =>
+                item === undefined ? [] : [item],
+              );
+              const rest = fit.hidden.length > 1 ? 1 : 0;
+              expect(
+                weekRowsRem(
+                  more,
+                  "week-slim",
+                  (fit.past.length > 0 ? 1 : 0) + rest,
+                  bring,
+                ),
+              ).toBeGreaterThan(height + 1e-6);
+            }
+          }
+        }
+      }
+    }
   });
 });

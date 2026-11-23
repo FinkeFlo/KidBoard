@@ -3,9 +3,18 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { FormatContext } from "../i18n/format";
+import de from "../i18n/locales/de.json";
 import en from "../i18n/locales/en.json";
 import tokensCss from "../styles/tokens.css?raw";
-import { EventTile, TILE_HEIGHT_REM, tileClasses } from "./EventTile";
+import {
+  BRING_EXTRA_REM,
+  type EventStatus,
+  EventTile,
+  showsBring,
+  TILE_HEIGHT_REM,
+  tileClasses,
+  type TileSize,
+} from "./EventTile";
 import { BEN, eventFixture, MIA } from "./fixtures.test-utils";
 
 const format: FormatContext = { locale: "en", timeZone: "Europe/Berlin" };
@@ -613,5 +622,197 @@ describe("EventTile", () => {
     );
     expect(screen.getByText(en.event.continues)).toBeInTheDocument();
     expect(screen.queryByText("8:00 PM")).toBeNull();
+  });
+});
+
+describe("EventTile bring chips", () => {
+  const BRING = ["👟", "🩱"];
+  const ALL_SIZES: TileSize[] = [
+    "large",
+    "medium",
+    "dense",
+    "slim",
+    "compact",
+    "compact-dense",
+    "week",
+    "week-dense",
+    "week-small",
+    "week-slim",
+  ];
+  const TODAY_SIZES: TileSize[] = ["large", "medium", "dense", "slim"];
+
+  it.each(ALL_SIZES)(
+    "%s: shows the bring list as decorative chips and one accessible description",
+    (size) => {
+      render(
+        <EventTile
+          event={eventFixture({ childIds: ["mia"], bring: BRING })}
+          childList={[MIA]}
+          format={format}
+          timeOfDay="midday"
+          size={size}
+        />,
+      );
+      const article = screen.getByRole("article", {
+        name: "Swimming, 2:30 PM, For Mia",
+      });
+      // One description listing every icon; the chips themselves are hidden.
+      expect(article).toHaveAccessibleDescription("Bring along: 👟 🩱");
+      const area = within(article).getByTestId("bring-chips");
+      expect(area).toHaveAttribute("aria-hidden", "true");
+      expect(
+        within(area)
+          .getAllByTestId("bring-chip")
+          .map((chip) => chip.textContent),
+      ).toEqual(BRING);
+      // Today's tiles keep their height (chips in the time row); the narrow ones grow
+      // by their chip row, exactly what the capacity steps count.
+      if (TODAY_SIZES.includes(size)) {
+        expect(BRING_EXTRA_REM[size]).toBe(0);
+        expect(article).toHaveAttribute("data-bring", "inline");
+        expect(article.style.height).toBe("");
+      } else {
+        expect(BRING_EXTRA_REM[size]).toBeGreaterThan(0);
+        expect(article).toHaveAttribute("data-bring", "row");
+        expect(article.style.height).toBe(
+          `${String(TILE_HEIGHT_REM[size] + BRING_EXTRA_REM[size])}rem`,
+        );
+        expect(within(article).getByTestId("bring-row")).toContainElement(area);
+      }
+    },
+  );
+
+  it("today's sizes put the chips at the end of the time row (slim: of its one row)", () => {
+    render(
+      <EventTile
+        event={eventFixture({ bring: BRING })}
+        childList={[]}
+        format={format}
+        timeOfDay="midday"
+        size="large"
+      />,
+    );
+    const area = screen.getByTestId("bring-chips");
+    expect(area.parentElement).toContainElement(screen.getByText("2:30 PM"));
+    expect(area).toHaveClass("ms-auto", "justify-end");
+  });
+
+  it("describes the list in German too", async () => {
+    const { default: i18n } = await import("i18next");
+    await i18n.changeLanguage("de");
+    try {
+      render(
+        <EventTile
+          event={eventFixture({ bring: BRING })}
+          childList={[]}
+          format={{ locale: "de", timeZone: "Europe/Berlin" }}
+        />,
+      );
+      expect(screen.getByRole("article")).toHaveAccessibleDescription(
+        de.event.bring.replace("{{icons}}", "👟 🩱"),
+      );
+      expect(de.event.bring).toBe("Mitbringen: {{icons}}");
+    } finally {
+      await i18n.changeLanguage("en");
+    }
+  });
+
+  it("past tiles show no chips, no description and keep their height", () => {
+    for (const size of ["large", "compact", "week"] as const) {
+      const { unmount } = render(
+        <EventTile
+          event={eventFixture({ bring: BRING })}
+          childList={[]}
+          format={format}
+          status="past"
+          size={size}
+        />,
+      );
+      expect(screen.queryByTestId("bring-chips")).toBeNull();
+      expect(tile()).not.toHaveAttribute("aria-describedby");
+      expect(tile()).not.toHaveAttribute("data-bring");
+      expect(tile().style.height).toBe("");
+      unmount();
+    }
+  });
+
+  it("no list, an empty list: no chips, no description, no extra height", () => {
+    for (const bring of [undefined, []]) {
+      const { unmount } = render(
+        <EventTile
+          event={eventFixture(bring === undefined ? {} : { bring })}
+          childList={[]}
+          format={format}
+          size="week"
+        />,
+      );
+      expect(screen.queryByTestId("bring-chips")).toBeNull();
+      expect(tile()).not.toHaveAttribute("aria-describedby");
+      expect(tile().style.height).toBe("");
+      unmount();
+    }
+  });
+
+  it("showsBring: a non-empty list on a tile that is not over yet", () => {
+    const statuses: EventStatus[] = ["upcoming", "current", "past"];
+    expect(
+      statuses.map((status) =>
+        showsBring(eventFixture({ bring: BRING }), status),
+      ),
+    ).toEqual([true, true, false]);
+    expect(showsBring(eventFixture({ bring: [] }), "upcoming")).toBe(false);
+    expect(showsBring(eventFixture(), "upcoming")).toBe(false);
+  });
+
+  it("leaves the now / next cues, the child tint and the badges unchanged", () => {
+    const states = [
+      { status: "current" as const, next: false, cue: "now-cue" },
+      { status: "upcoming" as const, next: true, cue: "next-cue" },
+    ];
+    for (const { status, next, cue } of states) {
+      const looks = [undefined, BRING].map((bring) => {
+        const { unmount } = render(
+          <EventTile
+            event={eventFixture({
+              childIds: ["mia"],
+              ...(bring === undefined ? {} : { bring }),
+            })}
+            childList={[MIA]}
+            format={format}
+            status={status}
+            next={next}
+            size="large"
+          />,
+        );
+        const look = {
+          className: tile().className,
+          tint: tile().getAttribute("data-tint"),
+          background: tile().style.background,
+          edge: tile().style.getPropertyValue("--child-color"),
+          badges: badges().innerHTML,
+          cue: screen.getByTestId(cue).className,
+        };
+        unmount();
+        return look;
+      });
+      expect(looks[1]).toEqual(looks[0]);
+    }
+  });
+
+  it("renders an XSS-looking title together with a bring list as text", () => {
+    const evil = '<img src=x onerror="alert(1)"><script>alert(2)</script>';
+    const { container } = render(
+      <EventTile
+        event={eventFixture({ title: evil, bring: ["🩱", "🧴", "🥽"] })}
+        childList={[MIA]}
+        format={format}
+        size="compact"
+      />,
+    );
+    expect(screen.getByText(evil)).toBeInTheDocument();
+    expect(container.querySelector("img, script")).toBeNull();
+    expect(screen.getAllByTestId("bring-chip")).toHaveLength(3);
+    expect(tile()).toHaveAccessibleDescription("Bring along: 🩱 🧴 🥽");
+    expect(tile()).toHaveAccessibleName(`${evil}, 2:30 PM, For everyone`);
   });
 });

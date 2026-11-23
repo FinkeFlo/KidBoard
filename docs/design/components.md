@@ -57,6 +57,17 @@ fixed per size, so a column can compute how many tiles fit.
   time below; an all-day `week-slim` tile shows the span icon and the badges in that row,
   "Ganztägig" stays in the accessible name. The title shows wherever the column's list is
   wide enough (5.5rem, `week-slim` 7rem; CSS container query), on today's column too.
+- **Bring chips** (an event's `bring` list, up to 8 emoji): 24px discs
+  (`--color-surface-sunken`, 1px `--color-border` ring) with a 16px emoji, 2px apart; on
+  `week-small` and `week-slim` 20px discs with a 14px emoji. Today's sizes put them at the
+  end of the time row (`slim`: at the end of its one row, at most 40 %) and keep their
+  height; `compact`, `compact-dense` and the week sizes give them a row of their own below
+  the time (centred on stacked week tiles) and grow: +20px (`compact`, `week`,
+  `week-dense`, `week-small`), +12px (`compact-dense`), +16px (`week-slim`). Only whole
+  chips are drawn; the rest is a plain-text "+N" (`--text-meta` / `--text-caption`, 900,
+  `--color-text-muted`, no fill). Past tiles show none. Decorative; the tile's accessible
+  description lists every icon ("Mitbringen: 👟 🩱" / "Bring along: 👟 🩱"). Now/next
+  cues, tint, edge and badges are unchanged.
 - **Night:** avatar discs, child edges and stripes are dimmed a quarter towards the page
   (`color-mix(in oklab, child 75%, surface)`); emoji are dimmed by the `Emoji` component.
 - **Rules:** accessible name = title, time, children, state ("Ballett, 15:30, Für Mia");
@@ -108,7 +119,8 @@ One column per day; events top to bottom in time order, meals at the bottom.
 
 All-day events at the top of a column, not as timed tiles: a row per event with the emoji
 disc, a visible "Ganztägig" label with the span icon above the title, tint, stripes and
-badges as on the tiles; at most two rows, then a named "+N".
+badges as on the tiles; a bring list as chips before the badges (as on the tiles, at most
+45 % of the row); at most two rows, then a named "+N".
 
 ## NowLine
 

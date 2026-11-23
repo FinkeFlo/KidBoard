@@ -507,7 +507,7 @@ task; 🎒 means only "tomorrow bring" (rule 1).
   4. ARCHITECTURE "Title conventions" rule 5 examples and the README title table list the
      subject icons.
 
-- [ ] **T-35 Bring chips on tiles** (risk: medium, deps: T-33)
+- [x] **T-35 Bring chips on tiles** (risk: medium, deps: T-33)
   Goal: an event's bring list is visible as small emoji chips on its tile in the overview
   and the week.
   Acceptance:

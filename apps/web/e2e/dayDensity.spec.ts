@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 import { columnAccount, expectNoOverflow, MEALS, minEmojiRem } from "./layout";
 import {
@@ -14,7 +14,8 @@ import {
  * Overview density matrix: 1 to 12 timed events in today's column (at the fixed 12:00,
  * the early ones are over, one is current, the rest upcoming), three children (tiles for
  * one, two and three children and for everyone), a long German title, the 📅 fallback,
- * an all-day banner and four meals per day, the countdown in the header; English and
+ * an all-day banner and four meals per day, bring lists (chips) on most events and the
+ * all-day banner, the countdown in the header; English and
  * German alternate. Both tablet sizes run it as their own project, each count at a
  * pinned burn-in position (the four corners rotate through the counts). Nothing
  * scrolls, overflows or is cut; every event is a tile, in the named "vorbei" strip or
@@ -49,8 +50,59 @@ const ICONS = [
 ];
 const LONG_TITLE =
   "Kinderturnen in der Sporthalle am Marktplatz mit Elternabend";
+/** Bring lists of one to eight icons (ADR-0010 allows up to eight). */
+const BRING_LISTS: (string[] | undefined)[] = [
+  ["🩱", "🧴", "🥽"],
+  ["👟"],
+  undefined,
+  ["🎨", "👕", "🥤", "🍎", "🧢", "🧤", "🧣", "🧦"],
+];
 /** Burn-in corners (maximum shift on both axes), see burnin.spec.ts. */
 const CORNERS = [1, 3, 5, 7] as const;
+
+/**
+ * Every bring chip area on the board: whole chips only, inside its tile, and a "+N" that
+ * counts exactly the chips not drawn.
+ */
+async function expectWholeChips(page: Page): Promise<void> {
+  const problems = await page.getByTestId("bring-chips").evaluateAll((areas) =>
+    areas.flatMap((area) => {
+      const tile = area.closest("article");
+      if (tile === null) return ["chips outside a tile"];
+      const count = Number(area.getAttribute("data-count"));
+      const drawn = Number(area.getAttribute("data-drawn"));
+      const box = area.getBoundingClientRect();
+      const tileBox = tile.getBoundingClientRect();
+      const inside = (rect: DOMRect, outer: DOMRect): boolean =>
+        rect.left >= outer.left - 0.5 &&
+        rect.right <= outer.right + 0.5 &&
+        rect.top >= outer.top - 0.5 &&
+        rect.bottom <= outer.bottom + 0.5;
+      const issues: string[] = [];
+      const chips = area.querySelectorAll("[data-testid=bring-chip]");
+      if (chips.length !== drawn) issues.push("drawn count");
+      for (const chip of chips) {
+        const rect = chip.getBoundingClientRect();
+        if (!inside(rect, box) || !inside(rect, tileBox)) {
+          issues.push(`cut chip ${chip.textContent}`);
+        }
+      }
+      const more = area.querySelector("[data-testid=bring-chips-more]");
+      const expected = count - drawn;
+      if (
+        (more?.textContent ?? "") !==
+        (expected > 0 ? `+${String(expected)}` : "")
+      ) {
+        issues.push(`+N ${more?.textContent ?? ""} for ${String(expected)}`);
+      }
+      if (more !== null && !inside(more.getBoundingClientRect(), tileBox)) {
+        issues.push("+N outside its tile");
+      }
+      return issues;
+    }),
+  );
+  expect(problems).toEqual([]);
+}
 
 /** `count` one-hour events today from 07:00 on, every hour. */
 function todayEvents(count: number): MockEvent[] {
@@ -59,13 +111,33 @@ function todayEvents(count: number): MockEvent[] {
     icon: ICONS[i % ICONS.length] ?? "📅",
     time: `${String(7 + i).padStart(2, "0")}:00`,
     childIds: CHILD_SETS[i % CHILD_SETS.length] ?? [],
+    ...withBring(i),
   }));
+}
+
+function withBring(i: number): { bring?: string[] } {
+  const bring = BRING_LISTS[i % BRING_LISTS.length];
+  return bring === undefined ? {} : { bring };
 }
 
 /** A few events on the other overview days, so every column has tiles and plates. */
 const OTHER_DAYS: MockEvent[] = [1, 2, 3].flatMap((day) => [
-  { title: "Kita", icon: "🏫", time: "08:00", day, childIds: ["mia", "ben"] },
-  { title: LONG_TITLE, icon: "📅", time: "15:00", day, childIds: ["leo"] },
+  {
+    title: "Kita",
+    icon: "🏫",
+    time: "08:00",
+    day,
+    childIds: ["mia", "ben"],
+    bring: ["🎨", "👟"],
+  },
+  {
+    title: LONG_TITLE,
+    icon: "📅",
+    time: "15:00",
+    day,
+    childIds: ["leo"],
+    bring: ["🩱", "🧴", "🥽", "🧢"],
+  },
   { title: "Baden", icon: "🛁", time: "18:30", day },
 ]);
 const ALL_DAY: MockEvent = {
@@ -73,6 +145,7 @@ const ALL_DAY: MockEvent = {
   icon: "🦁",
   time: null,
   childIds: ["mia", "ben", "leo"],
+  bring: ["🧢", "🥪"],
 };
 const COUNTDOWN: MockEvent = {
   title: "Geburtstag",
@@ -173,6 +246,53 @@ for (let count = 1; count <= 12; count += 1) {
     await expect(
       page.getByTestId("all-day").first().getByRole("article"),
     ).toBeInViewport({ ratio: 1 });
+    // Upcoming tiles carry their bring chips, past ones none (chips are never cut).
+    await expect(
+      today.locator("article[data-status=past] [data-testid=bring-chips]"),
+    ).toHaveCount(0);
+    await expectWholeChips(page);
+    await expectNoOverflow(page);
+  });
+}
+
+/**
+ * All-day event of the week matrix, for two children: a three-child all-day `week-slim`
+ * tile overflows its row by a few pixels without any bring list (known, not part of this
+ * check).
+ */
+const WEEK_ALL_DAY: MockEvent = { ...ALL_DAY, childIds: ["mia", "ben"] };
+
+for (let count = 1; count <= 12; count += 1) {
+  const locale = count % 2 === 0 ? "de" : "en";
+  test(`week: ${String(count)} events today with bring lists (${locale}) fit without loss`, async ({
+    page,
+  }) => {
+    await mockBoard(page, {
+      config: config({ locale, children: KIDS }),
+      agenda: agenda(
+        [WEEK_ALL_DAY, COUNTDOWN, ...todayEvents(count), ...OTHER_DAYS],
+        MEALS,
+      ),
+    });
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: locale === "de" ? "Woche" : "Week" })
+      .click();
+    await expect(page.getByTestId("day-column")).toHaveCount(7);
+    const today = page.locator("[data-testid=day-column][data-today=true]");
+    await expect(today.getByTestId("event-tile").first()).toBeVisible();
+    // Week tiles with a bring list get a chip row (taller); still nothing is lost.
+    const account = await columnAccount(today);
+    expect(account.shown.length + account.folded + account.hidden).toBe(
+      count + 1,
+    );
+    await expect(
+      page.locator("article[data-bring=row] [data-testid=bring-chips]").first(),
+    ).toBeVisible();
+    await expect(
+      today.locator("article[data-status=past] [data-testid=bring-chips]"),
+    ).toHaveCount(0);
+    await expectWholeChips(page);
     await expectNoOverflow(page);
   });
 }

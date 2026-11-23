@@ -1,6 +1,8 @@
 import type { Child } from "@kidboard/shared";
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
+import { BringChips } from "../components/BringChips";
 import { ChildBadges } from "../components/ChildBadges";
 import { CHILD_EDGE } from "../components/childColor";
 import { resolveTileTint, tileTintStyle } from "../components/childTint";
@@ -28,7 +30,8 @@ const STRIPE_ROOM = "ms-2.5";
  * All-day events at the top of a day column (merge rule 1: their own treatment, not a
  * tile with the midday sun): a flat strip per event with the emoji, a visible "All day"
  * label with the span icon above the title, and the children's tint, stripes and badges
- * as on the tiles. Beyond {@link ALL_DAY_MAX} a "+N" names the rest for assistive tech.
+ * as on the tiles, and a bring list as chips before the badges (described as on the
+ * tiles). Beyond {@link ALL_DAY_MAX} a "+N" names the rest for assistive tech.
  */
 export function AllDayBanner({
   items,
@@ -41,6 +44,7 @@ export function AllDayBanner({
   large: boolean;
 }): React.JSX.Element | null {
   const { t } = useTranslation();
+  const baseId = useId();
   if (items.length === 0) return null;
   const shown = items.slice(0, ALL_DAY_MAX);
   const rest = items.slice(ALL_DAY_MAX);
@@ -51,7 +55,9 @@ export function AllDayBanner({
       data-testid="all-day"
       className="-mx-1.5 flex shrink-0 flex-col gap-2 px-1.5 pt-2"
     >
-      {shown.map(({ event }) => {
+      {shown.map(({ event }, index) => {
+        const bring = event.bring ?? [];
+        const bringId = `${baseId}-bring-${String(index)}`;
         const kids = childrenOf(event, childList);
         const tint = resolveTileTint(kids);
         const name = tileName([
@@ -67,6 +73,7 @@ export function AllDayBanner({
           <li key={event.id} className="min-w-0">
             <article
               aria-label={name}
+              aria-describedby={bring.length > 0 ? bringId : undefined}
               data-testid="event-tile"
               data-all-day="true"
               data-tint={tint.kind}
@@ -98,12 +105,20 @@ export function AllDayBanner({
                   {event.title}
                 </p>
               </div>
+              {bring.length > 0 && (
+                <BringChips bring={bring} className="max-w-[45%]" />
+              )}
               <ChildBadges
                 tint={tint}
                 size={badge.size}
                 text={badge.text}
                 overlap={badge.overlap}
               />
+              {bring.length > 0 && (
+                <span id={bringId} hidden>
+                  {t("event.bring", { icons: bring.join(" ") })}
+                </span>
+              )}
             </article>
           </li>
         );
