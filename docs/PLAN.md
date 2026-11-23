@@ -462,7 +462,7 @@ not address. These rules apply to every M5b task:
   bottom-right fullscreen control (press and hold), wake-lock behaviour and its limits (battery
   saver), Fully Kiosk "keep screen on" as backup; `?night=` / `?burnin=` in a short developer note.
 
-- [ ] **T-27a UI/UX dummy test loop** (risk: medium, deps: T-27; mandatory before T-28)
+- [x] **T-27a UI/UX dummy test loop** (risk: medium, deps: T-27; mandatory before T-28)
   Acceptance: the demo build (`pnpm dev:demo` / preview with demo data) is clicked through by
   three independent agents on different models (Haiku, Sonnet, Opus) at 1280×800 and 2000×1200,
   light and night, incl. offline/error states; each rates UI/UX (glanceability for children
@@ -496,6 +496,7 @@ not address. These rules apply to every M5b task:
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-23 | T-27a outcome: tile size ladder extended with space-based steps (`medium`, dense 2.75rem emoji, `slim` 2rem emoji row tiles; week `week-small`/`week-slim` with 16–18px time-of-day badge on the emoji corner) so "+N" only appears when another tile cannot fit; remaining week polish tracked as issue #5 | UI/UX dummy test loop (4 rounds): showing every event beats a larger emoji on dense days |
 | 2026-11-22 | M5b review: dense overview tiles may use ~3rem emoji (large tiles stay ≥ 3.5rem, T-30b criterion met); English title truncation, week past-event ranking, 🌞/☀️ pair, skeleton header jump become explicit T-27a checks; T-27 docs scope extended (overview, rail, states, `KB-*` codes, CONFIG `bands` wording) | M5b milestone review by reviewer-opus: 3.5rem emoji in a 4rem dense tile tucked under the child edge |
 | 2026-11-22 | release-please switched to manual dispatch; early 1.0.0 release PR closed by the maintainer, who cuts the release himself | The automatic release PR proposed 1.0.0 too early |
 | 2026-11-22 | T-26 (Vercel) removed from v1.0.0, tracked as issue #3; T-27 no longer depends on it | Maintainer decision: Cloudflare is the only deploy target for v1.0.0 |
