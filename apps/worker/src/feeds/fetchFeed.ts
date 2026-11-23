@@ -35,7 +35,11 @@ export const FEED_MAX_BYTES = 5 * 1024 * 1024;
 export interface FetchFeedOptions {
   timeoutMs?: number;
   maxBytes?: number;
+  /** `Accept` header; defaults to iCalendar (other upstreams, e.g. weather, ask for JSON). */
+  accept?: string;
 }
+
+const DEFAULT_ACCEPT = "text/calendar, text/plain;q=0.9, */*;q=0.1";
 
 /**
  * Downloads a feed as text with a timeout (covering headers and body) and a byte cap
@@ -57,7 +61,7 @@ export async function fetchFeed(
     // `globalThis.fetch` is looked up per call so tests can mock it.
     response = await globalThis.fetch(url, {
       signal,
-      headers: { Accept: "text/calendar, text/plain;q=0.9, */*;q=0.1" },
+      headers: { Accept: options.accept ?? DEFAULT_ACCEPT },
     });
   } catch {
     throw new FeedFetchError(signal.aborted ? "timeout" : "network");

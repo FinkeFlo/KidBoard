@@ -23,7 +23,7 @@ flowchart LR
     P["parse + expand<br/>(ical.js: RRULE, EXDATE,<br/>RECURRENCE-ID, VTIMEZONE)"]
     N["normalize<br/>(title conventions,<br/>children, meals)"]
     C[("KV or Cache API<br/>fresh ≈1h<br/>last-good ≈7d")]
-    A["/api/agenda<br/>/api/config<br/>/api/health"]
+    A["/api/agenda<br/>/api/config<br/>/api/weather<br/>/api/health"]
     S["static assets<br/>(apps/web/dist)"]
   end
 
@@ -1011,7 +1011,9 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
   isolate share one upstream fetch (single flight).
 - **KV write budget:** one write per source per refresh. With KV the fresh TTL is at
   least `ceil(sources × 86 400 / 500)` s (half of the Free plan's 1 000 writes/day; e.g.
-  2 sources → 346 s); a lower `KIDBOARD_CACHE_TTL` is raised with a log warning.
+  2 sources → 346 s); a lower `KIDBOARD_CACHE_TTL` is raised with a log warning. While
+  weather is on, its 49 writes/day (48 forecasts + the place) are reserved first:
+  `ceil(sources × 86 400 / (500 − 49))` (2 sources → 384 s).
 - **Failures:** non-2xx, timeout (10 s, headers and body), > 5 MB (Content-Length and
   streamed byte count), network errors and `FeedParseError` → the stored entry as
   `stale` (an old entry may cover only part of the requested range, e.g. after several
@@ -1027,6 +1029,38 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
 - **Config:** `KIDBOARD_CONFIG` is parsed once per isolate (memoized by raw string);
   invalid → `500 { error: "server_misconfigured" }` and a log line with the validation
   errors.
+
+### Weather API (T-48, ADR-0015)
+
+`GET /api/weather` (`apps/worker/src/weather/`, behind the access token, `no-store`) →
+`WeatherResponse` from `packages/shared` (`fetchedAt`, `unit`, `current`, up to 7 `days`,
+`stale`); days before today (config zone) are dropped from what is served.
+
+- **Upstreams:** Open-Meteo geocoding (`weather.place`: first result, `countryCode` from
+  `weather.country`, `language` `de` for locale `de`, else `en`) and forecast (`timezone` =
+  config zone, `forecast_days=7`, `current`, `hourly`, `daily` variables, `temperature_unit`
+  from the config). Plain `fetch` through the feed downloader: 5 s timeout, 1 MB cap; JSON
+  validated with zod (extra keys ignored). Non-2xx (e.g. `400 { error, reason }`) is never
+  read, so upstream text never travels further.
+- **Condensing** (`condense.ts`): temperatures rounded to whole degrees; `feelsMin`/
+  `feelsMax` = hourly `apparent_temperature` 07:00–19:00, grouped by the local time strings
+  (DST days with 23/25 hours need no special case); `rain` = drizzle/rain/shower/thunder
+  code, or daytime precipitation probability ≥ 50 % and daytime sum ≥ 0.5 mm; `snow` = snow
+  code or `snowfall_sum` > 0; `uvMax` = daily max (fallback: daytime hourly max).
+  Preceding-hour variables (precipitation, its probability, `uv_index`; Open-Meteo docs)
+  count at 08:00–19:00, the instant `apparent_temperature` at 07:00–19:00. Days
+  with a missing code, high, low or daytime feels-like are skipped.
+- **Cache:** place coordinates 30 days (`v1/weather/place/<hash>`), forecast fresh 30 min
+  and last good 24 h (`v1/weather/forecast/<hash>`, hash of the weather block, zone and
+  geocoding language) in KV or the Cache API, memory map and single flight per isolate as
+  for the feeds. At most 48 forecast writes/day. A geocoding miss is cached for 1 hour
+  (memory + KV/Cache API; ≤ 24 writes/day, and then no forecast is written). After a
+  failed upstream load the isolate does not ask Open-Meteo again for 5 minutes (memory
+  only; meanwhile last good as `stale` or `503`).
+- **Errors:** weather off → `404 weather_off`; no geocoding match →
+  `503 weather_place_unknown`; upstream failure without last good →
+  `503 weather_unavailable` (with last good → `200`, `stale: true`). Place, coordinates
+  and upstream URLs appear in no key, response, error or log line.
 
 ### Deploy & static headers (T-25)
 

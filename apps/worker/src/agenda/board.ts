@@ -19,6 +19,7 @@ import {
 import { parseCalendarDate } from "../ical/zonedTime";
 import { logWarn } from "../log";
 import { editorEnabled } from "../parent/pin";
+import { WEATHER_KV_WRITES_PER_DAY } from "../weather/budget";
 import {
   APP_SOURCES,
   invalidateAppSources,
@@ -154,21 +155,26 @@ let clampMemo: string | undefined;
 
 /**
  * Fresh TTL actually used: with KV, at least the minimum that keeps the daily writes
- * within {@link KV_WRITES_PER_DAY_BUDGET} (logged once per value).
+ * within {@link KV_WRITES_PER_DAY_BUDGET} (logged once per value). `reservedWritesPerDay`
+ * is the part of the budget other KV users take first (the weather forecast while it is
+ * on, `WEATHER_KV_WRITES_PER_DAY`); the sources share the rest.
  */
 export function effectiveTtlSeconds(
   configured: number,
   sourceCount: number,
   usesKv: boolean,
+  reservedWritesPerDay = 0,
 ): number {
   if (!usesKv) {
     return configured;
   }
-  const minimum = Math.ceil((sourceCount * 86_400) / KV_WRITES_PER_DAY_BUDGET);
+  const minimum = Math.ceil(
+    (sourceCount * 86_400) / (KV_WRITES_PER_DAY_BUDGET - reservedWritesPerDay),
+  );
   if (configured >= minimum) {
     return configured;
   }
-  const memoKey = `${String(configured)}/${String(sourceCount)}`;
+  const memoKey = `${String(configured)}/${String(sourceCount)}/${String(reservedWritesPerDay)}`;
   if (clampMemo !== memoKey) {
     clampMemo = memoKey;
     logWarn(
@@ -269,6 +275,7 @@ export function createBoard(options: BoardOptions): Board {
           cacheTtlSeconds(c.env.KIDBOARD_CACHE_TTL),
           config.calendars.length + (db === undefined ? 0 : APP_SOURCES.length),
           backend.kind === "kv",
+          config.weather === undefined ? 0 : WEATHER_KV_WRITES_PER_DAY,
         ),
         db,
       };

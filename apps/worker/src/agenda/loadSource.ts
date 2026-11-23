@@ -34,7 +34,10 @@ export interface Flight {
 export const FLIGHT_MARGIN_MS = 1000;
 
 /** `promise`, or a `timeout` FeedFetchError after `ms` (the timer is cleared). */
-async function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
+export async function withDeadline<T>(
+  promise: Promise<T>,
+  ms: number,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {

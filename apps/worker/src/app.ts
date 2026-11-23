@@ -20,6 +20,7 @@ import { apiCors } from "./http/cors";
 import { logError } from "./log";
 import { editorEnabled } from "./parent/pin";
 import { PARENT_BASE_PATH, parentRoutes } from "./parent/routes";
+import { registerWeatherRoute } from "./weather/routes";
 
 export {
   cacheTtlSeconds,
@@ -43,14 +44,20 @@ export interface AppOptions {
   fetchMaxBytes?: number;
   /** D1 deadline of the app sources on `/api/agenda` (default 2.5 s). */
   d1TimeoutMs?: number;
+  /** Weather upstream timeout override (default 5 s). */
+  weatherTimeoutMs?: number;
+  /** Weather upstream size limit override (default 1 MB). */
+  weatherMaxBytes?: number;
 }
 
 /** Builds the Hono app. Options exist for tests (clock, cache, limits). */
 export function createApp(options: AppOptions = {}): Hono<AppEnv> {
   const now = options.now ?? Date.now;
+  const openCache =
+    options.openCache ?? (() => Promise.resolve(caches.default));
   const board = createBoard({
     now,
-    openCache: options.openCache ?? (() => Promise.resolve(caches.default)),
+    openCache,
     fetchTimeoutMs: options.fetchTimeoutMs,
     fetchMaxBytes: options.fetchMaxBytes,
     d1TimeoutMs: options.d1TimeoutMs,
@@ -110,6 +117,14 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
       return c.json(body, status);
     },
   );
+
+  // Weather forecast from Open-Meteo (ADR-0015), behind the access token.
+  registerWeatherRoute(app, {
+    now,
+    openCache,
+    timeoutMs: options.weatherTimeoutMs,
+    maxBytes: options.weatherMaxBytes,
+  });
 
   // Parent lock and editor API (ADR-0013, ADR-0014), behind the access token.
   app.route(PARENT_BASE_PATH, parentRoutes({ now, board }).app);

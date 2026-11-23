@@ -816,7 +816,7 @@ often, never force-push.
      / exact), °F input, a cool morning + hot afternoon day (jacket and T-shirt).
   6. Every new emoji is in the ADR-0011 baseline (Emoji ≤ 13.0, test).
 
-- [ ] **T-48 Worker: `/api/weather`** (risk: **high** → Opus, deps: T-47)
+- [x] **T-48 Worker: `/api/weather`** (risk: **high** → Opus, deps: T-47)
   Goal: the worker fetches, condenses and caches the forecast; the tablet never talks to a
   third party and never learns the place.
   Acceptance:
