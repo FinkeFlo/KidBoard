@@ -423,8 +423,8 @@ so a tiny column may overflow rather than hide. Strip and "+N" name all their ti
 assistive tech, so nothing is lost silently.
 
 **Bring chips (T-35, ADR-0010).** An event's `bring` list shows on its tile as small emoji
-chips (`BringChips`: each icon through `<Emoji>` on a `--color-surface-sunken` disc with a
-`--color-border` ring, as the tile's own emoji; React text only). Only tiles that are not
+chips (`BringChips`: each icon through `<Emoji>` on a `--color-chip` disc with a
+`--color-border` ring, `CHIP_DISC`; React text only). Only tiles that are not
 over show them (`showsBring`); past tiles and the "vorbei"/"done" strip never do. Chips are
 decorative (`aria-hidden`); the tile has one accessible description listing every icon
 (`aria-describedby` → `event.bring`, "Bring along: 👟 🩱" / "Mitbringen: 👟 🩱"). Where they
@@ -439,9 +439,49 @@ so the space rules (fold, shrink, then "+N" only when one more tile would not fi
 width of all chips and shrinks first (`shrink-999`) down to the room of a "+N"; it measures
 the width it got (`useContentWidth`) and `chipsThatFit` (the strip's `iconsThatFit`) draws
 only whole chips, the rest is a plain-text "+N". Its width never depends on how many it
-draws, so the measurement is stable. No new colour token: the chip reuses the emoji disc
-tokens, its "+N" is `--color-text-muted` on the tile (contrast-tested on every tint, both
-themes).
+draws, so the measurement is stable. The disc is `--color-chip` (T-36): the emoji
+disc colour by day; at night lighter than every surface and tint (night `#6b5c4e`), so a
+black glyph and a white one after the night dimming both keep >= 3:1 (`tokens.test.ts`);
+its "+N" is `--color-text-muted` on the tile (contrast-tested on every tint, both themes).
+
+**Evening-before 🎒 area (T-36, ADR-0010).** What to pack, per child, until the event has
+started. `buildBringReminder(agenda, config, now)` (pure, `day/buildBringReminder.ts`) reads
+`now` on the wall clock of the config zone (never the device zone): from
+`bands.eveningStart` until midnight (`when: "tomorrow"`) it collects the bring lists of
+tomorrow's events, from midnight until `bands.eveningStart` (`when: "today"`) those of
+today's events that have not started yet. A timed event counts on the date it starts on
+until its start instant; an all-day event on its first day until `bands.middayStart` (the
+whole evening before); an event that started earlier and continues into the date, a later
+day of a multi-day event and anything two days ahead never count. Each occurrence of a
+series is its own event with its own list (an override carries its own). So the area
+fills at eveningStart, switches to the morning variant at midnight and loses an event's
+icons as it starts; it is empty (not rendered) when nothing is left. DST nights need no
+special case: the switch points are wall-clock minutes (`minuteOfDay`), the start is an
+instant. **Grouping:** events for everyone (`childIds: []`, or only children the config
+does not know) form one neutral group shown first, then one group per configured child in
+config order; an event for several children adds its icons to each; icons are
+deduplicated per group (ignoring VS16, first spelling wins) in start order (all-day
+first). **Data and clock:** the Board builds it from the same 31-day agenda as the
+overview (it always holds today and tomorrow) and the minute clock (`useNow`), so it
+switches without a reload, also offline: at midnight `useToday` seeds the new day from the
+persisted agenda. **Placement:** only in today's overview column (`DayColumn` ignores it on
+other days; the week view never gets it), between the event list and `MealPlates`.
+`BringArea` is a labelled region (`section`, "Pack for tomorrow: …" / "Für morgen
+einpacken: …", morning "Today bring: …" / "Heute mitbringen: …", the name lists every
+child and icon via the locale's list format; not a live region, nothing interactive): 🎒,
+then per group a pill (the child's tint, edge ring and avatar badge; the neutral group a
+raised pill) with the icons as `CHIP_DISC` chips through `<Emoji>` (dimmed at night). One
+row of fixed height (`h-11`, `BRING_AREA_REM` 2.75rem) that never wraps: it measures the
+width of its groups row (`useContentWidth`; the row is `flex-1 basis-0`, so the width
+never depends on what is drawn) and `bringGroupsThatFit` draws whole chips only, shared
+out one chip per group in turn, each group's rest as a plain-text "+N"; only when not
+even every badge fits, the last groups are counted in a trailing "+N" (`shown + counted`
+= every icon). The area is a `shrink-0` sibling outside the `flex-1 min-h-0` list, so
+the list's measured height (`useContentHeight`) is simply shorter by it and `fitColumn`
+folds, shrinks and sums up around it by the usual space rules: no "+N" while space is
+free, nothing lost, nothing scrolls. 🎒 means only this area (rule 1): defined once
+(`BRING_BAG`), drawn only by `BringArea`, in no locale, built-in table or fallback keyword
+(`bringBag.test.ts`, shared fallback-table tests).
 
 **Today's markers.** `NowLine` is a named separator between started and upcoming events and
 moves only from tile to tile, never per minute: a clock disc, a thick bar and a "now" pill,
@@ -593,7 +633,8 @@ badge next to the icon (shared or nobody's events keep the day's surface).
 `MealRows` is a three-row list (breakfast, lunch, dinner, each led by its time-of-day
 symbol; an empty row for a missing meal; `unspecified` meals in an extra row only when
 present).
-**One meaning per symbol:** 🌙 only counts sleeps (countdown), ☀️ is the "Today" button;
+**One meaning per symbol:** 🌙 only counts sleeps (countdown), ☀️ is the "Today" button,
+🎒 only leads the bring area (overview only, never in the week);
 tiles and meal plates use 🌅 / 🌞 / 🌆 for the time of day, all-day events a span icon
 with the visible "All day" label.
 Weekend = Saturday/Sunday of the date key (zone-independent calendar math).
@@ -631,7 +672,8 @@ The week uses the board's one agenda query (`AGENDA_DAYS` = 31 since T-19).
 
 `apps/web/demo/demoData.ts`: synthetic config and agenda (Mia 🦊 / Ben 🐻) built from
 "today" in the config zone (a repeating week of events and meals for 31 days plus one
-countdown event), so nothing goes stale. `pnpm dev:demo` serves it from a dev-only Vite
+countdown event), so nothing goes stale. Tomorrow always has bring lists (Mia's swimming
+things, the library book for both), so the 🎒 area shows from `eveningStart` (17:00). `pnpm dev:demo` serves it from a dev-only Vite
 plugin (`--mode demo`, `apply: "serve"`, never in a build). `pnpm screenshots` (own
 Playwright config, `apps/web/screenshots/`, after `pnpm build`) mocks the API with the
 same data, pins the clock (`fixClock`), `?burnin=0`, `?night=` and reduced motion, and

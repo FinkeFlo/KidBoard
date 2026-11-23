@@ -58,7 +58,8 @@ fixed per size, so a column can compute how many tiles fit.
   "Ganztägig" stays in the accessible name. The title shows wherever the column's list is
   wide enough (5.5rem, `week-slim` 7rem; CSS container query), on today's column too.
 - **Bring chips** (an event's `bring` list, up to 8 emoji): 24px discs
-  (`--color-surface-sunken`, 1px `--color-border` ring) with a 16px emoji, 2px apart; on
+  (`--color-chip`: the emoji disc colour by day, lighter than the tile at night; 1px
+  `--color-border` ring) with a 16px emoji, 2px apart; on
   `week-small` and `week-slim` 20px discs with a 14px emoji. Today's sizes put them at the
   end of the time row (`slim`: at the end of its one row, at most 40 %) and keep their
   height; `compact`, `compact-dense` and the week sizes give them a row of their own below
@@ -82,7 +83,8 @@ One column per day; events top to bottom in time order, meals at the bottom.
   board header, not repeated).
 - **Other days:** `--color-surface-sunken`, weekday (`--text-title`) and date (muted).
 - Padding 14, gap 10, radius `--radius-column`. Order: header, all-day banner, past events
-  (or the "vorbei" strip), NowLine (today only), upcoming events, "+N", MealPlates
+  (or the "vorbei" strip), NowLine (today only), upcoming events, "+N", the 🎒 area
+  (today only, when there is something to pack), MealPlates
   (`margin-top: auto`).
 - **Space rule (no fixed count):** the list's height is measured. In this order, the first
   that fits wins: every event as a tile at the largest size (past ones receded); else
@@ -121,6 +123,30 @@ All-day events at the top of a column, not as timed tiles: a row per event with 
 disc, a visible "Ganztägig" label with the span icon above the title, tint, stripes and
 badges as on the tiles; a bring list as chips before the badges (as on the tiles, at most
 45 % of the row); at most two rows, then a named "+N".
+
+## BringArea (🎒, today's column only)
+
+What to pack, per child: from `bands.eveningStart` the next day's bring lists ("Für morgen
+einpacken" / "Pack for tomorrow"), after midnight the not yet started ones of the day
+("Heute mitbringen" / "Today bring"; all-day events until `bands.middayStart`); an
+event's icons leave when it starts, the area disappears when nothing is left.
+
+- **Place:** today's overview column, between the events (or "+N") and the meal plates;
+  never in the other columns or the week view. The list above gives way by the space rule
+  (fold, shrink, then "+N"), the area itself never scrolls or wraps.
+- **Anatomy (44px high, one row):** `--color-surface-sunken` with a 1px `--color-border`
+  ring, radius `--radius-tile`; 🎒 (28px) first, then one pill (36px high) per group: the
+  group for everyone first (`--color-surface-raised`, 1px ring, no badge), then one per child
+  in config order (the child's tint, a 2px ring in the child's colour, its 32px avatar
+  badge). Icons as 28px chips (`--color-chip`, 1px `--color-border` ring, 18px emoji), 4px
+  apart, deduplicated per child; an event for several children appears with each.
+- **Overflow:** only whole chips; each group's rest as a plain-text "+N" (`--text-meta`,
+  900, `--color-text-muted`), chips shared out one per child in turn; if not even every
+  badge fits, the last groups are counted in one trailing "+N".
+- **Night:** stays visible (night tokens, dimmed emoji, the lighter `--color-chip` disc).
+- **Rules:** a labelled region whose name lists every child and icon ("Für morgen
+  einpacken: Mia 🩱 🧴 und Ben 👟"); not a live region; not interactive. 🎒 appears nowhere
+  else.
 
 ## NowLine
 

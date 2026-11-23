@@ -11,6 +11,7 @@ import {
 } from "../components/fixtures.test-utils";
 import type { FormatContext } from "../i18n/format";
 import en from "../i18n/locales/en.json";
+import type { BringReminder } from "./buildBringReminder";
 import type { DayModelConfig } from "./buildDayModel";
 import { buildOverviewModel, type OverviewDay } from "./buildOverviewModel";
 import { COLUMN_GAP_REM, SUMMARY_ROW_REM } from "./columnCapacity";
@@ -505,6 +506,58 @@ describe("DayColumn", () => {
     );
     expect(within(tight).getByTestId("past-strip")).toBeInTheDocument();
     expect(within(tight).queryByTestId("day-done")).toBeNull();
+  });
+
+  it("the 🎒 area: today only, between the event list and the meals, outside the measured list", () => {
+    const reminder: BringReminder = {
+      when: "tomorrow",
+      groups: [{ child: MIA, icons: ["🩱", "🧴"] }],
+    };
+    const meals = [mealFixture()];
+    const { rerender } = render(
+      <DayColumn
+        day={day(hourly(2, 13), meals)}
+        childList={[MIA, BEN]}
+        format={format}
+        nowTime="12:00 PM"
+        reminder={reminder}
+      />,
+    );
+    const column = screen.getByTestId("day-column");
+    const area = within(column).getByTestId("bring-area");
+    const list = within(column).getByTestId("column-events");
+    const plates = within(column).getByTestId("meal-plates");
+    // A direct child of the column (not inside the flex-1 list): list, area, meals.
+    expect(area.parentElement).toBe(column);
+    expect(list.contains(area)).toBe(false);
+    expect(list.compareDocumentPosition(area)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(area.compareDocumentPosition(plates)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    // Another day never shows it, even when handed one.
+    rerender(
+      <DayColumn
+        day={day(hourly(2, 13, "2026-11-23"), meals, 1)}
+        childList={[MIA, BEN]}
+        format={format}
+        nowTime="12:00 PM"
+        reminder={reminder}
+      />,
+    );
+    expect(screen.queryByTestId("bring-area")).toBeNull();
+    // Nothing to pack: no area (and no empty row).
+    rerender(
+      <DayColumn
+        day={day(hourly(2, 13), meals)}
+        childList={[MIA, BEN]}
+        format={format}
+        nowTime="12:00 PM"
+        reminder={{ when: "today", groups: [] }}
+      />,
+    );
+    expect(screen.queryByTestId("bring-area")).toBeNull();
   });
 
   it("renders titles as text, never as markup", () => {

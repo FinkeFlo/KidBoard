@@ -136,7 +136,14 @@ const WEEK: Slot[][] = [
       childIds: ["mia"],
       bring: SWIM_BRING,
     },
-    { title: "Library", icon: "📚", time: "15:30", childIds: ["ben", "mia"] },
+    // Tomorrow's bring lists fill the 🎒 area from the evening before (T-36).
+    {
+      title: "Library",
+      icon: "📚",
+      time: "15:30",
+      childIds: ["ben", "mia"],
+      bring: ["📕"],
+    },
   ],
   [
     { title: "Dentist", icon: "🦷", time: "09:00", childIds: ["ben"] },

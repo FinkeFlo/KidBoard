@@ -101,14 +101,11 @@ describe("BringChips", () => {
     expect(area).toHaveAttribute("aria-hidden", "true");
     const chips = within(area).getAllByTestId("bring-chip");
     expect(chips.map((chip) => chip.textContent)).toEqual(["🩱", "🧴", "🥽"]);
-    // Through the Emoji seam (emoji font, dimmed at night), on a light disc with a ring.
+    // Through the Emoji seam (emoji font, dimmed at night), on the chip disc with a ring
+    // (`--color-chip`: lighter than the tile at night, contrast-tested in tokens.test.ts).
     for (const chip of chips) {
       expect(chip.querySelector(".font-emoji")).not.toBeNull();
-      expect(chip).toHaveClass(
-        "bg-surface-sunken",
-        "inset-ring-border",
-        "rounded-pill",
-      );
+      expect(chip).toHaveClass("bg-chip", "inset-ring-border", "rounded-pill");
     }
     expect(screen.queryByTestId("bring-chips-more")).toBeNull();
     // Asks for the width of every chip; it shrinks first in a short row.

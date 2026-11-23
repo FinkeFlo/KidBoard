@@ -95,5 +95,10 @@
     "todayLabel": "Today is the day: {{titles, list}}!",
     "today": "Today!",
     "count": "{{count}} ×"
+  },
+  "bring": {
+    "tomorrow": "Pack for tomorrow: {{groups, list}}",
+    "today": "Today bring: {{groups, list}}",
+    "everyone": "Everyone"
   }
 }

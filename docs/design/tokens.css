@@ -171,6 +171,9 @@
   --color-child-6-tint: #e3e4ea;
   /* Ring around child badges, text on a child tone. */
   --color-on-child: #ffffff;
+  /* Disc behind a bring chip (tiles and the 🎒 area): the emoji disc by day; at night
+     lighter than every surface and tint, >= 3:1 against a black and a dimmed white glyph. */
+  --color-chip: #f3ece1;
   /* Legacy band surfaces (band layout only). */
   --color-band-morning: #fff0c2;
   --color-band-midday: #dcefff;
@@ -219,6 +222,7 @@
   --color-child-5-tint: #36270f;
   --color-child-6-tint: #262833;
   --color-on-child: #1a1008;
+  --color-chip: #6b5c4e;
   --color-band-morning: #2b2214;
   --color-band-midday: #16222c;
   --color-band-evening: #231c30;

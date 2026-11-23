@@ -526,7 +526,7 @@ task; 🎒 means only "tomorrow bring" (rule 1).
      (contrast test for the chip surface token if a new token is added).
   4. An XSS-looking title together with a bring list still renders as text (component test).
 
-- [ ] **T-36 Evening-before 🎒 "tomorrow bring" area** (risk: **high** → Opus, deps: T-33, T-35)
+- [x] **T-36 Evening-before 🎒 "tomorrow bring" area** (risk: **high** → Opus, deps: T-33, T-35)
   Goal: the evening before, the today column shows what to pack for the next day, per
   child, until the event has started.
   Acceptance:

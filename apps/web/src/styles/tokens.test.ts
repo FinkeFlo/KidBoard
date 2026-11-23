@@ -167,6 +167,10 @@ const PAIRS: readonly (readonly [string, string, number])[] = [
   ["--color-nav-active", "--color-surface-raised", UI_AA] as const,
   ["--color-nav-active", "--color-surface-sunken", UI_AA] as const,
   ["--color-nav-active", "--color-surface", UI_AA] as const,
+  // The 🎒 area (T-36): a `surface-sunken` row with a `border` ring inside today's
+  // `surface-raised` column; its "+N" is `text-muted` on that row (above), on a child tint
+  // and on the neutral group's `surface-raised` pill (both above).
+  ["--color-border", "--color-surface-raised", 1.2] as const,
 ];
 
 describe.each([
@@ -177,6 +181,44 @@ describe.each([
     expect(contrast(color(theme, fg), color(theme, bg))).toBeGreaterThanOrEqual(
       min,
     );
+  });
+});
+
+/** A black glyph, and a white one after the night dimming of `<Emoji>` (brightness 0.75). */
+const BLACK_GLYPH = "#000000";
+const DIMMED_WHITE_GLYPH = "#bfbfbf";
+
+describe("bring chip disc (--color-chip, T-35/T-36)", () => {
+  it.each([
+    ["light", light],
+    ["night", night],
+  ] as const)("%s: a black glyph stays visible on it (>= 3:1)", (_n, theme) => {
+    expect(
+      contrast(BLACK_GLYPH, color(theme, "--color-chip")),
+    ).toBeGreaterThanOrEqual(UI_AA);
+  });
+
+  it("night: a dimmed white glyph stays visible on it too (>= 3:1)", () => {
+    expect(
+      contrast(DIMMED_WHITE_GLYPH, color(night, "--color-chip")),
+    ).toBeGreaterThanOrEqual(UI_AA);
+  });
+
+  it("night: the disc is lighter than every surface and tint it sits on and stands out (>= 2:1)", () => {
+    const chip = color(night, "--color-chip");
+    for (const bg of [
+      "--color-surface",
+      "--color-surface-raised",
+      "--color-surface-sunken",
+      ...CHILD_TINTS,
+    ]) {
+      expect(luminance(chip), bg).toBeGreaterThan(luminance(color(night, bg)));
+      expect(contrast(chip, color(night, bg)), bg).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("the probes are real colours (negative case: the old dark disc failed)", () => {
+    expect(contrast(BLACK_GLYPH, "#1b1611")).toBeLessThan(UI_AA);
   });
 });
 
