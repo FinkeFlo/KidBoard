@@ -15,10 +15,11 @@ operation, works offline with the last known state.
 
 ## Non-goals (MVP)
 
-* Editing events on the tablet, write access to Google, Google OAuth.
+* Google OAuth consent flows and tokens on the tablet (editing goes through a service
+  account on the worker, M11 / ADR-0012).
 * Accounts, databases, multi-family hosting.
 * Copying anything from third-party products (texts, graphics, names, layouts).
-* Routines, parent PIN, weather (→ M7+).
+* Routines, weather (→ M7+). (Parent PIN for the editor: M11 / ADR-0013.)
 * Portrait layout and phones (should not break, but not designed for).
 
 ## Definition of Done (every task)
@@ -589,6 +590,164 @@ task; 🎒 means only "tomorrow bring" (rule 1).
 robustness, layout without scrolling), a short T-27a-style UI/UX check of the new surfaces
 (one Sonnet agent, both sizes, light/night, findings fixed via the loop), CI green.
 
+## M11 – Parent editor (before v1.0.0)
+
+Parents add and change entries on the tablet (or a phone) instead of typing title
+conventions in Google Calendar: pick the child, the activity icon, once or weekly, done.
+Decisions: [ADR-0012](adr/0012-write-via-google-calendar-api.md) (Google Calendar API via a
+service account, reading stays on iCal, editor writes the existing conventions) and
+[ADR-0013](adr/0013-parent-lock.md) (parent PIN, short sessions, lockout, hidden entry).
+M11 touches no M10 file except the nav rail and i18n files and may be worked in parallel to
+T-36–T-38 (rebase often). Merge rules 1–6 of M5b apply. The editor is a parent surface:
+touch targets ≥ 48 px (≥ 64 px for the hold-to-open entry and the PIN pad), WCAG AA, DE + EN.
+
+- [ ] **T-39 Editor model: compose and parse entries** (risk: **high** → Opus, deps: T-33)
+  Goal: one pure, runtime-agnostic description of an editor entry in `packages/shared` and
+  loss-free conversion to and from Google event fields.
+  Acceptance:
+  1. zod schemas `EditorEntryInput` (kind `event`/`meal`; `childIds` (configured ids, `[]` =
+     everyone); `icon` (`EmojiSchema`); `title` (trimmed, 1–60 chars, plain text, no line
+     breaks); `allDay`; `date` + optional `startTime`/`endTime` (`HH:mm`, end after start,
+     default duration 1 h) or all-day `endDate` (multi-day, exclusive end); `repeat`:
+     `none` | `{ weekly: { weekdays (1–7 unique), interval 1|2, until? } }`; `bring`
+     (≤ 8 emoji); `countdown`; `slot` for meals) and `EditorEntry` (adds Google ids,
+     `sourceId`, `recurringEventId`, `repeatEditable`) exported from `@kidboard/shared`.
+  2. `composeTitle(entry, config)` writes ADR-0005 titles: `Mia: 🏊 Schwimmen`,
+     `Mia, Ben: 🛁 Baden`, everyone → no prefix, child of a per-child calendar → no prefix,
+     meals `Mittag: 🍝 Spaghetti` / `Lunch: …` by config locale; round-trip property test:
+     `parseTitle(composeTitle(x))` returns the same children, icon, title and slot for
+     every generated input (names with umlauts, titles starting with a child name or a
+     meal word, titles with colons, emoji with ZWJ/VS16/skin tones).
+  3. `composeDescription(existing, { bring, countdown, locale })` replaces only bring lines
+     and the `#countdown` marker and keeps every other line and its HTML byte for byte
+     (Google-style HTML descriptions, `TESTONLY-private-note` marker test); empty bring +
+     no countdown on an empty description → empty string; `parseBringList` of the result
+     equals `bring`.
+  4. `buildRecurrence(repeat, start, timeZone)` → `RRULE:FREQ=WEEKLY;BYDAY=…[;INTERVAL=2][;UNTIL=…]`
+     (UNTIL as `YYYYMMDD` for all-day, UTC `…T…Z` covering the last local day otherwise,
+     DST-safe); `parseRecurrence(lines)` returns the editor form for exactly these shapes
+     and `null` (= `repeatEditable: false`) for anything else (COUNT, BYMONTHDAY, MONTHLY,
+     RDATE, EXRULE, several RRULEs); EXDATE lines are kept on master edits. Table tests
+     incl. DST weeks in `Europe/Berlin` and `America/Los_Angeles`.
+  5. `toGoogleEvent(input, config)` / `fromGoogleEvent(event, source, config)` (Google
+     REST shapes typed with zod, unknown fields ignored, title through `parseTitle`, bring
+     through `parseBringList`, times in the config zone, never the device zone); tests for
+     timed, all-day, multi-day, series master, instance, meal.
+  6. `pickTargetCalendar(entry, writableSources, config)` implements the ADR-0012 rule;
+     table tests. ARCHITECTURE gets an "Editor" section (model, conventions, target rule).
+
+- [ ] **T-40 Worker: Google service account client** (risk: **high** → Opus, deps: T-39)
+  Goal: the worker can call the Calendar API for shared calendars without leaking secrets.
+  Acceptance:
+  1. `jose` added to the worker (version and Workers support verified via Context7 or the
+     installed sources); `GOOGLE_SERVICE_ACCOUNT_KEY` parsed with zod (bad JSON, missing
+     fields, template value → editor off with one logged warning naming the variable, never
+     its content); access token via JWT bearer grant, cached per isolate until 60 s before
+     expiry, concurrent callers share one token request (tests with a fake token endpoint
+     and a generated test key pair, never a committed real-looking key).
+  2. Google calendar id per source: `CAL_<ID>_GOOGLE_ID` or derived from the secret iCal
+     address (URL-decoded path segment of `calendar.google.com/calendar/ical/<id>/private-…`;
+     anything else → not writable); tests incl. `%40`, `#` ids, non-Google feeds.
+  3. Small typed client (`listInstances(from, to)`, `getEvent`, `insert`, `patch`,
+     `remove`) with timeout (10 s), response size limit, `fetch` only; Google errors mapped
+     to `not_shared` (403/404 on the calendar), `not_found`, `conflict` (412), `rate_limited`
+     (429/403 rate reasons), `upstream` – never forwarding Google's message text, the
+     calendar id or the token to the client or logs (test asserts absence in bodies and
+     console output).
+  4. `/api/config` gains `editor: boolean` (true only with a valid key, a valid PIN per
+     ADR-0013 and at least one writable source); old clients ignore it; shared
+     `PublicConfigSchema` updated with a default `false`.
+  5. `.dev.vars.example`, `env.ts` typed; CONFIG docs follow in T-45.
+
+- [ ] **T-41 Worker: parent lock** (risk: **high** → Opus, deps: T-40)
+  Acceptance: ADR-0013 implemented and tested: PIN validation (6–12 digits, template →
+  off); `POST /api/parent/unlock` constant-time compare, session token format and 15 min
+  expiry (fake clock), wrong/expired/tampered/other-PIN tokens → 401 `parent_locked`;
+  lockout after 5 failures in 15 min → 429 + `Retry-After`, reset after the window, success
+  does not write KV; works with KV, Cache API fallback and memory; access token still
+  required in front of it; CORS adds `POST, PATCH, DELETE`, `Content-Type` and
+  `X-KidBoard-Parent` for allowed origins only; request bodies limited to 8 KB and parsed
+  with zod; editor off → all `/api/parent/*` 404.
+
+- [ ] **T-42 Worker: editor API** (risk: **high** → Opus, deps: T-41)
+  Acceptance:
+  1. `GET /api/parent/entries?from&days` (≤ 31 days, same window rules as `/api/agenda`)
+     → `EditorEntry[]` of all writable sources (instances, series info, `repeatEditable`)
+     plus per-source status (`ok`/`not_shared`/`error`); `GET /api/parent/templates` → up to
+     12 frequent entries (same icon + title + children, last 8 weeks + next 4) for one-tap
+     reuse, most frequent first.
+  2. `POST /api/parent/entries` (create), `PATCH /api/parent/entries/:id?scope=one|series`,
+     `DELETE /api/parent/entries/:id?scope=one|series`; series patch keeps EXDATEs and the
+     untouched description; `scope=one` on an instance edits/deletes only that day;
+     entries of sources that are not writable → 404; `If-Match`/etag from the listing used
+     so a concurrent edit in Google returns 409 `conflict`.
+  3. After every successful write the affected source's cached agenda entry is dropped
+     (memory + KV/Cache API) and the response says `boardRefresh: "soon"`; test: the next
+     `/api/agenda` refetches the feed.
+  4. Fake Google server in tests covering create/edit/delete for once, weekly, interval 2,
+     until, all-day, multi-day, meal, instance vs series, not shared, conflict, rate limit;
+     responses never contain descriptions other than the bring list (privacy, ADR-0010).
+
+- [ ] **T-43 Web: parent gate** (risk: medium, deps: T-41)
+  Acceptance: ✏️ entry in the nav rail only when `config.editor` is true, opens after a
+  2 s press and hold (≥ 64 px target, progress ring, `prefers-reduced-motion` respected,
+  keyboard: Enter held 2 s), short taps do nothing visible; PIN pad (≥ 64 px keys, digits
+  masked, error shake without motion when reduced, lockout message with minutes left);
+  session in memory only; auto-lock after 3 min idle, on `visibilitychange` hidden and on
+  "Done"; board auto-return paused while open; i18n DE + EN; component tests and an e2e
+  with the mock API (unlock, wrong PIN, lockout, auto-lock).
+
+- [ ] **T-44 Web: editor screens** (risk: **high** → Opus, deps: T-42, T-43)
+  Goal: adding a weekly swimming lesson for one child takes under 20 seconds and no typing
+  except the optional name.
+  Acceptance:
+  1. **List:** next 14 days grouped by day (today first), each entry as the child sees it
+     (reusing `EventTile` look), meals per slot, 🔁 marker for series; tap → edit sheet;
+     per-source warnings (`not_shared`: "Share calendar X with the service account").
+  2. **New entry flow** (one screen, large controls): *who* (child avatars, multi-select,
+     "Alle"), *what* (activity catalogue of ≥ 40 icons in 6 groups – sport, school/kita,
+     friends & play, appointments, outings, celebrations – each with a DE/EN label that
+     pre-fills the title; plus "your own emoji" input validated by `EmojiSchema`; all
+     built-in icons within the ADR-0011 baseline, test), *when* (today/tomorrow/date
+     chips, time wheel or all-day, duration presets), *repeat* (once / weekly with weekday
+     chips preset to the chosen date's weekday, every 1 or 2 weeks, optional end date or
+     "until the summer holidays" free date), *bring* (≈ 16 common items as toggle chips +
+     own emoji), *countdown* toggle ("count the sleeps"), and a **live preview** tile.
+  3. **Templates:** a "Again" row with the templates from T-42 and built-in quick picks
+     (e.g. 🏊 Swimming weekly, 🎂 Birthday with countdown, 🦷 Dentist) that pre-fill the form.
+  4. **Meals:** "What's for dinner?" mode: day + slot chips, dish catalogue (≈ 24 dishes
+     with icons), own emoji/text; "repeat last week's meals" copies the 7 meals of the
+     previous week to this week in one confirmed step.
+  5. **Edit/delete:** same form pre-filled; for series a clear choice "only on <date>" /
+     "every week" (and "repeat can only be changed in Google Calendar" when
+     `repeatEditable` is false); delete asks once with an undo-free confirmation naming the
+     entry; after saving a calm toast "Saved – the board updates within a few minutes" and
+     the agenda query is invalidated.
+  6. Demo build (`pnpm dev:demo`) runs the editor against an in-memory fake API (PIN
+     `123456` shown in the demo only), so the UI/UX test needs no Google account.
+  7. Errors (offline, `not_shared`, `conflict`, `rate_limited`, `parent_locked`) as calm
+     messages with the `KB-*` code style; nothing lost on a failed save (form kept).
+  8. Component tests for every control, a11y (labels, roles, focus order, AA contrast in
+     light and night), XSS-looking titles render as text.
+
+- [ ] **T-45 Editor e2e, screenshots and docs** (risk: medium, deps: T-44)
+  Acceptance: Playwright e2e at 1280×800 and 2000×1200 against the mock API (create once,
+  create weekly, edit one vs series, delete, meal, template, lockout, auto-lock, offline);
+  screenshots `docs/screenshots/editor-*` (light/night); README + README.de "Edit on the
+  tablet" section; `docs/DEPLOY.md` + `DEPLOY.de.md` step-by-step Google Cloud setup
+  (project, Calendar API, service account, JSON key, sharing each calendar with "Make
+  changes to events", `GOOGLE_SERVICE_ACCOUNT_KEY`, `KIDBOARD_PARENT_PIN`, optional
+  `CAL_<ID>_GOOGLE_ID`, Workspace restrictions, how to revoke); CONFIG EN + DE;
+  troubleshooting for `not_shared`, lockout, "board shows the change only later".
+
+**M11 exit:** milestone review by `reviewer-opus` (secrets, write auth, lockout, privacy of
+descriptions, conventions round-trip), a T-27a-style UI/UX click test of the editor by three
+agents (Haiku, Sonnet, Opus) at both sizes, light/night, fixed via the builder/reviewer loop
+and re-checked by Sonnet until no blocking findings; CI green.
+
+**M12 idea (not planned yet):** click-through setup wizard (children, colours, avatars,
+calendars) stored in KV instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
+
 ## M6 – Deploy, docs, v1.0.0
 
 - [x] **T-25 Cloudflare deploy** (risk: **high** → Opus, deps: M5; built before M5b, see change log)
@@ -623,7 +782,7 @@ robustness, layout without scrolling), a short T-27a-style UI/UX check of the ne
   ranking for leftover slots, 🌞 vs ☀️ glanceability, faint emoji on light tints, skeleton → board
   header jump, all states at both sizes light/night with 3 children and 1–12 events.
 
-- [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27a, M10; last task before the release)
+- [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27a, M10, M11; last task before the release)
   Acceptance: full review by `reviewer-opus`; gitleaks over full history clean;
   `pnpm audit --prod` without high/critical; release-please release `v1.0.0` published;
   branch-protection settings documented/applied; `CLAUDE.md` switched to PR workflow;
@@ -637,7 +796,7 @@ robustness, layout without scrolling), a short T-27a-style UI/UX check of the ne
   holidays; a full timetable as a separate per-child view (all subjects would crowd the board).
 * **M7 Routines** – routine checklist (e.g. brush teeth, get dressed) with reward stars,
   stored locally on the tablet; optional emoji asset set (ADR-0009).
-* **M8 Parent mode** – PIN-protected settings overlay (refresh, night mode override, locale).
+* **M8 Parent mode** – PIN-protected settings overlay (refresh, night mode override, locale); reuses the M11 parent lock (ADR-0013).
 * **M9 Weather** – small weather icon in the header via a keyless open API (e.g.
   Open-Meteo), cached in the worker.
 
@@ -648,6 +807,7 @@ robustness, layout without scrolling), a short T-27a-style UI/UX check of the ne
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-23 | New milestone M11 Parent editor (T-39–T-45, exit review + UI/UX click test) before v1.0.0; ADR-0012 (write via Google Calendar API with a service account, reading stays on iCal) and ADR-0013 (parent PIN, sessions, lockout); non-goals updated; T-28 also depends on M11; M12 setup wizard noted as an idea | Maintainer wants to maintain entries in the app (child, activity, once/weekly) instead of typing title conventions in Google Calendar |
 | 2026-11-23 | New milestone M10 School (bring list from event description, evening-before 🎒 reminder, later holidays/timetable), scheduled right after v1.0.0 | Maintainer request: school subjects where children must bring something |
 | 2026-11-23 | M10 School items 1–3 planned as a milestone before v1.0.0 (T-33 bring list parsing, T-34 subject icons + emoji baseline, T-35 bring chips, T-36 evening-before 🎒 area, T-37 fixtures/demo/e2e/screenshots, T-38 docs, M10 exit review); ADR-0010 (bring list from the description, server-side) and ADR-0011 (Emoji 13.0 baseline for built-in icons, 🛝 replaced); T-28 now depends on M10 and stays last; holiday feed and timetable stay in "Later" | Maintainer wants the school features in the first release; the release itself is cut later by the maintainer |
 | 2026-11-23 | T-27a outcome: tile size ladder extended with space-based steps (`medium`, dense 2.75rem emoji, `slim` 2rem emoji row tiles; week `week-small`/`week-slim` with 16–18px time-of-day badge on the emoji corner) so "+N" only appears when another tile cannot fit; remaining week polish tracked as issue #5 | UI/UX dummy test loop (4 rounds): showing every event beats a larger emoji on dense days |
