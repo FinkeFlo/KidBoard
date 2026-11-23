@@ -448,6 +448,51 @@ hidden, after 3 min without input and at the session end (a 1 s tick compares
 A lockout (`Retry-After`) is remembered in memory and shown as minutes left. While open
 the board is `inert` and its auto-return is paused. `EditorScreen` is the shell T-45 fills.
 
+### Phone feed (T-46, ADR-0014 "Getting data out")
+
+`GET /api/feed.ics?token=<KIDBOARD_FEED_TOKEN>` (`apps/worker/src/feed/`) publishes the
+app entries for calendar apps on the parents' phones (read-only there).
+
+* **On only when configured:** the editor is on (D1 + valid PIN) and
+  `KIDBOARD_FEED_TOKEN` is 32–256 characters of `A-Z a-z 0-9 _ -` without the template
+  marker `REPLACE_ME` (`feed/token.ts`; e.g. `openssl rand -hex 32`). Unset → no feed;
+  unusable → no feed and one warning per isolate (never the value). Every miss (feed
+  off, missing or wrong `token`) is the plain `404 not_found` of unknown paths; the
+  token is compared with `tokensEqual` (SHA-256 + `timingSafeEqual`). The parameter is
+  `token`, distinct from the board's `key`: neither token opens the other's routes.
+* **Token in the query string, not the path:** Workers Logs record the request URL of
+  every invocation; `observability.redact_query_string` (`wrangler.jsonc`) drops query
+  strings there, as for `?key=`. Worker log lines use `c.req.path`, which has no query.
+  Calendar apps keep query strings of subscription URLs (Google "From URL" and Apple
+  subscriptions fetch the URL as given; many published feeds carry tokens there); this
+  is an assumption from common practice, no vendor documentation was available.
+* **No access token:** calendar apps subscribe by URL only, so the access token
+  middleware lets exactly `GET`/`HEAD` of the path `/api/feed.ics` through
+  (`feed/path.ts` `isFeedRequest`); every other path or method still needs it. The
+  feed token is the only guard of this route.
+* **Body:** one calendar with events and meals (one subscription; meals all-day or
+  timed exactly as stored), built from the same VEVENTs as the board's virtual sources
+  (`appEventComponents` in `entries/renderCalendar.ts`): wall-clock times with
+  `TZID` = the configured zone, `RRULE`/`EXDATE`/`RECURRENCE-ID` kept, so the feed
+  expands to the board's occurrences (tested by parsing it back). Headers: `PRODID`,
+  `CALSCALE`, `METHOD:PUBLISH`, `X-WR-CALNAME` (`KidBoard`), `X-WR-TIMEZONE`,
+  `REFRESH-INTERVAL`/`X-PUBLISHED-TTL` `PT1H` (hints; Google polls on its own schedule).
+  RFC 5545 requires a `VTIMEZONE` for each `TZID`: Google and Apple map IANA names
+  themselves, but clients like Outlook need the definition, so the feed carries the
+  configured zone's VTIMEZONE from `timezones-ical-library` (Apache-2.0, tzdb rules,
+  TZID set to the configured name; tested to resolve to the board's instants across DST
+  in three hemispheres). UTC times were rejected: a weekly `RRULE` in UTC drifts by an
+  hour at every DST switch. A zone the library lacks → no VTIMEZONE (Google/Apple
+  still work) and one warning.
+* **Responses:** `200` `Content-Type: text/calendar; charset=utf-8`,
+  `Cache-Control: no-store` (global middleware), all entries (no window). Invalid
+  config → `500 server_misconfigured`; D1 unavailable → `503 storage_unavailable`
+  (type logged only).
+* **Subscribe link:** `GET /api/parent/feed` (parent session) → `{ feedUrl }` with the
+  relative URL `/api/feed.ics?token=…`, omitted while the feed is off
+  (`ParentFeedResponseSchema` in `packages/shared`). Rotating `KIDBOARD_FEED_TOKEN`
+  revokes every subscription.
+
 ## Caching & offline (summary – details in [ADR-0006](adr/0006-caching-offline.md))
 
 | Layer | What | Lifetime |
@@ -976,7 +1021,7 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
 - **Security:** optional `KIDBOARD_ACCESS_TOKEN` (Bearer or `?key=`, SHA-256 +
   `crypto.subtle.timingSafeEqual`); a token still containing the template marker
   `REPLACE_ME` fails closed (`500 server_misconfigured`, T-25); `/api/health` is public and returns only
-  `{ ok: true }`. CORS only for `KIDBOARD_ALLOWED_ORIGINS` (preflights are answered before
+  `{ ok: true }`; the phone feed path has its own token (see "Phone feed"). CORS only for `KIDBOARD_ALLOWED_ORIGINS` (preflights are answered before
   the token check). Hono `secureHeaders()` (nosniff, `Referrer-Policy: no-referrer`, …) and
   `Cache-Control: no-store` on every API response (the client owns caching, ADR-0006).
 - **Config:** `KIDBOARD_CONFIG` is parsed once per isolate (memoized by raw string);

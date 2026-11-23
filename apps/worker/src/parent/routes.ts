@@ -1,3 +1,4 @@
+import type { ParentFeedResponse } from "@kidboard/shared";
 import { type Context, Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { except } from "hono/combine";
@@ -5,6 +6,8 @@ import { z } from "zod";
 
 import { type Board, defer } from "../agenda/board";
 import type { AppEnv } from "../env";
+import { feedPath } from "../feed/path";
+import { configuredFeedToken } from "../feed/token";
 import { tokensEqual } from "../http/auth";
 import { parseJsonBody, payloadTooLarge } from "../http/jsonBody";
 import { logWarn } from "../log";
@@ -59,6 +62,8 @@ function isoSeconds(epochSeconds: number): string {
  *   during the following 15 min → 429 `parent_lockout` with `Retry-After`. Each attempt
  *   is reserved against the limit before the PIN is compared (see `UnlockLimiter`);
  * * `GET /session` (needs {@link requireParentSession}) → `{ expiresAt }`;
+ * * `GET /feed` (session) → `{ feedUrl }`, the relative phone feed path, only while
+ *   `KIDBOARD_FEED_TOKEN` is valid (`ParentFeedResponseSchema`);
  * * the editor API (`./editorRoutes.ts`, T-43), behind the same session guard.
  *
  * State (key cache, per-isolate failure counter) lives in the returned instance.
@@ -164,6 +169,13 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
   app.get("/session", requireSession, (c) =>
     c.json({ expiresAt: isoSeconds(c.var.parentSessionExpiresAt) }),
   );
+
+  app.get("/feed", requireSession, (c) => {
+    const token = configuredFeedToken(c.env);
+    const body: ParentFeedResponse =
+      token === undefined ? {} : { feedUrl: feedPath(token) };
+    return c.json(body);
+  });
 
   registerEditorRoutes(app, {
     now: options.now,

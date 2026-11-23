@@ -24,6 +24,13 @@ KIDBOARD_ACCESS_TOKEN="REPLACE_ME"
 # The editor also needs the D1 database KIDBOARD_DATA, which Wrangler creates on deploy.
 KIDBOARD_PARENT_PIN="REPLACE_ME"
 
+# Optional: secret token of the phone feed of the editor's entries, subscribed to in Google
+# or Apple Calendar as https://<worker>/api/feed.ics?token=<token> (no access token needed; the
+# parent area shows the link). 32 to 256 characters of A-Z a-z 0-9 _ -, e.g. the output of
+# `openssl rand -hex 32`. Unset = no feed; shorter or still REPLACE_ME = no feed and a log
+# warning. Changing it ends every subscription. Needs the editor (PIN and D1).
+# KIDBOARD_FEED_TOKEN="REPLACE_ME"
+
 # Required: non-secret settings as one JSON document on a single line (shape:
 # config.example.json, options: docs/CONFIG.md). Its calendars match CAL_KINDER_URL and
 # CAL_ESSEN_URL above.

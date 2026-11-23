@@ -47,8 +47,9 @@ function dateTime(date: string, time?: string): ICAL.Time {
 
 /**
  * Adds a DATE (`time` absent) or a wall-clock DATE-TIME with `TZID` = the configured
- * zone. No VTIMEZONE is written: the expansion converts IANA TZIDs with the runtime's
- * tz database (ADR-0003, ADR-0008), exactly as for Google feeds.
+ * zone. No VTIMEZONE is written here: the expansion converts IANA TZIDs with the
+ * runtime's tz database (ADR-0003, ADR-0008), exactly as for Google feeds. The phone
+ * feed adds one for other calendar apps (`feed/renderFeed.ts`).
  */
 function addTime(
   component: ICAL.Component,
@@ -196,6 +197,22 @@ function entryComponents(
 }
 
 /**
+ * The VEVENTs of the stored app entries of the given kinds (see
+ * {@link renderAppCalendar}); shared with the phone feed (`feed/renderFeed.ts`), so the
+ * feed carries exactly what the board expands.
+ */
+export function appEventComponents(
+  entries: readonly AppEntry[],
+  kinds: readonly EditorKind[],
+  config: AppConfig,
+): ICAL.Component[] {
+  const locale = resolveWriteLocale(config.locale);
+  return entries
+    .filter((entry) => kinds.includes(entry.kind))
+    .flatMap((entry) => entryComponents(entry, config, locale));
+}
+
+/**
  * Renders the stored app entries of one `kind` as an iCalendar document (ADR-0014),
  * written with the same conventions as hand-written Google events: titles via
  * `composeTitle` (ADR-0005), bring list and `#countdown` via `composeDescription`
@@ -209,17 +226,11 @@ export function renderAppCalendar(
   kind: EditorKind,
   config: AppConfig,
 ): string {
-  const locale = resolveWriteLocale(config.locale);
   const calendar = new ICAL.Component("vcalendar");
   calendar.addPropertyWithValue("prodid", APP_CALENDAR_PRODID);
   calendar.addPropertyWithValue("version", "2.0");
-  for (const entry of entries) {
-    if (entry.kind !== kind) {
-      continue;
-    }
-    for (const component of entryComponents(entry, config, locale)) {
-      calendar.addSubcomponent(component);
-    }
+  for (const component of appEventComponents(entries, [kind], config)) {
+    calendar.addSubcomponent(component);
   }
   return calendar.toString();
 }

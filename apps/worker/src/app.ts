@@ -14,6 +14,7 @@ import {
 import { buildAgenda } from "./agenda/buildAgenda";
 import { loadConfig } from "./config/loadConfig";
 import type { AppEnv } from "./env";
+import { registerFeedRoute } from "./feed/routes";
 import { accessToken } from "./http/auth";
 import { apiCors } from "./http/cors";
 import { logError } from "./log";
@@ -113,12 +114,17 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
   // Parent lock and editor API (ADR-0013, ADR-0014), behind the access token.
   app.route(PARENT_BASE_PATH, parentRoutes({ now, board }).app);
 
+  // Phone feed of the app entries (ADR-0014), guarded by its own secret token.
+  registerFeedRoute(app, { board });
+
   app.notFound((c) =>
     c.json({ error: "not_found", message: "Not found" }, 404),
   );
 
   app.onError((error, c) => {
     // Log the error type only: messages of runtime errors may quote URLs or feed text.
+    // The path only: query strings carry the access token (`key`) and the phone feed
+    // token (`token`).
     logError(`unhandled ${error.name} on ${c.req.method} ${c.req.path}`);
     return c.json(
       { error: "internal_error", message: "Internal server error" },

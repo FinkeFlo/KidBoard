@@ -55,7 +55,7 @@ then app entries live only in KidBoard.
   token. Without it KidBoard is the read-only board it was.
 * **Getting data out:** the parent area offers a JSON export and import (backup, moving to
   a new deployment), and an optional secret iCal feed of the app entries
-  (`/api/feed/<feed token>.ics`) that parents can subscribe to in Google Calendar or Apple
+  (`/api/feed.ics?token=<feed token>`) that parents can subscribe to in Google Calendar or Apple
   Calendar on their phones (read-only there; Google refreshes subscriptions slowly).
 * **Privacy:** descriptions of app entries contain only what the editor writes (bring line,
   `#countdown`); D1 lives in the family's own Cloudflare account.
@@ -66,5 +66,8 @@ then app entries live only in KidBoard.
   or the later Google sync (ADR-0012) is turned on; parents edit them in KidBoard (on the
   tablet or on a phone browser with the same link).
 * New binding `KIDBOARD_DATA` (D1); free-tier limits are far above a family's use.
+* New dependency `timezones-ical-library` (Apache-2.0, tzdb-based VTIMEZONE data) for the
+  phone feed: RFC 5545 requires a VTIMEZONE per TZID and clients such as Outlook need it,
+  ical.js ships no zone data, and UTC times would shift weekly series at DST switches.
 * The T-39 Google conversion helpers (`toGoogleEvent`/`fromGoogleEvent`,
   `pickTargetCalendar`) remain for the optional sync.

@@ -31,6 +31,11 @@ export interface Env {
    * template value → the editor is off.
    */
   KIDBOARD_PARENT_PIN?: string;
+  /**
+   * Optional secret token of the phone feed `/api/feed.ics?token=<token>` (ADR-0014): 32 to
+   * 256 characters of `A-Z a-z 0-9 _ -`. Unset, invalid or the template value → no feed.
+   */
+  KIDBOARD_FEED_TOKEN?: string;
   /** Secret iCal URL per calendar, see `calendarSecretName` in `@kidboard/shared`. */
   [secret: `CAL_${string}_URL`]: string | undefined;
 }

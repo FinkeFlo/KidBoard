@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 
 import type { AppEnv } from "../env";
+import { isFeedRequest } from "../feed/path";
 import { logError } from "../log";
 
 const encoder = new TextEncoder();
@@ -38,15 +39,20 @@ const PUBLIC_PATHS = new Set(["/api/health"]);
 
 /**
  * Optional access token (`KIDBOARD_ACCESS_TOKEN`). When set and non-empty, every API
- * path except {@link PUBLIC_PATHS} needs `Authorization: Bearer <token>` or
- * `?key=<token>`; otherwise 401. A token that still contains
+ * path except {@link PUBLIC_PATHS} and `GET`/`HEAD` of exactly the phone feed path
+ * (`/api/feed.ics`, `isFeedRequest`; it checks its own `?token=`) needs
+ * `Authorization: Bearer <token>` or `?key=<token>`; otherwise 401. A token that still contains
  * {@link PLACEHOLDER_TOKEN_MARKER} fails closed with 500 `server_misconfigured`. CORS
  * preflights are answered by the CORS middleware before this runs.
  */
 export function accessToken(): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     const expected = c.env.KIDBOARD_ACCESS_TOKEN ?? "";
-    if (expected === "" || PUBLIC_PATHS.has(c.req.path)) {
+    if (
+      expected === "" ||
+      PUBLIC_PATHS.has(c.req.path) ||
+      isFeedRequest(c.req.method, c.req.path)
+    ) {
       await next();
       return;
     }

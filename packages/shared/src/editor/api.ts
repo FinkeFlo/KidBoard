@@ -151,6 +151,19 @@ export const EditorListResponseSchema = z.object({
 });
 export type EditorListResponse = z.output<typeof EditorListResponseSchema>;
 
+/**
+ * `GET /api/parent/feed` (ADR-0014 "Getting data out"): the relative URL of the phone
+ * feed, `/api/feed.ics?token=<token>`, present only while the feed is configured. The token
+ * is a secret: show it to the unlocked parent only, never log or cache it.
+ */
+export const ParentFeedResponseSchema = z.object({
+  feedUrl: z
+    .string()
+    .regex(/^\/api\/feed\.ics\?token=[A-Za-z0-9_-]{32,256}$/)
+    .optional(),
+});
+export type ParentFeedResponse = z.output<typeof ParentFeedResponseSchema>;
+
 /** A suggestion for a new app entry ("Again" row), built from recent occurrences. */
 export const EditorTemplateSchema = z.object({
   kind: EditorKindSchema,
