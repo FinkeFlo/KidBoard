@@ -19,7 +19,7 @@ operation, works offline with the last known state.
   M11 / ADR-0014; an optional Google sync is a later idea, ADR-0012).
 * Accounts, multi-family hosting. (The family's own D1 database stores app entries, M11.)
 * Copying anything from third-party products (texts, graphics, names, layouts).
-* Routines, weather (→ M7+). (Parent PIN for the editor: M11 / ADR-0013.)
+* Routines (→ M7+). Weather: M9. (Parent PIN for the editor: M11 / ADR-0013.)
 * Portrait layout and phones (should not break, but not designed for).
 
 ## Definition of Done (every task)
@@ -781,6 +781,95 @@ via the builder/reviewer loop and re-checked by Sonnet until no blocking finding
 account (ADR-0012); click-through setup wizard (children, colours, avatars, calendars)
 stored in D1 instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
 
+## M9 – Weather and what to wear (before v1.0.0)
+
+Children see the weather and what to put on without reading: a weather icon with the
+temperature on every overview day, and a small row of clothing pictures for today (from
+`bands.eveningStart` for tomorrow, so it can be laid out the evening before). Pulled forward
+from "Later" at the maintainer's request (2026-11-23). Decision:
+[ADR-0015](adr/0015-weather-open-meteo.md) (Open-Meteo without a key, fetched and cached by
+the worker, place from `KIDBOARD_CONFIG`, clothing rules in `packages/shared`). Merge rules
+1–6 of M5b apply. M9 touches the board, i18n and config files that M11 also touches: rebase
+often, never force-push.
+
+- [ ] **T-47 Weather config, forecast model and clothing rules** (risk: medium, deps: M10)
+  Goal: everything pure and runtime-agnostic in `packages/shared`.
+  Acceptance:
+  1. Optional `weather` block in `AppConfigSchema` (strict): either `place` (1–80 chars,
+     optional `country` as ISO 3166-1 alpha-2) or `latitude` (−90…90) + `longitude`
+     (−180…180), never both, never neither; `unit` `celsius` (default) | `fahrenheit`. No
+     block → weather off. Config tests for every invalid shape.
+  2. `PublicConfigSchema`/`toPublicConfig`: only a flag `weather: true` (omitted when off, as
+     `editor`), never the place or coordinates (test).
+  3. `WeatherResponseSchema` (DTO of `/api/weather`): `fetchedAt`, `unit`, `current`
+     (`temperature`, `code`) and `days[]` (`date` `YYYY-MM-DD` in the config zone, `code`,
+     `tempMax`, `tempMin`, `feelsMin`, `feelsMax` over the daytime hours 07:00–19:00,
+     `rain` (bool), `snow` (bool), `uvMax`), up to 7 days; temperatures rounded to whole
+     degrees; old clients ignore unknown keys.
+  4. `weatherIcon(code)` maps every WMO code of the Open-Meteo docs to one emoji (☀️ 🌤️ ⛅
+     ☁️ 🌫️ 🌦️ 🌧️ 🌨️ ❄️ ⛈️), unknown codes → ☁️; never 🌙 (rule 1: 🌙 counts sleeps).
+  5. `clothingFor(day)` returns at most 5 emoji from a documented threshold table (feels-like
+     in °C, converted for °F): 🧥 jacket below 12°, 🧣 below 5°, 🧤 below 0° or snow; 👕
+     from 22°, 🩳 from 24° (`feelsMax`); ☔ + 👢 for rain; 🧤 + 👢 for snow; 🧢 when sunny
+     (code ≤ 2) with UV ≥ 3 and `feelsMax` ≥ 15°, 🧴 from UV ≥ 5; fixed order, no
+     duplicates, priority to protection when capped. Table tests at every threshold (below
+     / exact), °F input, a cool morning + hot afternoon day (jacket and T-shirt).
+  6. Every new emoji is in the ADR-0011 baseline (Emoji ≤ 13.0, test).
+
+- [ ] **T-48 Worker: `/api/weather`** (risk: **high** → Opus, deps: T-47)
+  Goal: the worker fetches, condenses and caches the forecast; the tablet never talks to a
+  third party and never learns the place.
+  Acceptance:
+  1. `place` resolved once via the Open-Meteo geocoding API (first result, `countryCode`
+     when given, language from the config locale) and cached for 30 days; no result →
+     `/api/weather` answers 503 `weather_place_unknown` (the config stays valid).
+  2. Forecast via the Open-Meteo forecast API (JSON, `timezone` = config zone,
+     `forecast_days=7`, current + hourly + daily variables per ADR-0015; request shape
+     verified via Context7), validated with zod, condensed to `WeatherResponseSchema`;
+     daytime feels-like from the hourly values in the config zone (DST day test). Timeout
+     5 s and 1 MB size limit; upstream errors never leak upstream text.
+  3. Cache: fresh for 30 min in `KIDBOARD_CACHE` (KV) or the Cache API fallback, last good
+     forecast served up to 24 h when Open-Meteo fails (marked `stale: true`); KV writes stay
+     within `KV_WRITES_PER_DAY_BUDGET` together with the feeds (≤ 48 forecast writes/day,
+     test).
+  4. Route behind the access token; weather off → 404 `weather_off`; place, coordinates and
+     upstream URLs appear in no response body, error or log line (test with a marker
+     place `TESTONLY-Weatherplace`). `Cache-Control: no-store` as every API route.
+  5. Worker tests with mocked upstreams (forecast fixture modelled on the documented
+     response, geocoding hit/miss, timeout, 400 error object, oversize body).
+
+- [ ] **T-49 Weather and clothing on the board** (risk: medium, deps: T-47, T-48)
+  Acceptance:
+  1. Client query `weather` (only when `config.weather`), refetch every 30 min, persisted
+     for offline like the agenda; a forecast older than 24 h or for a past date is not
+     shown; any weather error hides the weather silently (the board never shows an error
+     for it).
+  2. Overview: every day column shows a weather chip in its header (icon + temperature; today:
+     current temperature, other days: daily high); today's column shows the clothing row
+     (`clothingFor`) for today until `bands.eveningStart`, from then for tomorrow with the
+     🎒 day cue (arrow + short weekday); whole icons only; heights measured so the event
+     list shrinks through the existing steps and nothing scrolls (density e2e re-run with
+     weather at 1280×800 and 2000×1200, incl. burn-in corners).
+  3. Week view: icon + daily high in the day headers for days inside the forecast.
+  4. A11y and i18n (DE + EN): each chip is one image with a full name ("Sunny, 12 degrees"
+     / "Sonnig, 12 Grad"), the clothing row a labelled list ("Today wear: jacket, scarf" /
+     "Morgen anziehen: Jacke, Schal"); °C/°F from the config; night tokens and dimmed
+     `<Emoji>`; contrast tests for any new token pair.
+  5. Attribution "Weather: Open-Meteo.com" / "Wetter: Open-Meteo.com" (CC BY 4.0) shown small
+     in the rail under "Updated" while weather is on.
+  6. Demo data with weather (relative dates, a cold rainy tomorrow so the evening row shows
+     jacket + rain gear), e2e `weather.spec.ts` (chips, morning vs. evening row, weather off,
+     weather error hides quietly), screenshots `docs/screenshots/day-weather-*` (light +
+     night, 1280×800).
+  7. Short docs only (maintainer asked for full guides later): README + README.de feature
+     bullet and a `weather` entry in `docs/CONFIG.md` EN + DE (example, privacy note,
+     Open-Meteo terms).
+
+**M9 exit:** milestone review by `reviewer-opus` (privacy of the place, caching/KV budget,
+layout without scrolling), a T-27a-style UI/UX click test of the new surfaces by three
+agents (Haiku, Sonnet, Opus) at both sizes, light/night, fixed via the builder/reviewer loop
+and re-checked by Sonnet until no blocking findings; CI green.
+
 ## M6 – Deploy, docs, v1.0.0
 
 - [x] **T-25 Cloudflare deploy** (risk: **high** → Opus, deps: M5; built before M5b, see change log)
@@ -815,7 +904,7 @@ stored in D1 instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
   ranking for leftover slots, 🌞 vs ☀️ glanceability, faint emoji on light tints, skeleton → board
   header jump, all states at both sizes light/night with 3 children and 1–12 events.
 
-- [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27a, M10, M11; last task before the release)
+- [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27a, M9, M10, M11; last task before the release)
   Acceptance: full review by `reviewer-opus`; gitleaks over full history clean;
   `pnpm audit --prod` without high/critical; release-please release `v1.0.0` published;
   branch-protection settings documented/applied; `CLAUDE.md` switched to PR workflow;
@@ -830,8 +919,6 @@ stored in D1 instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
 * **M7 Routines** – routine checklist (e.g. brush teeth, get dressed) with reward stars,
   stored locally on the tablet; optional emoji asset set (ADR-0009).
 * **M8 Parent mode** – PIN-protected settings overlay (refresh, night mode override, locale); reuses the M11 parent lock (ADR-0013).
-* **M9 Weather** – small weather icon in the header via a keyless open API (e.g.
-  Open-Meteo), cached in the worker.
 
 ---
 
@@ -840,6 +927,7 @@ stored in D1 instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-23 | New milestone M9 Weather and what to wear (T-47–T-49) before v1.0.0, pulled forward from "Later"; ADR-0015; T-28 also depends on M9 | Maintainer request: weather with temperature and child-friendly clothing pictures for today and tomorrow |
 | 2026-11-23 | T-46: user docs for the editor (README, DEPLOY, CONFIG EN + DE) deferred | Maintainer: the feature is not final yet, docs would change too much |
 | 2026-11-23 | T-46 split: T-46a (worker phone feed) and T-46 (link in the parent area, e2e, docs); the feed token moves from a path segment to the query (`/api/feed.ics?token=`) | Workers Logs redact query strings (`redact_query_string`) but not path segments; the worker part could be built in parallel to T-45 |
 | 2026-11-23 | T-43: Google template suggestions use the cached feed window (today − 1 to today + 28) instead of 8 weeks back | Looking 8 weeks back would need a second feed expansion per request, outside the Workers CPU budget (ADR-0003); app entries still count 8 weeks back |
