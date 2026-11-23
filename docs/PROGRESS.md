@@ -49,6 +49,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-23 | T-43 Worker: editor API | Opus (builder-opus) | Opus (reviewer-opus) | 2 | PASS round 2; round 1: entries the config can no longer express were invisible (now `unresolved`, fixable/deletable; import checks shape only), Google template window aligned via plan change; also D1 deadline 2.5 s on /api/agenda, unlock reservation released on every early exit; Context7 unreachable for subagents |
 | 2026-11-23 | T-44 Web: parent gate | Opus (builder-opus) | Opus (reviewer-opus) | 2 | PASS round 2; round 1: focus not returned after closing (fixed: `close()` returns focus to the entry, auto-lock does not); gate closes when `config.editor` turns false; entry is a quiet SVG pencil (low contrast per ADR-0013); parent calls bypass the board's 401 token wipe |
 | 2026-11-23 | T-46a Worker: phone feed | Opus (builder-opus) | Opus (reviewer-opus) | 1 | Worker criteria met in round 1 (token in the query so Workers Logs redact it, tight access-token exemption, VTIMEZONE via `timezones-ical-library` 3.0.0, parity with the board over a DST year); the UI link was split into T-46 by a plan change; nits: memoize VTIMEZONE per zone, separate log text for render errors, tzdb bumps need a version bump, subscriber query-string support to verify in T-46 |
+| 2026-11-23 | T-45 Web: editor screens | Opus (builder-opus) | Opus (reviewer-opus) | 2 | PASS round 2; round 1: "every week" from a day changed on its own corrupted the series (fixed: stored weekdays kept, changed day patched with scope=one), delete 409 wording, dialog focus trap, input border token (≥ 3:1), meal copy skips occupied slots, "Again" row scrolls sideways; nits for the click test: second-step failure test/notice, quick picks off-screen in the row |
 | 2026-11-23 | T-36 Evening-before 🎒 "tomorrow bring" area | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; resumed from interrupted partial work; night chip token --color-chip; nit: two-digit +N width for T-37 e2e |
 | 2026-11-23 | T-38 School docs | Sonnet (builder) | Sonnet (reviewer, together with T-37) | 1 | PASS round 1; README/README.de bring-list section, subject icons, emoji baseline note, CONFIG window rows, troubleshooting |
 | 2026-11-23 | T-37 Fixtures, demo data, e2e and screenshots | Sonnet (builder) | Sonnet (reviewer, together with T-38) | 1 | PASS round 1; e2e found a two-digit +N clip in the bag area, reservation raised to 2rem with a fit fix |
@@ -80,6 +81,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-23 | T-43 | Sonnet → Opus | High-risk task (write API, data integrity, auth) |
 | 2026-11-23 | T-44 | Sonnet → Opus | Security-adjacent UI (session handling, token wipe isolation) |
 | 2026-11-23 | T-46a | Sonnet → Opus | High-risk task (secret token route exempt from the access token) |
+| 2026-11-23 | T-45 | Sonnet → Opus | High-risk task (series edits/recurrence in the UI, large surface) |
 
 ## Milestone reviews
 
