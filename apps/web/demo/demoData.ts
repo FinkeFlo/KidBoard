@@ -65,6 +65,8 @@ interface Slot {
   minutes?: number;
   /** Bring list (as parsed from a `Mitbringen:` line, ADR-0010). */
   bring?: string[];
+  /** The icon comes from the fallback table (a school subject without an emoji in its title). */
+  fallbackIcon?: boolean;
   /** Takes place Monday to Friday only; on Saturday and Sunday {@link Slot.weekend} replaces it. */
   weekend?: Omit<Slot, "weekend">;
 }
@@ -136,7 +138,35 @@ const WEEK: Slot[][] = [
       childIds: ["mia"],
       bring: SWIM_BRING,
     },
-    // Tomorrow's bring lists fill the 🎒 area from the evening before (T-36).
+    // Tomorrow's bring lists fill the 🎒 area from the evening before (T-36). The school
+    // subjects carry no emoji in their title: their icons are the fallback ones (T-34).
+    {
+      title: "Math",
+      icon: "🔢",
+      fallbackIcon: true,
+      time: "08:30",
+      childIds: ["mia"],
+      bring: ["📏", "✏️"],
+      weekend: { title: "Playdate", icon: "🧸", time: "10:00" },
+    },
+    {
+      title: "PE",
+      icon: "👟",
+      fallbackIcon: true,
+      time: "10:00",
+      childIds: ["ben"],
+      bring: ["👟", "🩳"],
+      weekend: { title: "Bike ride", icon: "🚲", time: "10:00" },
+    },
+    {
+      title: "Art",
+      icon: "🎨",
+      fallbackIcon: true,
+      time: "11:30",
+      childIds: ["mia", "ben"],
+      bring: ["👕"],
+      weekend: { title: "Park picnic", icon: "🧺", time: "11:30" },
+    },
     {
       title: "Library",
       icon: "📚",
@@ -283,10 +313,7 @@ export function demoAgenda(
 ): AgendaResponse {
   const events: CalendarEvent[] = [];
   const meals: Meal[] = [];
-  const base = {
-    sourceId: "family",
-    iconIsFallback: false,
-  } as const;
+  const base = { sourceId: "family" } as const;
   for (let offset = 0; offset < AGENDA_DAYS; offset += 1) {
     const date = addCalendarDays(today, offset);
     const weekend = isWeekend(date);
@@ -296,12 +323,14 @@ export function demoAgenda(
       const id = `demo-${String(offset)}-${String(index)}`;
       const childIds = slot.childIds ?? [];
       const bring = slot.bring === undefined ? {} : { bring: slot.bring };
+      const iconIsFallback = slot.fallbackIcon ?? false;
       if (slot.time === null) {
         events.push({
           ...base,
           id,
           title: slot.title,
           icon: slot.icon,
+          iconIsFallback,
           childIds,
           ...bring,
           allDay: true,
@@ -316,6 +345,7 @@ export function demoAgenda(
         id,
         title: slot.title,
         icon: slot.icon,
+        iconIsFallback,
         childIds,
         ...bring,
         allDay: false,
@@ -346,6 +376,7 @@ export function demoAgenda(
     id: "demo-countdown",
     title: "Birthday party",
     icon: "🎂",
+    iconIsFallback: false,
     childIds: ["ben"],
     allDay: false,
     start: isoInZone(partyDate, "17:30", DEMO_TIME_ZONE),

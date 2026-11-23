@@ -1,4 +1,8 @@
-import { AgendaResponseSchema, AppConfigSchema } from "@kidboard/shared";
+import {
+  AgendaResponseSchema,
+  AppConfigSchema,
+  findFallbackIcon,
+} from "@kidboard/shared";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -93,6 +97,41 @@ describe("demo data", () => {
       const day = new Date(`${event.start.slice(0, 10)}T12:00:00Z`).getUTCDay();
       expect([1, 2, 3, 4, 5]).toContain(day);
     }
+  });
+
+  it("packs something for Mia and for Ben tomorrow, school subjects with fallback icons", () => {
+    // Monday 2026-11-23 is a school day (the busy template starts on Sunday).
+    const agenda = demoAgenda(TODAY, NOW);
+    const tomorrow = agenda.events.filter((event) =>
+      event.start.startsWith("2026-11-23"),
+    );
+    for (const child of ["mia", "ben"]) {
+      const packed = tomorrow.filter(
+        (event) =>
+          event.childIds.includes(child) && (event.bring?.length ?? 0) > 0,
+      );
+      expect(packed.length, child).toBeGreaterThanOrEqual(2);
+    }
+    const subjects = tomorrow.filter((event) => event.iconIsFallback);
+    expect(subjects.map((event) => event.title)).toEqual(["Math", "PE", "Art"]);
+    for (const subject of subjects) {
+      // The icon really is what the title parser's table gives for that title.
+      expect(findFallbackIcon(subject.title)).toBe(subject.icon);
+      expect(subject.bring?.length ?? 0).toBeGreaterThan(0);
+    }
+    // The other events keep their own icons.
+    expect(
+      tomorrow.filter((event) => !event.iconIsFallback && event.bring),
+    ).not.toHaveLength(0);
+  });
+
+  it("has no school subjects on a weekend, but plays instead", () => {
+    // Tomorrow is a Saturday when today is a Friday.
+    const saturday = demoAgenda("2026-11-20", NOW).events.filter((event) =>
+      event.start.startsWith("2026-11-21"),
+    );
+    expect(saturday.some((event) => event.iconIsFallback)).toBe(false);
+    expect(saturday.map((event) => event.title)).toContain("Playdate");
   });
 
   it("gives every meal a slot", () => {

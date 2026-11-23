@@ -560,7 +560,7 @@ task; 🎒 means only "tomorrow bring" (rule 1).
      offline with persisted data (test with fake timers).
   7. ARCHITECTURE overview section documents the window, grouping and placement.
 
-- [ ] **T-37 Fixtures, demo data, e2e and screenshots** (risk: medium, deps: T-34, T-36)
+- [x] **T-37 Fixtures, demo data, e2e and screenshots** (risk: medium, deps: T-34, T-36)
   Acceptance:
   1. `apps/web/demo/demoData.ts` (relative dates): school subjects with fallback icons and
      bring lists for Mia 🦊 and Ben 🐻 so tomorrow has bring items; `demoData.test.ts`

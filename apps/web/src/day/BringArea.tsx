@@ -27,8 +27,8 @@ export const BRING_AREA_METRICS = {
   itemGapRem: 0.25,
   /** The child's avatar badge (`size-8`). */
   badgeRem: 2,
-  /** Room kept for a "+N" (`min-w-7`). */
-  moreRem: 1.75,
+  /** Room kept for a "+N" (`min-w-8`): two digits ("+12") are 1.8rem wide. */
+  moreRem: 2,
   /** Inline padding of a group with a badge (`ps-0.5 pe-2`) … */
   badgePadRem: 0.125 + 0.5,
   /** … and of the neutral group, which has none (`px-2`). */
@@ -128,6 +128,13 @@ export function bringGroupsThatFit(
       const current = drawn[index] ?? 0;
       if (current >= (all[index] ?? 0)) continue;
       drawn[index] = current + 1;
+      if (bringRowRem(groups, drawn, hidden) <= available) {
+        grew = true;
+        continue;
+      }
+      // One more chip does not fit with the group's "+N" kept; all of its remaining
+      // chips may still, as the "+N" then falls away (it is wider than a chip).
+      drawn[index] = all[index] ?? current;
       if (bringRowRem(groups, drawn, hidden) <= available) {
         grew = true;
       } else {
@@ -236,7 +243,7 @@ export function BringArea({
               {counted > 0 && (
                 <span
                   data-testid="bring-group-more"
-                  className="text-meta text-text-muted min-w-7 shrink-0 text-center font-black"
+                  className="text-meta text-text-muted min-w-8 shrink-0 text-center font-black"
                 >
                   {t("day.hidden.badge", { count: counted })}
                 </span>
@@ -247,7 +254,7 @@ export function BringArea({
         {fit.hiddenIcons > 0 && (
           <span
             data-testid="bring-area-more"
-            className="text-meta text-text-muted min-w-7 shrink-0 text-center font-black"
+            className="text-meta text-text-muted min-w-8 shrink-0 text-center font-black"
           >
             {t("day.hidden.badge", { count: fit.hiddenIcons })}
           </span>

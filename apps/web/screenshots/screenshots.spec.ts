@@ -15,15 +15,24 @@ const NIGHT_NOW = at("20:00");
 
 type Theme = "light" | "night";
 
+/** Evening before a school day, still light (night mode starts at 19:30). */
+const EVENING_NOW = at("18:30");
+
 async function openBoard(
   page: Page,
   theme: Theme,
-  options: { countdownDays?: number } = {},
+  options: { countdownDays?: number; now?: string } = {},
 ): Promise<void> {
-  const now = theme === "light" ? NOW : NIGHT_NOW;
+  const now = options.now ?? (theme === "light" ? NOW : NIGHT_NOW);
   await mockBoard(page, {
     config: demoConfig(),
-    agenda: demoAgenda(dateOf(0), now, options),
+    agenda: demoAgenda(
+      dateOf(0),
+      now,
+      options.countdownDays === undefined
+        ? {}
+        : { countdownDays: options.countdownDays },
+    ),
     now,
   });
   await page.goto(`/?burnin=0&night=${theme === "night" ? "1" : "0"}`);
@@ -69,6 +78,33 @@ for (const theme of ["light", "night"] as const) {
     await shoot(page, `week-${theme}`, size);
   });
 }
+
+/*
+ * School (T-37): the evening 🎒 area for tomorrow's bring lists (Mia 🦊 and Ben 🐻), light
+ * at 18:30 and night at 20:00, and the week view with bring chips on the tiles.
+ */
+for (const theme of ["light", "night"] as const) {
+  test(`day with the bring area, ${theme}`, async ({ page }, testInfo) => {
+    const size = testInfo.project.name.replace("tablet-", "");
+    await openBoard(page, theme, {
+      now: theme === "light" ? EVENING_NOW : NIGHT_NOW,
+    });
+    const area = page.getByTestId("bring-area");
+    await expect(area).toBeVisible();
+    await expect(area.getByTestId("bring-group")).toHaveCount(2);
+    await shoot(page, `day-bring-evening-${theme}`, size);
+  });
+}
+
+test("week with bring chips, light", async ({ page }, testInfo) => {
+  const size = testInfo.project.name.replace("tablet-", "");
+  await openBoard(page, "light", { now: EVENING_NOW });
+  await page.getByRole("button", { name: "Week" }).click();
+  await expect(page.getByTestId("day-column")).toHaveCount(7);
+  await page.mouse.move(0, 0);
+  await expect(page.getByTestId("bring-chip").first()).toBeVisible();
+  await shoot(page, "week-bring-light", size);
+});
 
 test("countdown reaching today, light", async ({ page }, testInfo) => {
   const size = testInfo.project.name.replace("tablet-", "");

@@ -106,6 +106,20 @@ describe("bringGroupsThatFit", () => {
     });
   });
 
+  it('reserves room for a two-digit +N (2rem, as measured for "+12" in the e2e)', () => {
+    const m = BRING_AREA_METRICS;
+    expect(m.moreRem).toBeGreaterThanOrEqual(2);
+    // One child with 20 icons: room for 3 chips plus the "+17" is exactly enough for 3.
+    const one: BringGroupSize[] = [{ icons: 20, badge: true }];
+    const width = bringRowRem(one, [3], false);
+    const fit = bringGroupsThatFit(one, width);
+    expect(fit.drawn).toEqual([3]);
+    // One chip fewer in the same room would leave the "+N" no less room (it is reserved).
+    expect(bringRowRem(one, [4], false)).toBeGreaterThan(width);
+    // The row with its drawn chips and "+N" never needs more than the room it was given.
+    expect(bringRowRem(one, fit.drawn, false)).toBeLessThanOrEqual(width);
+  });
+
   it("at every width: nothing lost, never wider than the row, no +N while another chip fits", () => {
     for (let tenths = 0; tenths <= 600; tenths += 1) {
       const width = tenths / 10;
@@ -267,8 +281,9 @@ describe("BringArea", () => {
       icons: group.icons.length,
       badge: group.child !== null,
     }));
-    // Room for the neutral group's chip and Mia's badge and "+N", but not Ben's badge.
-    stubWidth(bringRowRem(sizes, [1, 0], true));
+    // Room for the neutral group and Mia's badge with their "+N" (the neutral icon then
+    // fits whole, as a chip is narrower than a "+N"), but not Ben's badge.
+    stubWidth(bringRowRem(sizes, [0, 0], true) + 0.05);
     const { unmount } = render(<BringArea reminder={REMINDER} />);
     expect(
       screen.getAllByTestId("bring-group").map((g) => g.dataset["child"]),
