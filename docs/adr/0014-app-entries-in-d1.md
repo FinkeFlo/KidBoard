@@ -78,3 +78,16 @@ then app entries live only in KidBoard.
   ical.js ships no zone data, and UTC times would shift weekly series at DST switches.
 * The T-39 Google conversion helpers (`toGoogleEvent`/`fromGoogleEvent`,
   `pickTargetCalendar`) remain for the optional sync.
+
+## Note (2026-11-23, T-46b): app entries are the default source
+
+App entries in D1 are the default source of the board; Google Calendar feeds are an
+optional add-on. `KIDBOARD_CONFIG` may list no calendars (`calendars` defaults to `[]`),
+so the "Deploy to Cloudflare" form asks only for `KIDBOARD_ACCESS_TOKEN`,
+`KIDBOARD_PARENT_PIN` and `KIDBOARD_CONFIG` (KV and D1 are created automatically).
+Families add Google later by listing `calendars` in the config and setting one
+`CAL_<ID>_URL` secret per calendar in the dashboard; deployments with calendars behave as
+before. With no calendars the editor shows no Google entries or templates and the meal band
+holds app meals only. With no calendars and the editor off there is no source at all: the
+worker logs one configuration warning and `/api/agenda` answers `200` with an empty board
+(not `502`).

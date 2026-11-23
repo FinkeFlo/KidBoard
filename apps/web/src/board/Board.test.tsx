@@ -238,6 +238,76 @@ describe("Board", () => {
     expect(screen.queryByRole("separator")).not.toBeInTheDocument();
   });
 
+  describe("without configured calendars (ADR-0014: app entries only)", () => {
+    beforeEach(() => {
+      fake.setReplies("/api/config", {
+        status: 200,
+        body: configFixture({ children: [MIA], calendars: [] }),
+      });
+    });
+
+    it("shows the normal empty state, not an error, when there are no sources at all", async () => {
+      fake.setReplies("/api/agenda", {
+        status: 200,
+        body: agendaFixture({ sources: [], events: [], meals: [] }),
+      });
+      renderDay();
+      expect(
+        await screen.findByRole("heading", { name: en.day.empty.title }),
+      ).toBeVisible();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByText(STALE_TEXT)).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: en.board.week }));
+      expect(screen.getAllByTestId("day-column")).toHaveLength(7);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+
+    it("shows app events and app meals in the day and the week view", async () => {
+      fake.setReplies("/api/agenda", {
+        status: 200,
+        body: agendaFixture({
+          sources: [
+            {
+              id: "app-events",
+              status: "ok",
+              fetchedAt: "2026-11-22T08:00:00+01:00",
+            },
+            {
+              id: "app-meals",
+              status: "ok",
+              fetchedAt: "2026-11-22T08:00:00+01:00",
+            },
+          ],
+          events: [eventFixture({ sourceId: "app-events" })],
+          meals: [
+            mealFixture({ sourceId: "app-meals" }),
+            mealFixture({
+              id: "m2",
+              sourceId: "app-meals",
+              date: "2026-11-24",
+              title: "Soup",
+            }),
+          ],
+        }),
+      });
+      renderDay();
+      expect(
+        await screen.findByRole("article", { name: /^Swimming, 2:30 PM/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("img", { name: "Lunch: Pasta" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("day-empty")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: en.board.week }));
+      expect(
+        screen.getByRole("img", { name: "Lunch: Soup" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
+
   it("shows the 'Stand' time of the agenda in the rail, not as a live region", async () => {
     fake.setReplies("/api/agenda", { status: 200, body: agendaFixture() });
     renderDay();

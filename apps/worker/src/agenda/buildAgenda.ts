@@ -47,7 +47,8 @@ function overlaps(
 /**
  * Assembles the `AgendaResponse` for `range` from the per-source results (each holding
  * a larger cached window) and the HTTP status: 200 if any source is `ok` or `stale`,
- * 502 if all failed.
+ * 502 if all failed. No sources at all (no calendars configured and the editor off) is
+ * an empty board, not a failure: 200.
  */
 export function buildAgenda(
   results: readonly SourceResult[],
@@ -85,7 +86,8 @@ export function buildAgenda(
     };
   });
 
-  const anyData = results.some((r) => r.status !== "error");
+  const anyData =
+    results.length === 0 || results.some((r) => r.status !== "error");
   return {
     status: anyData ? 200 : 502,
     body: {

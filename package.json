@@ -24,26 +24,20 @@
   },
   "cloudflare": {
     "bindings": {
-      "CAL_KINDER_URL": {
-        "description": "Secret iCal address of the calendar with id `kinder` (Google Calendar: Settings > calendar > **Secret address in iCal format**). One `CAL_<ID>_URL` per calendar in `KIDBOARD_CONFIG`; see [docs/DEPLOY.md](https://github.com/FinkeFlo/kidboard/blob/main/docs/DEPLOY.md)."
-      },
-      "CAL_ESSEN_URL": {
-        "description": "Secret iCal address of the meal plan calendar with id `essen`. Never share it."
-      },
       "KIDBOARD_ACCESS_TOKEN": {
-        "description": "API access token: a long random string, e.g. `openssl rand -hex 32`. Open the board once as `https://<worker>/?key=<token>`. Must not contain `REPLACE_ME` (the API refuses it)."
+        "description": "40 or more random letters and digits (no spaces or symbols); the editor needs it. Open the board once with `?key=<token>` at the end of its address."
       },
       "KIDBOARD_PARENT_PIN": {
-        "description": "Parent PIN for the editor: 6 to 12 digits of your choice. Keep `REPLACE_ME` (or leave it empty) to stay with the read-only board; see [docs/DEPLOY.md](https://github.com/FinkeFlo/kidboard/blob/main/docs/DEPLOY.md)."
+        "description": "A PIN of 6 to 12 digits that unlocks the editor for parents. Without it the board stays read-only."
       },
       "KIDBOARD_CONFIG": {
-        "description": "Settings as single-line JSON (children, calendars, time zone, ...). Template: `config.example.json`, options: `docs/CONFIG.md`. Its calendar ids must match the `CAL_<ID>_URL` secrets."
+        "description": "Your children and settings as one line of JSON: change the example names, colours and emojis. Google calendars can be added later ([docs/CONFIG.md](https://github.com/FinkeFlo/kidboard/blob/main/docs/CONFIG.md))."
       },
       "KIDBOARD_CACHE": {
-        "description": "KV namespace for the calendar cache. Created automatically; keep the default."
+        "description": "Storage for the calendar cache, created automatically. Keep the default."
       },
       "KIDBOARD_DATA": {
-        "description": "D1 database for entries made in the parent editor. Created automatically; keep the default."
+        "description": "Database for the entries made in the editor, created automatically. Keep the default."
       }
     }
   },

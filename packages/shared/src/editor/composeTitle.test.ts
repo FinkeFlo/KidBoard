@@ -312,3 +312,22 @@ describe("mergeSourceChildIds / canExpressChildren", () => {
     ).toBe(expected);
   });
 });
+
+describe("composeTitle without configured calendars (app entries)", () => {
+  const appOnly = editorTestConfig({ calendars: [] });
+
+  it("writes the same titles as with calendars", () => {
+    expect(composeTitle(event("Schwimmen", ["mia"]), appOnly)).toBe(
+      compose(event("Schwimmen", ["mia"])),
+    );
+    expect(
+      composeTitle(meal("Suppe", "lunch", "🍲"), appOnly, { locale: "de" }),
+    ).toBe("Mittag: 🍲 Suppe");
+  });
+
+  it("rejects a calendar id the config does not list", () => {
+    expect(
+      codeOf(() => composeTitle(event("x"), appOnly, { sourceId: "kinder" })),
+    ).toBe("unknown_source");
+  });
+});

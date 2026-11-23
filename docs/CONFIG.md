@@ -2,12 +2,13 @@
 
 KidBoard has two kinds of settings:
 
-1. **Secrets** (iCal URLs, optional access token) - Worker secrets / `.dev.vars` (repository root).
+1. **Secrets** (access token, parent PIN, optional iCal URLs) - Worker secrets / `.dev.vars` (repository root).
 2. **Non-secret settings** - one JSON document in the `KIDBOARD_CONFIG` variable. The
    shape is shown in [`config.example.json`](../config.example.json); the worker validates
    it with the schema from `packages/shared` and exposes the public part at `/api/config`.
-   JSON has no comments, so every option is documented here. All options except
-   `calendars` have defaults.
+   JSON has no comments, so every option is documented here. All options have defaults;
+   `calendars` (Google feeds) is optional: without it the board shows the entries made in
+   the parent editor (ADR-0014).
 
 Deutsche Kurzfassung am Ende dieses Dokuments.
 
@@ -22,7 +23,7 @@ Set locally in `.dev.vars` in the repository root, next to `wrangler.jsonc` (cop
 
 | Name                      | Required | Default            | Description                                                                                                                                      |
 | ------------------------- | -------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CAL_<ID>_URL`            | yes, one per calendar | -     | Secret iCal address of the calendar with id `<ID>` (upper case), e.g. `CAL_KINDER_URL`. Google Calendar: Settings > calendar > "Secret address in iCal format". `https://`, `http://` or `webcal://` (fetched as `https://`). Never commit it. A missing or invalid value marks only that calendar as `error`. |
+| `CAL_<ID>_URL`            | one per calendar in `calendars` | -     | Secret iCal address of the calendar with id `<ID>` (upper case), e.g. `CAL_KINDER_URL`. Google Calendar: Settings > calendar > "Secret address in iCal format". `https://`, `http://` or `webcal://` (fetched as `https://`). Never commit it. A missing or invalid value marks only that calendar as `error`. |
 | `KIDBOARD_ACCESS_TOKEN`   | no       | unset (no check)   | If set (non-empty), API requests must present this token as `Authorization: Bearer <token>` or `?key=<token>`, else `401`. Prefer the header: `?key=` ends up in browser history (Workers Logs drop query strings, `redact_query_string`). A value that still contains `REPLACE_ME` (the template) is refused: every protected path answers `500 server_misconfigured`. `/api/health` stays public (it only returns `{ "ok": true }`). |
 | `KIDBOARD_ALLOWED_ORIGINS`| no       | same origin only   | Comma-separated list of allowed CORS origins, e.g. `http://localhost:5173`.                                                                      |
 | `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh (integer 60-86400; other values fall back to 3600 with a log warning). With the KV cache at least `ceil(calendars × 86400 / 500)` (KV Free plan write quota; 2 calendars → 346; with the parent editor on, its two app sources count as calendars).                                    |
@@ -59,7 +60,7 @@ shared secret for this tablet: treat the link like a password.
 | `children[].name`       | string                        | required                         | `"Mia"`                         | Display name; also the title prefix `Mia: ...`.                                                      |
 | `children[].color`      | CSS color or token name       | required                         | `"#E4572E"`                     | Child colour: tints the child's event tiles and rings the badge. A token name `child-1` ... `child-6` or any CSS colour (hex, `rgb()`, `hsl()`, `oklch()`, named); an unusable value falls back to neutral. Text stays readable on the tint in both themes. |
 | `children[].avatar`     | single emoji                  | required                         | `"🦊"`                          | The child's emoji (this is the field the schema calls `avatar`; there is no `emoji` key). Shown in the badge on the child's tiles and in the "who is who" legend. |
-| `calendars`             | array of calendar source      | required                         | see below                       | Configured feeds. Ids must be unique.                                                                |
+| `calendars`             | array of calendar source      | `[]` (no Google feeds)           | see below                       | Optional Google Calendar feeds, added any time. Ids must be unique.                                  |
 | `calendars[].id`        | string                        | required                         | `"kinder"`                      | Maps to the secret `CAL_<ID>_URL`. `app-events` and `app-meals` are reserved (entries made in the app). |
 | `calendars[].kind`      | `"events"` \| `"meals"`       | required                         | `"meals"`                       | Events calendar or meal plan.                                                                        |
 | `calendars[].childId`   | string (child id)             | unset (event is for everyone)    | `"mia"`                         | Marks a one-calendar-per-child feed. Must reference an existing child.                               |
@@ -128,7 +129,7 @@ midnight for tomorrow.
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/health`                       | Always `{ "ok": true }`; public, does not read the config or the feeds.                                                                                                                                               |
 | `GET /api/config`                       | Public part of `KIDBOARD_CONFIG` with defaults applied.                                                                                                                                                                |
-| `GET /api/agenda?from=YYYY-MM-DD&days=N` | `days` 1-14 (default 8), `from` default today in `timeZone`. `[from, from + days)` must lie within yesterday ... today + 31 days (the cached window `[today − 1, today + 32)`), else `400`. `200` if any calendar has data (`ok` or `stale`), `502` otherwise. |
+| `GET /api/agenda?from=YYYY-MM-DD&days=N` | `days` 1-14 (default 8), `from` default today in `timeZone`. `[from, from + days)` must lie within yesterday ... today + 31 days (the cached window `[today − 1, today + 32)`), else `400`. `200` if any source has data (`ok` or `stale`) or there are no sources (no calendars, editor off: empty board and one log warning), `502` otherwise. |
 | `GET /api/weather`                      | The condensed forecast ([Weather](#weather)), never the place. `404 weather_off` without a `weather` block, `503` when the place is unknown or Open-Meteo fails without a last good forecast. |
 
 Feeds are fetched with a 10 s timeout and a 5 MB limit. Each calendar's normalized data
@@ -147,9 +148,9 @@ carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and
 
 ## Deutsche Kurzfassung
 
-**Geheimnisse** (iCal-URLs, optionales Zugriffstoken) liegen als Worker-Secrets bzw. lokal in
-`.dev.vars` im Repository-Root (Vorlage: `.dev.vars.example`, nie einchecken; Deployment:
-[DEPLOY.de.md](DEPLOY.de.md)). Pro Kalender gibt es
+**Geheimnisse** (Zugriffstoken, Eltern-PIN, optionale iCal-URLs) liegen als Worker-Secrets bzw.
+lokal in `.dev.vars` im Repository-Root (Vorlage: `.dev.vars.example`, nie einchecken;
+Deployment: [DEPLOY.de.md](DEPLOY.de.md)). Pro Kalender in `calendars` gibt es
 `CAL_<ID>_URL` (ID in Großbuchstaben; fehlt sie, zeigt nur dieser Kalender einen Fehler).
 Optional: `KIDBOARD_ACCESS_TOKEN` (dann brauchen alle API-Aufrufe außer `/api/health` den
 Token als `Authorization: Bearer <token>` oder `?key=<token>`; besser den Header, denn `?key=`
@@ -170,7 +171,7 @@ widerrufen) **vergisst** das Tablet das Token und zeigt "Dieses Tablet braucht e
 konfiguriertes Token ist das alles nicht nötig.
 
 **Nicht geheime Einstellungen** stehen als JSON in `KIDBOARD_CONFIG` (Pflicht; Vorlage:
-`config.example.json`; fehlerhaft → API antwortet `500`, das Log nennt die Fehler). Alle Optionen außer `calendars` haben Standardwerte: `locale`
+`config.example.json`; fehlerhaft → API antwortet `500`, das Log nennt die Fehler). Alle Optionen haben Standardwerte; `calendars` (Google-Feeds) ist optional, ohne zeigt das Board die Einträge aus dem Eltern-Editor (ADR-0014): `locale`
 (`de`/`en`/`auto`; `auto` = Browsersprache, sonst `de`), `timeZone` (IANA, Standard `Europe/Berlin`), `children` (id, name, color,
 avatar = Emoji des Kindes; Farbe und Emoji färben die Kacheln des Kindes und bilden das Abzeichen), `calendars` (id, kind `events`/`meals`, optional `childId`, `label`), `bands`
 (`morningStart`/`middayStart`/`eveningStart`, `HH:mm` aufsteigend: sie bestimmen das Tageszeit-Icon auf den Kacheln und den Mahlzeit-Slot für Mahlzeiten mit Uhrzeit, keine Abschnitte auf dem Bildschirm), `nightMode` (an/aus, Start, Ende), `countdown.emojis`
@@ -219,7 +220,8 @@ Kalender im KV-Namespace `KIDBOARD_CACHE` gespeichert (legt Wrangler beim ersten
 ohne Binding: Cache API, die nur mit eigener Domain funktioniert): frisch für
 `KIDBOARD_CACHE_TTL`, danach bis 7 Tage als letzter guter Stand. Fällt ein Kalender aus, wird
 dieser Stand mit `status: "stale"` geliefert (ein alter Stand deckt evtl. nur einen Teil des
-Zeitraums ab), ohne Stand `error`. Antwort `200`, wenn mindestens ein Kalender Daten hat, sonst
+Zeitraums ab), ohne Stand `error`. Antwort `200`, wenn mindestens eine Quelle Daten hat oder es
+keine Quelle gibt (keine Kalender, Editor aus: leeres Board und eine Log-Warnung), sonst
 `502`. Mit Eltern-Editor kommen die Quellen `app-events` und `app-meals` (Einträge aus der
 App, aus D1) hinzu; eine Änderung in der App ist beim nächsten Abruf sichtbar, fällt D1 aus,
 sind nur sie `stale` bzw. `error`.

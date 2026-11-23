@@ -1028,6 +1028,70 @@ describe("GET /api/parent/templates", () => {
   });
 });
 
+describe("no configured calendars (app entries only, ADR-0014)", () => {
+  const appOnly = (h: Harness): void => {
+    h.use({
+      KIDBOARD_CONFIG: JSON.stringify({ ...CONFIG_INPUT, calendars: [] }),
+      CAL_KINDER_URL: undefined,
+      CAL_ESSEN_URL: undefined,
+    });
+  };
+
+  it("creates, lists and shows events and meals without any Google source", async () => {
+    const h = harness();
+    appOnly(h);
+    await createEntry(h, SWIM);
+    await createEntry(h, PIZZA);
+
+    const body = await list(h);
+    expect(body.sources).toEqual([]);
+    expect(body.storageUnavailable).toBe(false);
+    expect(body.items.every((item) => item.origin === "app")).toBe(true);
+    expect(
+      appItemsOf(body).map((item) => [item.date, item.kind, item.title]),
+    ).toEqual([
+      ["2026-03-10", "meal", "Pizza"],
+      ["2026-03-10", "event", "Schwimmen"],
+      ["2026-03-17", "event", "Schwimmen"],
+    ]);
+
+    const agenda = await h.agenda();
+    expect(agenda.sources.map((s) => [s.id, s.status])).toEqual([
+      ["app-events", "ok"],
+      ["app-meals", "ok"],
+    ]);
+    expect(agenda.events.map((e) => [e.start, e.title])).toEqual([
+      ["2026-03-10T16:00:00+01:00", "Schwimmen"],
+      ["2026-03-17T16:00:00+01:00", "Schwimmen"],
+    ]);
+    // No meal calendar: the meal band holds the app meals only.
+    expect(agenda.meals.map((m) => [m.sourceId, m.date, m.slot])).toEqual([
+      ["app-meals", "2026-03-10", "dinner"],
+    ]);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(consoleOutput.join("\n")).not.toContain(
+      "KIDBOARD_CONFIG lists no calendars",
+    );
+  });
+
+  it("suggests templates from app entries only (no Google part)", async () => {
+    const h = harness();
+    appOnly(h);
+    const empty = await h.editor("/api/parent/templates");
+    expect(empty.status).toBe(200);
+    expect(EditorTemplatesResponseSchema.parse(empty.json).templates).toEqual(
+      [],
+    );
+    await createEntry(h, SWIM);
+    const reply = await h.editor("/api/parent/templates");
+    const { templates } = EditorTemplatesResponseSchema.parse(reply.json);
+    expect(templates.map((t) => [t.title, t.origins])).toEqual([
+      ["Schwimmen", ["app"]],
+    ]);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+});
+
 describe("export and import", () => {
   it("exports a JSON download and restores it with replace", async () => {
     const h = harness();

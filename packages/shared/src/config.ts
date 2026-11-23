@@ -137,9 +137,11 @@ const appConfigShape = {
   locale: LocaleSchema.default("auto"),
   timeZone: TimeZoneSchema.default("Europe/Berlin"),
   children: z.array(ChildSchema).default([]),
-  calendars: z
-    .array(CalendarSourceSchema)
-    .min(1, "At least one calendar is required"),
+  /**
+   * Google Calendar feeds (optional, ADR-0014): app entries of the parent editor are the
+   * default source; without calendars the board shows only those.
+   */
+  calendars: z.array(CalendarSourceSchema).default([]),
   bands: BandsSchema.default(DEFAULT_BANDS),
   nightMode: NightModeSchema.default(DEFAULT_NIGHT_MODE),
   countdown: CountdownSchema.default({ emojis: DEFAULT_COUNTDOWN_EMOJIS }),

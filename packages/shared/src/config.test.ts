@@ -47,6 +47,31 @@ describe("parseConfig valid", () => {
     });
   });
 
+  it("accepts no calendars (app entries only) and defaults them to []", () => {
+    const children = [
+      { id: "mia", name: "Mia", color: "#E4572E", avatar: "🦊" },
+    ];
+    const missing = parseConfig({ children });
+    const empty = parseConfig({ children, calendars: [] });
+    expect(missing.ok && missing.config.calendars).toEqual([]);
+    expect(empty.ok && empty.config.calendars).toEqual([]);
+    expect(missing).toEqual(empty);
+    const bare = parseConfig({});
+    expect(bare.ok && bare.config.children).toEqual([]);
+    expect(bare.ok && bare.config.calendars).toEqual([]);
+  });
+
+  it("keeps the cross-field rules for children without calendars", () => {
+    expect(
+      errorsOf({
+        children: [
+          { id: "mia", name: "Mia", color: "#E4572E", avatar: "🦊" },
+          { id: "mia", name: "Ben", color: "#2E86AB", avatar: "🐻" },
+        ],
+      }),
+    ).toEqual(['children[1].id: Duplicate child id "mia"']);
+  });
+
   it("allows partial bands/nightMode with per-field defaults", () => {
     const result = parseConfig({
       ...minimal,
@@ -93,11 +118,11 @@ describe("parseConfig invalid", () => {
     expect(errorsOf("x")[0]).toMatch(/^\(config\): /);
   });
 
-  it("rejects empty or missing calendars", () => {
-    expect(errorsOf({ calendars: [] })).toEqual([
-      "calendars: At least one calendar is required",
-    ]);
-    expect(errorsOf({})[0]).toMatch(/^calendars: /);
+  it("rejects calendars that are not a list", () => {
+    expect(errorsOf({ calendars: null })[0]).toMatch(/^calendars: /);
+    expect(errorsOf({ calendars: { id: "kinder" } })[0]).toMatch(
+      /^calendars: /,
+    );
   });
 
   it("rejects duplicate calendar ids with a path", () => {
@@ -259,7 +284,7 @@ describe("parseConfig invalid", () => {
   });
 
   it("rejects unknown keys (typos) and reports every problem", () => {
-    const errors = errorsOf({ calendars: [], localee: "de" });
+    const errors = errorsOf({ calendars: 3, localee: "de" });
     expect(errors).toHaveLength(2);
     expect(errors.some((e) => e.includes("localee"))).toBe(true);
   });
@@ -367,6 +392,22 @@ describe("PublicConfigSchema", () => {
     });
     expect(parsed).not.toHaveProperty("futureFlag");
     expect(parsed.editor).toBe(true);
+  });
+
+  it("round-trips a config without calendars", () => {
+    const parsed = parseConfig({ timeZone: "Europe/Vienna" });
+    if (!parsed.ok) {
+      throw new Error(parsed.errors.join("\n"));
+    }
+    const dto = toPublicConfig(parsed.config, { editor: true });
+    expect(dto.calendars).toEqual([]);
+    const pub = PublicConfigSchema.parse(dto);
+    expect(pub.calendars).toEqual([]);
+    expect(pub.editor).toBe(true);
+    // A body without the key (cannot come from this worker) still parses.
+    const withoutCalendars: Partial<typeof dto> = { ...dto };
+    delete withoutCalendars.calendars;
+    expect(PublicConfigSchema.parse(withoutCalendars).calendars).toEqual([]);
   });
 
   it("rejects a non-boolean editor flag and keeps the config rules", () => {

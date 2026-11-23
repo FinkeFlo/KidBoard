@@ -202,3 +202,28 @@ describe("pickTargetCalendar (ADR-0012)", () => {
     ).toBe(true);
   });
 });
+
+describe("pickTargetCalendar without configured calendars (ADR-0014 default)", () => {
+  const appOnly = editorTestConfig({ calendars: [] });
+
+  it.each<TargetEntry>([
+    { kind: "event", childIds: ["mia"] },
+    { kind: "event", childIds: [] },
+    { kind: "meal", childIds: [] },
+  ])("has no Google target for %o", (entry) => {
+    expect(pickTargetCalendar(entry, [], appOnly)).toEqual({
+      ok: false,
+      reason: "no_writable_calendar",
+    });
+  });
+
+  it("finds no current calendar for an entry with a source id", () => {
+    expect(
+      pickTargetCalendar(
+        { kind: "event", childIds: [], sourceId: "kinder" },
+        ids("kinder"),
+        appOnly,
+      ),
+    ).toEqual({ ok: false, reason: "source_not_writable" });
+  });
+});

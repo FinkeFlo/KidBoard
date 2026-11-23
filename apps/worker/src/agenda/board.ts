@@ -184,6 +184,30 @@ export function effectiveTtlSeconds(
   return minimum;
 }
 
+let noSourcesMemo: string | undefined;
+
+/**
+ * Logs once per config (per isolate) that the board has nothing to show: no calendars
+ * in `KIDBOARD_CONFIG` and the editor off (ADR-0014: app entries are the default source,
+ * Google feeds are optional). The board then shows its normal empty state.
+ */
+function warnIfNoSources(
+  config: AppConfig,
+  configHash: string,
+  editorOn: boolean,
+): void {
+  if (config.calendars.length > 0 || editorOn) {
+    noSourcesMemo = undefined;
+    return;
+  }
+  if (noSourcesMemo !== configHash) {
+    noSourcesMemo = configHash;
+    logWarn(
+      "KIDBOARD_CONFIG lists no calendars and the editor is off (it needs KIDBOARD_PARENT_PIN, KIDBOARD_ACCESS_TOKEN and the D1 binding KIDBOARD_DATA); the board stays empty",
+    );
+  }
+}
+
 /** What the board needs of a request (any route env based on {@link AppEnv}). */
 export type BoardRequest = Pick<Context<AppEnv>, "env" | "executionCtx">;
 
@@ -264,9 +288,11 @@ export function createBoard(options: BoardOptions): Board {
       const backend = backendFor(c.env);
       // ADR-0014: app entries join the board as virtual sources while the editor is on.
       const db = editorEnabled(c.env) ? c.env.KIDBOARD_DATA : undefined;
+      const configHash = await loaded.hash;
+      warnIfNoSources(config, configHash, db !== undefined);
       return {
         config,
-        configHash: await loaded.hash,
+        configHash,
         today,
         window: {
           from: addCalendarDays(today, -WINDOW_DAYS_BEFORE),

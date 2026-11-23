@@ -213,17 +213,20 @@ werden derzeit nicht unterstützt (Vercel wird in
 
 Der Button kopiert dieses Repository in dein GitHub-/GitLab-Konto, baut es mit Workers Builds
 (`pnpm`, Web-App vor dem Worker) und deployt einen Worker, der Board und API ausliefert. Er
-fragt die Kalender-Secrets und Einstellungen ab (`CAL_<ID>_URL`, `KIDBOARD_ACCESS_TOKEN`,
-`KIDBOARD_CONFIG`) und legt den KV-Cache selbst an. Ersetze jedes `REPLACE_ME`.
+fragt drei Secrets ab (`KIDBOARD_ACCESS_TOKEN`, `KIDBOARD_PARENT_PIN`, `KIDBOARD_CONFIG` mit
+deinen Kindern) und legt KV-Cache und D1-Datenbank selbst an. Ersetze jedes `REPLACE_ME`.
+Google-Kalender sind optional: später als `calendars` in `KIDBOARD_CONFIG` plus je ein
+Secret `CAL_<ID>_URL` ergänzen.
 
 Alternativ aus einem lokalen Klon:
 
 ```sh
 pnpm install
 pnpm exec wrangler login
-pnpm exec wrangler secret put CAL_KINDER_URL   # eins pro Kalender: CAL_<ID>_URL
 pnpm exec wrangler secret put KIDBOARD_ACCESS_TOKEN
+pnpm exec wrangler secret put KIDBOARD_PARENT_PIN
 pnpm exec wrangler secret put KIDBOARD_CONFIG
+pnpm exec wrangler secret put CAL_KINDER_URL   # optional, eins pro Kalender: CAL_<ID>_URL
 pnpm deploy:cloudflare                          # baut Web-App + deployt den Worker
 ```
 

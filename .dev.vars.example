@@ -6,23 +6,32 @@
 # (Worker > Settings > Variables and Secrets). "Deploy to Cloudflare" asks for every
 # uncommented entry below as a secret. Details: docs/DEPLOY.md, docs/CONFIG.md.
 
-# Secret iCal addresses, one per calendar in KIDBOARD_CONFIG: CAL_<ID>_URL, where <ID> is
-# the calendar id in upper case ("kinder" -> CAL_KINDER_URL).
-# Google Calendar: Settings > your calendar > "Secret address in iCal format".
-CAL_KINDER_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPLACE_ME/basic.ics"
-CAL_ESSEN_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPLACE_ME/basic.ics"
-# Optional per-child calendars (id "mia" -> CAL_MIA_URL):
-# CAL_MIA_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPLACE_ME/basic.ics"
-
-# Access token for the API (strongly recommended for a public deployment): a long random
-# string, e.g. the output of `openssl rand -hex 32`. Empty = no check. A value that still
-# contains REPLACE_ME is rejected (the API answers 500), so the template cannot go live.
+# Access token for the API: a long random string, e.g. the output of
+# `openssl rand -hex 32`; open the board once as https://<worker>/?key=<token>. The editor
+# needs it. Empty = no check (read-only board only). A value that still contains
+# REPLACE_ME is rejected (the API answers 500), so the template cannot go live.
 KIDBOARD_ACCESS_TOKEN="REPLACE_ME"
 
 # Parent PIN for the editor (ADR-0013): 6 to 12 digits of your choice. Unset, shorter,
 # non-digit or still REPLACE_ME = the editor stays off and KidBoard is the read-only board.
-# The editor also needs the D1 database KIDBOARD_DATA, which Wrangler creates on deploy.
+# The editor also needs the access token above and the D1 database KIDBOARD_DATA, which
+# Wrangler creates on deploy.
 KIDBOARD_PARENT_PIN="REPLACE_ME"
+
+# Required: non-secret settings as one JSON document on a single line (shape:
+# config.example.json, options: docs/CONFIG.md). The template lists children only: the
+# board then shows the entries made in the editor. Google calendars are optional, see below.
+KIDBOARD_CONFIG='{"locale":"auto","timeZone":"Europe/Berlin","children":[{"id":"mia","name":"Mia","color":"#E4572E","avatar":"🦊"},{"id":"ben","name":"Ben","color":"#2E86AB","avatar":"🐻"}]}'
+
+# Optional: Google Calendar feeds (read-only), added any time later. List each calendar in
+# KIDBOARD_CONFIG, e.g. "calendars":[{"id":"kinder","kind":"events"},{"id":"essen","kind":"meals"}],
+# and set one secret CAL_<ID>_URL per calendar, where <ID> is the calendar id in upper case
+# ("kinder" -> CAL_KINDER_URL). Google Calendar: Settings > your calendar >
+# "Secret address in iCal format".
+# CAL_KINDER_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPLACE_ME/basic.ics"
+# CAL_ESSEN_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPLACE_ME/basic.ics"
+# Per-child calendar (id "mia" with "childId":"mia" -> CAL_MIA_URL):
+# CAL_MIA_URL="https://calendar.google.com/calendar/ical/REPLACE_ME/private-REPLACE_ME/basic.ics"
 
 # Optional: secret token of the phone feed of the editor's entries, subscribed to in Google
 # or Apple Calendar as https://<worker>/api/feed.ics?token=<token> (no access token needed; the
@@ -30,11 +39,6 @@ KIDBOARD_PARENT_PIN="REPLACE_ME"
 # `openssl rand -hex 32`. Unset = no feed; shorter or still REPLACE_ME = no feed and a log
 # warning. Changing it ends every subscription. Needs the editor (PIN and D1).
 # KIDBOARD_FEED_TOKEN="REPLACE_ME"
-
-# Required: non-secret settings as one JSON document on a single line (shape:
-# config.example.json, options: docs/CONFIG.md). Its calendars match CAL_KINDER_URL and
-# CAL_ESSEN_URL above.
-KIDBOARD_CONFIG='{"locale":"de","timeZone":"Europe/Berlin","children":[{"id":"mia","name":"Mia","color":"#E4572E","avatar":"🦊"}],"calendars":[{"id":"kinder","kind":"events","label":"Kinder"},{"id":"essen","kind":"meals","label":"Essen"}]}'
 
 # Optional: comma-separated list of allowed CORS origins (default: same origin only; the
 # Vite dev server proxies /api, so local development needs none).

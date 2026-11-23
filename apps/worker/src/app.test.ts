@@ -3,6 +3,7 @@ import {
   type AppConfigInput,
   AppConfigSchema,
   parseConfig,
+  PublicConfigSchema,
   toPublicConfig,
 } from "@kidboard/shared";
 import {
@@ -962,14 +963,14 @@ describe("invalid config", () => {
     const env = baseEnv({
       KIDBOARD_CONFIG: JSON.stringify({
         timeZone: "Mars/Valles",
-        calendars: [],
+        calendars: "kinder",
         typo: 2,
       }),
     });
     await harness().call("/api/agenda", undefined, env);
     const log = consoleOutput.join("\n");
     expect(log).toContain("timeZone: Expected a valid IANA time zone");
-    expect(log).toContain("calendars: At least one calendar is required");
+    expect(log).toMatch(/calendars: .*expected array/);
     expect(log).toContain("typo");
   });
 });
@@ -1094,6 +1095,89 @@ describe("editor flag and the board", () => {
       ["app-events", "ok"],
       ["app-meals", "ok"],
     ]);
+  });
+});
+
+describe("no calendars (app entries only, ADR-0014)", () => {
+  const NO_CALENDARS = JSON.stringify({ ...CONFIG, calendars: [] });
+  const NO_SOURCES_WARNING = "KIDBOARD_CONFIG lists no calendars";
+
+  it("serves an empty board (200, no error) with the editor off and warns once", async () => {
+    const h = harness();
+    const env = baseEnv({ KIDBOARD_CONFIG: NO_CALENDARS });
+    const first = await agenda(h, "?days=8", env);
+    const second = await agenda(h, "?days=31", env);
+    for (const { status, body } of [first, second]) {
+      expect(status).toBe(200);
+      expect(body.sources).toEqual([]);
+      expect(body.events).toEqual([]);
+      expect(body.meals).toEqual([]);
+      expect(body.stale).toBe(false);
+      expect(body.generatedAt).toBe(new Date(NOW).toISOString());
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+    const warnings = consoleOutput.filter((line) =>
+      line.includes(NO_SOURCES_WARNING),
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("the editor is off");
+    expect(consoleOutput.join("\n")).not.toContain("invalid");
+  });
+
+  it("works the same when the calendars key is missing, also on KV", async () => {
+    const withoutKey: AppConfigInput = { ...CONFIG };
+    delete withoutKey.calendars;
+    const h = harness({ backend: "kv" });
+    const { status, body } = await agenda(
+      h,
+      "",
+      h.env({ KIDBOARD_CONFIG: JSON.stringify(withoutKey) }),
+    );
+    expect(status).toBe(200);
+    expect(body.sources).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("serves the public config with an empty calendar list", async () => {
+    const response = await harness().call(
+      "/api/config",
+      undefined,
+      baseEnv({ KIDBOARD_CONFIG: NO_CALENDARS }),
+    );
+    expect(response.status).toBe(200);
+    const body = PublicConfigSchema.parse(await response.json());
+    expect(body.calendars).toEqual([]);
+    expect(body.children).toEqual(CONFIG.children);
+    expect(body.editor).toBe(false);
+  });
+
+  it("shows the app sources only, without the warning, while the editor is on", async () => {
+    const { status, body } = await agenda(
+      harness(),
+      `?days=8&key=${TOKEN}`,
+      baseEnv({
+        KIDBOARD_CONFIG: NO_CALENDARS,
+        KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
+        KIDBOARD_PARENT_PIN: "246813",
+        KIDBOARD_ACCESS_TOKEN: TOKEN,
+      }),
+    );
+    expect(status).toBe(200);
+    expect(body.sources.map((s) => [s.id, s.status])).toEqual([
+      ["app-events", "ok"],
+      ["app-meals", "ok"],
+    ]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(consoleOutput.join("\n")).not.toContain(NO_SOURCES_WARNING);
+  });
+
+  it("does not warn when calendars are configured", async () => {
+    serveIcs(KINDER_URL, eventsIcs);
+    serveIcs(ESSEN_URL, mealsIcs);
+    const { status, body } = await agenda(harness());
+    expect(status).toBe(200);
+    expect(body.sources.map((s) => s.id)).toEqual(["kinder", "essen"]);
+    expect(consoleOutput.join("\n")).not.toContain(NO_SOURCES_WARNING);
   });
 });
 

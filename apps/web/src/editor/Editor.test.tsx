@@ -974,6 +974,49 @@ describe("Editor: meals", () => {
   });
 });
 
+describe("Editor: no configured calendars (app entries only)", () => {
+  it("lists, suggests and saves events and meals without any Google calendar", async () => {
+    const h = renderEditor({ config: editorConfig({ calendars: [] }) });
+    expect(await screen.findByTestId("entry-list-empty")).toBeInTheDocument();
+    // Only the built-in quick picks: no Google entries to suggest.
+    expect(
+      within(screen.getByTestId("templates-row")).queryAllByTestId("template"),
+    ).toEqual([]);
+    expect(
+      screen.getByRole("button", {
+        name: en.editor.templates.quick.swimmingWeekly,
+      }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newMeal }),
+    );
+    const mealForm = form(en.editor.meal.newTitle);
+    await user.click(within(mealForm).getByRole("radio", { name: /Pizza/u }));
+    await save();
+    await screen.findByRole("status");
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: en.editor.templates.quick.dentist,
+      }),
+    );
+    await save();
+    await waitFor(() => {
+      expect(h.editor.entries()).toHaveLength(2);
+    });
+    expect(
+      h.editor
+        .entries()
+        .map((entry) => [entry.data.kind, entry.data.title])
+        .sort(),
+    ).toEqual([
+      ["event", en.editor.templates.quick.dentist],
+      ["meal", "Pizza"],
+    ]);
+  });
+});
+
 describe("Editor: backup", () => {
   it("downloads the export as a JSON file", async () => {
     const created: Blob[] = [];

@@ -206,17 +206,20 @@ supported at the moment (Vercel is tracked in
 
 The button copies this repository into your GitHub/GitLab account, builds it with Workers
 Builds (`pnpm`, web app before worker) and deploys one Worker that serves the board and the
-API. It asks for the calendar secrets and settings (`CAL_<ID>_URL`, `KIDBOARD_ACCESS_TOKEN`,
-`KIDBOARD_CONFIG`) and creates the KV cache by itself. Replace every `REPLACE_ME`.
+API. It asks for three secrets (`KIDBOARD_ACCESS_TOKEN`, `KIDBOARD_PARENT_PIN`,
+`KIDBOARD_CONFIG` with your children) and creates the KV cache and the D1 database by
+itself. Replace every `REPLACE_ME`. Google calendars are optional: add them later as
+`calendars` in `KIDBOARD_CONFIG` plus one `CAL_<ID>_URL` secret each.
 
 From a local clone instead:
 
 ```sh
 pnpm install
 pnpm exec wrangler login
-pnpm exec wrangler secret put CAL_KINDER_URL   # one per calendar: CAL_<ID>_URL
 pnpm exec wrangler secret put KIDBOARD_ACCESS_TOKEN
+pnpm exec wrangler secret put KIDBOARD_PARENT_PIN
 pnpm exec wrangler secret put KIDBOARD_CONFIG
+pnpm exec wrangler secret put CAL_KINDER_URL   # optional, one per calendar: CAL_<ID>_URL
 pnpm deploy:cloudflare                          # builds web + deploys the worker
 ```
 

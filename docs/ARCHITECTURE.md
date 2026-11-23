@@ -1039,8 +1039,9 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
   streamed byte count), network errors and `FeedParseError` → the stored entry as
   `stale` (an old entry may cover only part of the requested range, e.g. after several
   days offline), else `error`. Logs contain source ids, secret _names_, reason codes
-  and expansion warning codes only. Response `200` if any source is `ok`/`stale`, `502`
-  otherwise; `generatedAt` = oldest `fetchedAt` served.
+  and expansion warning codes only. Response `200` if any source is `ok`/`stale` or
+  there is no source at all (no calendars and the editor off: empty board, one config
+  warning, T-46b), `502` otherwise; `generatedAt` = oldest `fetchedAt` served.
 - **Security:** optional `KIDBOARD_ACCESS_TOKEN` (Bearer or `?key=`, SHA-256 +
   `crypto.subtle.timingSafeEqual`); a token still containing the template marker
   `REPLACE_ME` fails closed (`500 server_misconfigured`, T-25); `/api/health` is public and returns only

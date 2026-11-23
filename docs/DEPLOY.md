@@ -3,8 +3,9 @@
 [Deutsch](DEPLOY.de.md)
 
 KidBoard runs as **one Cloudflare Worker**: it serves the board (static assets from
-`apps/web/dist`) and the JSON API under `/api/*`, and reads your calendars' secret iCal
-addresses on the server. The Workers Free plan is enough for a family. You get a URL like
+`apps/web/dist`) and the JSON API under `/api/*`, stores the entries made in the parent
+editor and, optionally, reads your Google calendars' secret iCal addresses on the server.
+The Workers Free plan is enough for a family. You get a URL like
 `https://kidboard.<your-subdomain>.workers.dev`.
 
 Everything Wrangler needs is in the root [`wrangler.jsonc`](../wrangler.jsonc). Secrets
@@ -15,16 +16,19 @@ never go into the repository: they are Worker secrets in your Cloudflare account
 You need:
 
 1. A free **Cloudflare account** (and for option A a GitHub or GitLab account).
-2. The **secret iCal address** of every calendar you want to show. Google Calendar (web):
-   Settings > your calendar > "Integrate calendar" > **Secret address in iCal format**.
-   Treat it like a password: anyone with it can read the calendar.
-3. An **access token**: a long random string, for example the output of
+2. An **access token**: a long random string, for example the output of
    `openssl rand -hex 32`. Without it anyone who finds your `workers.dev` URL can read the
-   calendar data through the API, so set one.
-4. Your **settings** (`KIDBOARD_CONFIG`) as **one line of JSON**: children, calendars, time
-   zone, ... Start from [`config.example.json`](../config.example.json), all options are in
-   [CONFIG.md](CONFIG.md). Each calendar `id` needs a matching secret `CAL_<ID>_URL` (id in
-   upper case: `kinder` -> `CAL_KINDER_URL`). To turn the file into one line:
+   calendar data through the API, and the parent editor stays off, so set one.
+3. A **parent PIN** of 6 to 12 digits for the editor.
+4. Your **settings** (`KIDBOARD_CONFIG`) as **one line of JSON**: children, time zone, ...
+   The deploy form pre-fills an example with two children and no calendars. All options are
+   in [CONFIG.md](CONFIG.md).
+5. Optional, also later: the **secret iCal address** of every Google calendar you want to
+   show. Google Calendar (web): Settings > your calendar > "Integrate calendar" > **Secret
+   address in iCal format**. Treat it like a password: anyone with it can read the
+   calendar. List each calendar in `calendars` of `KIDBOARD_CONFIG` and add a matching
+   secret `CAL_<ID>_URL` (id in upper case: `kinder` -> `CAL_KINDER_URL`). To turn a config
+   file such as [`config.example.json`](../config.example.json) into one line:
 
    ```sh
    node -e "process.stdout.write(JSON.stringify(require('./config.example.json')))"
@@ -36,8 +40,8 @@ The worker reads exactly these names (`apps/worker/src/env.ts`):
 
 | Name                       | Kind                | Required | Notes                                                                                            |
 | -------------------------- | ------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `CAL_<ID>_URL`             | secret              | per calendar | e.g. `CAL_KINDER_URL`, `CAL_ESSEN_URL`, `CAL_MIA_URL`. A missing one only marks that calendar as `error`. |
-| `KIDBOARD_ACCESS_TOKEN`    | secret              | strongly recommended | Empty or unset = no check. A value still containing `REPLACE_ME` is refused (API answers `500`). |
+| `CAL_<ID>_URL`             | secret              | per calendar (optional) | Only for calendars listed in `KIDBOARD_CONFIG`, e.g. `CAL_KINDER_URL`. A missing one only marks that calendar as `error`. |
+| `KIDBOARD_ACCESS_TOKEN`    | secret              | strongly recommended | Needed for the editor. Empty or unset = no check. A value still containing `REPLACE_ME` is refused (API answers `500`). |
 | `KIDBOARD_CONFIG`          | secret or variable  | yes      | Single-line JSON. Missing/invalid: `/api/config` and `/api/agenda` answer `500`.                 |
 | `KIDBOARD_ALLOWED_ORIGINS` | variable            | no       | Only for cross-origin API use; the board itself is same-origin.                                  |
 | `KIDBOARD_CACHE_TTL`       | variable            | no       | Seconds a feed counts as fresh, default 3600.                                                    |
@@ -56,12 +60,13 @@ secrets always do. The template for all of them is [`.dev.vars.example`](../.dev
 2. Connect GitHub or GitLab and choose a name for the new repository. Cloudflare copies
    KidBoard into your account; later pushes to it redeploy automatically.
 3. Keep or change the **Worker name** (default `kidboard`, it becomes part of the URL) and
-   keep the suggested **KV namespace** for `KIDBOARD_CACHE`.
-4. Fill in the secrets the page asks for (taken from `.dev.vars.example`):
-   `CAL_KINDER_URL`, `CAL_ESSEN_URL`, `KIDBOARD_ACCESS_TOKEN`, `KIDBOARD_PARENT_PIN`,
-   `KIDBOARD_CONFIG`. **Replace every `REPLACE_ME`** (only `KIDBOARD_PARENT_PIN` may keep
-   it: the parent editor then stays off). If your calendars have other ids, enter the ones you have here and
-   add the remaining `CAL_<ID>_URL` secrets afterwards (step 7).
+   keep the suggested **KV namespace** (`KIDBOARD_CACHE`) and **D1 database**
+   (`KIDBOARD_DATA`).
+4. Fill in the three secrets the page asks for (taken from `.dev.vars.example`):
+   `KIDBOARD_ACCESS_TOKEN`, `KIDBOARD_PARENT_PIN` and `KIDBOARD_CONFIG` (change the example
+   children). **Replace every `REPLACE_ME`** (only `KIDBOARD_PARENT_PIN` may keep it: the
+   parent editor then stays off). Google calendars are not asked for; add them later
+   (step 7).
 5. Check the build settings. The repository is a pnpm monorepo, so the build must run in
    the repository root:
    - Root directory: empty (repository root)
@@ -72,8 +77,9 @@ secrets always do. The template for all of them is [`.dev.vars.example`](../.dev
 
    Node.js 22 comes from `.nvmrc`, pnpm from the `packageManager` field.
 6. Create and deploy. The first build takes a few minutes.
-7. Missing calendars or a changed setting: Workers & Pages > your Worker > Settings >
-   Variables and Secrets > Add (type "Secret"). Saving deploys a new version.
+7. Google calendars or a changed setting: Workers & Pages > your Worker > Settings >
+   Variables and Secrets. Add `calendars` to `KIDBOARD_CONFIG` and one `CAL_<ID>_URL` per
+   calendar (Add, type "Secret"). Saving deploys a new version.
 
 ## 4. Option B: from a local clone (Wrangler CLI)
 
@@ -90,9 +96,9 @@ The first deploy creates the Worker and its KV namespace. Then set the secrets (
 prompts for the value; every change is deployed at once):
 
 ```sh
-pnpm exec wrangler secret put CAL_KINDER_URL
-pnpm exec wrangler secret put CAL_ESSEN_URL        # one per calendar: CAL_<ID>_URL
 pnpm exec wrangler secret put KIDBOARD_ACCESS_TOKEN
+pnpm exec wrangler secret put KIDBOARD_PARENT_PIN
+pnpm exec wrangler secret put CAL_KINDER_URL       # optional: one per calendar, CAL_<ID>_URL
 node -e "process.stdout.write(JSON.stringify(require('./my-config.json')))" \
   | pnpm exec wrangler secret put KIDBOARD_CONFIG
 ```
@@ -113,8 +119,9 @@ curl -s -H "Authorization: Bearer <token>" https://<url>/api/config      # your 
 curl -s -H "Authorization: Bearer <token>" "https://<url>/api/agenda?days=3"
 ```
 
-In the agenda answer every entry of `sources` should have `"status":"ok"`. `"error"` means
-that calendar's secret is missing, misspelled or the address is wrong.
+In the agenda answer every entry of `sources` should have `"status":"ok"` (without Google
+calendars and with the editor off the list is empty). `"error"` means that calendar's
+secret is missing, misspelled or the address is wrong.
 
 Then open **`https://<url>/?key=<token>` once on the tablet**. The board stores the token,
 removes it from the address bar and from then on sends it as a header. Install it as an app

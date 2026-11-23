@@ -152,12 +152,27 @@ describe("createApiClient", () => {
 
   it("rejects a config that violates the shared schema", async () => {
     const fake = createFakeFetch();
-    fake.setReplies("/api/config", { status: 200, body: { calendars: [] } });
+    fake.setReplies("/api/config", {
+      status: 200,
+      body: { calendars: [], timeZone: "Mars/Valles" },
+    });
     const error = await rejection(
       createApiClient({ fetch: fake.fetch }).getConfig(),
     );
 
     expect(error).toMatchObject({ kind: "invalid-response" });
+  });
+
+  it("accepts a config without calendars (app entries only)", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/config", {
+      status: 200,
+      body: configFixture({ calendars: [] }),
+    });
+    const config = await createApiClient({ fetch: fake.fetch }).getConfig();
+
+    expect(config.calendars).toEqual([]);
+    expect(config.timeZone).toBe("Europe/Berlin");
   });
 
   it("rejects non-JSON bodies", async () => {
