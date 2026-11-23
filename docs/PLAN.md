@@ -761,7 +761,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
   same iCalendar as T-41 plus a VTIMEZONE (RFC 5545), and `GET /api/parent/feed` (behind
   the parent session) returning the relative subscribe URL; tests.
 
-- [ ] **T-46 Phone feed link, e2e, screenshots and docs** (risk: medium, deps: T-45, T-46a)
+- [x] **T-46 Phone feed link, e2e, screenshots and docs** (risk: medium, deps: T-45, T-46a)
   Acceptance:
   1. The parent area shows the subscribe link (absolute URL from `/api/parent/feed`) with a
      copy button and an `aria-live` "copied" confirmation, hidden when the feed is off;
