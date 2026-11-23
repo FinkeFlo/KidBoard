@@ -270,7 +270,7 @@ describe("Board", () => {
     expect(screen.getByText(de.day.empty.title)).toBeVisible();
   });
 
-  it("explains an expired access link, calm for children", async () => {
+  it("explains an access link that is no longer valid, calm and without jargon", async () => {
     fake.setReplies("/api/config", { status: 401, body: {} });
     renderDay();
     const alert = await screen.findByRole("alert");
@@ -278,7 +278,10 @@ describe("Board", () => {
     expect(alert).toHaveAttribute("data-variant", "unauthorized");
     expect(alert).toHaveTextContent(en.day.error.unauthorized.title);
     expect(alert).toHaveTextContent(en.day.error.unauthorized.hint);
-    expect(alert).toHaveTextContent("?key=");
+    expect(alert).toHaveTextContent("needs a new access link");
+    expect(alert).toHaveTextContent("no longer valid");
+    // No URL syntax or technical wording on the card; the docs explain `?key=`.
+    expect(alert.textContent).not.toMatch(/\?key|key=|token|expired/iu);
     expect(screen.getByTestId("error-code")).toHaveTextContent("KB-401");
     // Nothing to retry: only a parent opening the link again helps.
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
@@ -537,9 +540,10 @@ describe("Board", () => {
       expect(compact).toHaveAttribute("data-variant", "compact");
       expect(compact).toHaveAttribute("data-nights", "26");
       expect(compact).toHaveTextContent("26 more sleeps until Christmas");
-      expect(
-        within(compact).getByTestId("countdown-grouped"),
-      ).toHaveTextContent("×26");
+      expect(within(compact).getByTestId("countdown-grouped")).toBeTruthy();
+      expect(within(compact).getByTestId("countdown-count")).toHaveTextContent(
+        "26 ×",
+      );
       // The countdown lives in the header, next to the date.
       expect(compact.closest("header")).not.toBeNull();
 

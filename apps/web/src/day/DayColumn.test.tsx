@@ -14,7 +14,8 @@ import en from "../i18n/locales/en.json";
 import type { DayModelConfig } from "./buildDayModel";
 import { buildOverviewModel, type OverviewDay } from "./buildOverviewModel";
 import { COLUMN_GAP_REM, SUMMARY_ROW_REM } from "./columnCapacity";
-import { DayColumn, MORE_ICONS_MAX } from "./DayColumn";
+import { MORE_ICONS_MAX } from "./ColumnSummaries";
+import { DayColumn } from "./DayColumn";
 import { NOW_LINE_REM } from "./NowLine";
 
 const CONFIG: DayModelConfig = {

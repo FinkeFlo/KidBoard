@@ -7,8 +7,8 @@ export type ErrorCardVariant = "error" | "unauthorized";
 export interface ErrorCardProps {
   /**
    * `error`: soft error card ("Gleich geht's weiter") with a retry button.
-   * `unauthorized`: the calm variant for an expired link; a parent has to open the link
-   * again, so there is nothing to retry and no alarm colour.
+   * `unauthorized`: the calm variant for an access link that is no longer valid; a parent
+   * has to set up a new one, so there is nothing to retry and no alarm colour.
    */
   variant: ErrorCardVariant;
   /** Big friendly line for children. */

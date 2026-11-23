@@ -1,9 +1,64 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoOverflow, moons, withCountdown } from "./layout";
 import { mockBoard } from "./mockApi";
 
 const SHOT_DIR = process.env["E2E_SCREENSHOT_DIR"];
+
+/**
+ * The pill reads from start to goal: the number, the moons, the goal's icon and its short
+ * name, all visible inside the pill; and it is as high as the name chips beside it.
+ */
+async function expectPillReadsToGoal(
+  page: Page,
+  count: string,
+  name: string,
+): Promise<void> {
+  const pill = page.getByTestId("countdown");
+  await expect(pill.getByTestId("countdown-count")).toHaveText(count);
+  const nameEl = pill.getByTestId("countdown-name");
+  await expect(nameEl).toBeVisible();
+  await expect(nameEl).toHaveText(name);
+  const layout = await pill.evaluate((el) => {
+    const box = (node: Element | null): DOMRect | undefined =>
+      node?.getBoundingClientRect();
+    const pillBox = el.getBoundingClientRect();
+    const moon = [...el.querySelectorAll(".font-emoji")].find(
+      (node) => node.textContent === "🌙",
+    );
+    const target = box(el.querySelector("[data-testid=countdown-target]"));
+    const label = box(el.querySelector("[data-testid=countdown-name]"));
+    const chips = [...document.querySelectorAll("header li")].map(
+      (chip) => chip.getBoundingClientRect().height,
+    );
+    return {
+      pill: {
+        left: pillBox.left,
+        right: pillBox.right,
+        height: pillBox.height,
+      },
+      count: box(el.querySelector("[data-testid=countdown-count]"))?.left ?? 0,
+      moon: box(moon ?? null)?.left ?? 0,
+      target: target?.left ?? 0,
+      label: {
+        left: label?.left ?? 0,
+        right: label?.right ?? 0,
+        width: label?.width ?? 0,
+      },
+      chips,
+    };
+  });
+  // Number, moons, goal, name from start to end.
+  expect(layout.count).toBeLessThan(layout.moon);
+  expect(layout.moon).toBeLessThan(layout.target);
+  expect(layout.target).toBeLessThan(layout.label.left);
+  // The name shows at least a few letters and stays inside the pill.
+  expect(layout.label.width).toBeGreaterThan(40);
+  expect(layout.label.right).toBeLessThanOrEqual(layout.pill.right);
+  for (const chip of layout.chips) {
+    expect(Math.abs(chip - layout.pill.height)).toBeLessThanOrEqual(1);
+  }
+}
 
 test.describe("countdown", () => {
   test("30 nights: compact on the day view, full on the week view, no overflow", async ({
@@ -18,7 +73,9 @@ test.describe("countdown", () => {
     await expect(countdown).toContainText(
       "30 more sleeps until Christmas party",
     );
-    await expect(page.getByTestId("countdown-grouped")).toHaveText("🌙×30");
+    // Beyond 14 nights: the number, then a single moon.
+    await expect(page.getByTestId("countdown-count")).toHaveText("30 ×");
+    await expect(page.getByTestId("countdown-grouped")).toHaveText("🌙");
     await expect(page.getByTestId("board-ready")).toBeVisible();
     await expectNoOverflow(page);
     if (SHOT_DIR !== undefined) {
@@ -60,6 +117,7 @@ test.describe("countdown", () => {
     );
     expect(await moons(page)).toBe(14);
     await expectNoOverflow(page);
+    await expectPillReadsToGoal(page, "14 ×", "Christmas party");
 
     await page.getByRole("button", { name: "Week" }).click();
     await expect(countdown).toHaveAttribute("data-variant", "full");
@@ -70,6 +128,7 @@ test.describe("countdown", () => {
       page.getByTestId("day-column").getByTestId("column-moon"),
     ).toHaveCount(7);
     await expectNoOverflow(page);
+    await expectPillReadsToGoal(page, "14 ×", "Christmas party");
     if (SHOT_DIR !== undefined) {
       await page.screenshot({
         path: `${SHOT_DIR}/countdown-week-14-${testInfo.project.name}.png`,
@@ -153,6 +212,44 @@ test.describe("countdown", () => {
       "Noch einmal schlafen bis Christmas party",
     );
     expect(await moons(page)).toBe(1);
+    await expectNoOverflow(page);
+  });
+
+  test("German: 'Noch 6 Mal schlafen' (no hyphen) and the week marks the goal day", async ({
+    page,
+  }) => {
+    await mockBoard(page, {
+      config: {
+        locale: "de",
+        timeZone: "Europe/Berlin",
+        calendars: [{ id: "family", kind: "events" }],
+      },
+      agenda: withCountdown(6),
+    });
+    await page.goto("/");
+    const countdown = page.getByRole("region", {
+      name: "Wie oft noch schlafen?",
+    });
+    await expect(countdown).toContainText(
+      "Noch 6 Mal schlafen bis Christmas party",
+    );
+    await expectPillReadsToGoal(page, "6 ×", "Christmas party");
+    await page.getByRole("button", { name: "Woche" }).click();
+    const columns = page.getByTestId("day-column");
+    // Six moons, then the goal's icon on its day; every header keeps the same slot.
+    await expect(columns.getByTestId("column-moon")).toHaveCount(6);
+    const target = columns.nth(6);
+    await expect(target).toHaveAttribute("data-countdown-day", "true");
+    await expect(target.getByTestId("column-target")).toBeVisible();
+    const dateTops = await columns.evaluateAll((all) =>
+      all.map((column) =>
+        Math.round(
+          (column.querySelector("p") as HTMLElement).getBoundingClientRect()
+            .top,
+        ),
+      ),
+    );
+    expect(new Set(dateTops).size).toBe(1);
     await expectNoOverflow(page);
   });
 });

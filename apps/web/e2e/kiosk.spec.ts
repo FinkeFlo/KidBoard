@@ -83,15 +83,42 @@ test.describe("fullscreen control", () => {
     expect(await page.evaluate(() => document.fullscreenElement !== null)).toBe(
       false,
     );
+    // The tap leaves a short "press and hold" hint, fully on screen, then it goes.
+    const hint = page.getByTestId("fullscreen-hint");
+    await expect(hint).toHaveText("Press and hold");
+    await expect(hint).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(hint).toHaveCount(0, { timeout: 5_000 });
 
     const box = await control.boundingBox();
     if (box === null) throw new Error("control has no box");
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
+    // While held, a ring fills around the glyph.
+    await expect(page.getByTestId("fullscreen-hold-ring")).toBeVisible();
+    await expect(page.getByTestId("fullscreen-hold-progress")).toBeVisible();
     await page.waitForTimeout(900);
     await page.mouse.up();
     await expect(control).toHaveAttribute("data-active", "true");
     await expect(control).toBeVisible();
+    await expect(page.getByTestId("fullscreen-hold-ring")).toHaveCount(0);
+    await expect(hint).toHaveCount(0);
+  });
+
+  test("reduced motion: the hold shows a static ring without the sweep", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await mockBoard(page);
+    await page.goto("/");
+    const control = page.getByTestId("fullscreen-control");
+    const box = await control.boundingBox();
+    if (box === null) throw new Error("control has no box");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await expect(page.getByTestId("fullscreen-hold-ring")).toBeVisible();
+    await expect(page.getByTestId("fullscreen-hold-progress")).toBeHidden();
+    await page.mouse.up();
   });
 
   for (const view of ["Today", "Week"] as const) {

@@ -48,6 +48,13 @@ fails, and say so discreetly.
     `from + days` of its query key is `stale`, never `ready`, until the real response
     lands, also while that fetch is in flight (details: ARCHITECTURE.md "Clock & day
     rollover").
+  * Every page load refetches once: after the persisted cache is restored, all KidBoard
+    queries are marked outdated (`invalidateRestoredQueries`, TanStack `invalidate`
+    without an immediate refetch), so they fetch when the board mounts even if the
+    restored data is younger than `staleTime`. Otherwise a reload while the API is
+    unreachable showed the restored data as current with no hint (T-27a UI/UX test). The
+    restored `dataUpdatedAt` stays the "Stand" time; a failed refetch keeps the data and
+    shows "Can't update · as of …" (offline: the fetch waits, the status is `offline`).
   * Requests time out after 15 s (headers + body). The worker needs up to ~11 s (10 s
     upstream timeout + 1 s flight margin) before it answers with last-good data, so a
     slow upstream still delivers stale data. Network/timeout/5xx/429 errors are retried

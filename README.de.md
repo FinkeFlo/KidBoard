@@ -214,8 +214,9 @@ statt der Uhr zu folgen.
 
 | Was du siehst                                                               | Was zu tun ist                                                                                                                     |
 | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| "Link neu öffnen" / Hinweis für Erwachsene (**KB-401**)                     | Das Zugriffstoken fehlt, ist falsch oder wurde geändert. Den Tablet-Link mit `?key=<token>` noch einmal öffnen.                    |
+| "Dieses Tablet braucht einen neuen Zugangslink" (**KB-401**)                | Das Zugriffstoken fehlt, ist falsch oder wurde geändert. Den Tablet-Link mit `?key=<token>` noch einmal öffnen.                    |
 | "Offline · Stand von ..." (**KB-OFF**, wenn noch kein Plan gespeichert ist) | Kein Internet. Der letzte gute Plan bleibt sichtbar; das Board lädt von selbst neu, sobald das Netz zurück ist.                    |
+| "Aktualisieren klappt nicht · Stand von ..."                                | Das Tablet erreicht den Server nicht; der letzte gute Plan bleibt. WLAN und Server prüfen, es versucht es von selbst wieder.       |
 | "Vielleicht nicht aktuell · Stand von ..."                                  | Der Server erreicht Google nicht und zeigt die letzte gute Kopie (bis 7 Tage). Kalender-Link prüfen, siehe unten.                  |
 | "Gleich geht's weiter" mit Fehlercode                                       | Meist hilft "Jetzt neu laden". Der Code sagt einem Helfer, was passiert ist, siehe Liste unten.                                    |
 | Falscher Tag oder um Stunden verschobene Zeiten                             | `timeZone` in `KIDBOARD_CONFIG` setzen (z. B. `Europe/Berlin`). Die Zeitzone des Tablets wird bewusst ignoriert.                   |

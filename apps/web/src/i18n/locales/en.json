@@ -34,8 +34,10 @@
     "offlineNoTime": "Offline",
     "stale": "Maybe not current · as of {{time}}",
     "staleNoTime": "Maybe not current",
+    "cantUpdate": "Can't update · as of {{time}}",
+    "cantUpdateNoTime": "Can't update",
     "error": "The plan could not be loaded.",
-    "unauthorized": "Open the link again: please open the tablet link with ?key=… on this tablet once more."
+    "unauthorized": "This tablet needs a new access link."
   },
   "day": {
     "meals": "Meals",
@@ -49,7 +51,7 @@
       "offline": "Parents: No internet and no saved plan yet. KidBoard loads as soon as the network is back.",
       "unauthorized": {
         "title": "A grown-up can fix this",
-        "hint": "Parents: open the link again. The access link has expired; please open the new link with ?key=… on this tablet."
+        "hint": "Parents: This tablet needs a new access link; the old one is no longer valid. Please ask whoever set up KidBoard."
       }
     },
     "hidden": {
@@ -68,7 +70,8 @@
   },
   "fullscreen": {
     "enter": "Fullscreen on (press and hold)",
-    "exit": "Fullscreen off (press and hold)"
+    "exit": "Fullscreen off (press and hold)",
+    "hint": "Press and hold"
   },
   "board": {
     "viewGroup": "View",
@@ -80,8 +83,7 @@
   "week": {
     "label": "Next seven days",
     "more": "{{count}} more: {{titles, list}}",
-    "meals": "Meals",
-    "moreBadge": "+{{count}}"
+    "meals": "Meals"
   },
   "countdown": {
     "label": "How many sleeps?",
@@ -89,6 +91,6 @@
     "nights_other": "{{count}} more sleeps until {{titles, list}}",
     "todayLabel": "Today is the day: {{titles, list}}!",
     "today": "Today!",
-    "grouped": "×{{count}}"
+    "count": "{{count}} ×"
   }
 }

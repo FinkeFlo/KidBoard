@@ -4,6 +4,17 @@
 /* Night mode variant: `night:bg-...` applies under <html data-theme="night">. */
 @custom-variant night (&:where([data-theme="night"], [data-theme="night"] *));
 
+/* Fullscreen hold ring (FullscreenControl): the arc fills over the hold time, which the
+   component passes as the animation duration. Reduced motion hides the arc. */
+@keyframes kb-hold-ring {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 @layer base {
   /*
    * Fluid root size: 16px at 1280x800 up to 24px at 2000x1200 (2vh / 1.25vw, whichever is

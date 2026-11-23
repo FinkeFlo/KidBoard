@@ -38,7 +38,7 @@ type DehydratedQuery = DehydratedState["queries"][number];
 /**
  * A persisted query reduced to its data: `status: "success"`, no error, idle. Errors
  * are never written to storage (they are runtime state; a restored query refetches
- * anyway because its data is older than `staleTime`).
+ * once anyway, because `invalidateRestoredQueries` marks it invalid after restore).
  */
 function cleanQuery(
   query: Pick<DehydratedQuery, "queryKey" | "queryHash" | "dehydratedAt">,

@@ -222,7 +222,7 @@ test.describe("overview (main screen)", () => {
     await expectNoOverflow(page);
   });
 
-  test("shows a calm, parent-readable state for an expired access link", async ({
+  test("shows a calm, parent-readable state for an access link that is no longer valid", async ({
     page,
   }) => {
     await fixClock(page);
@@ -232,7 +232,10 @@ test.describe("overview (main screen)", () => {
     await page.goto("/");
     const alert = page.getByRole("alert");
     await expect(alert).toContainText("A grown-up can fix this");
-    await expect(alert).toContainText("?key=");
+    await expect(alert).toContainText("This tablet needs a new access link");
+    // No URL syntax on the card (the docs explain it); the code is for parents.
+    await expect(alert).not.toContainText("?key=");
+    await expect(page.getByTestId("error-code")).toContainText("KB-401");
     await expectNoOverflow(page);
   });
 

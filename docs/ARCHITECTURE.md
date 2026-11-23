@@ -420,14 +420,16 @@ refused). Unusable config text falls back to the neutral fill. The value is only
 style value, never in class names.
 
 **Tile anatomy.** The emoji sits on a light disc with a thin ring (`EmojiDisc`), so pale
-glyphs (🦷, 🥛) stay visible on light tints and at night; week tiles have no disc. Titles
+glyphs (🦷, 🥛) stay visible on light tints and at night; week tiles have no disc. At
+night avatar discs and child edges are mixed a quarter towards the page
+(`CHILD_FILL`/`CHILD_EDGE`, contrast tested), stripes dimmed alike. Titles
 may wrap to two lines where the tile has the height (large, medium, compact, prominent);
 the badges sit inside the tile, side by side and overlapping by at most a quarter, floated
 at the end of the title's first line only (one line high), so a second line and the time
 run under them. One-line sizes (dense, compact-dense) keep the badges in a row beside the
 title. Today's emoji: large 3.5rem (prominent 4.5rem), medium 3rem, dense 2.75rem in a
-3.5rem tile (the last step before "+N"). Time-of-day icons are at least 1.5rem in the
-overview.
+3.5rem tile (the last step before "+N"). Time-of-day icons are at least 1.5rem, in the
+overview and the week.
 
 **States:**
 
@@ -442,12 +444,14 @@ overview.
   `KB-502`, `KB-OFF`, `KB-UI`, ...; identifiers, never an error message, URL or body). No
   red surface and no fixed retry seconds: the data layer's backoff decides. The raw error
   is only logged, never shown. `AppErrorBoundary` uses the same card for render errors.
-* **401:** the calm variant (`unauthorized`): raised surface with an edge, "open the link
-  again", no retry button, because a parent has to act; the 401 wipe already forgot the
+* **401:** the calm variant (`unauthorized`): raised surface with an edge, "this tablet
+  needs a new access link" (no URL syntax or technical wording; the `KB-401` code is for
+  parents, the docs explain `?key=`), no retry button, because a parent has to act; the 401 wipe already forgot the
   token.
 * **Offline / stale with data:** the board stays and only the `DiscreetStatusBanner` pill
-  in the bottom strip reports it ("Offline · as of 14:02", "Maybe not current · as of
-  14:02", without the time where unknown; calm notice colours, polite `status`). **Stale
+  in the bottom strip reports it ("Offline · as of 14:02", "Can't update · as of 14:02"
+  when the last refresh failed, "Maybe not current · as of 14:02" when the worker served
+  last-good data; always the time of the last *successful* fetch, without it where unknown; calm notice colours, polite `status`). **Stale
   delay:** `stale` shows only after it has lasted **5 s** (`STALE_BANNER_DELAY_MS`,
   `useSettled`), because online every midnight is briefly `stale` (the new day is seeded
   from the cache until its fetch lands). `offline`, `error` and `unauthorized` show at
@@ -465,12 +469,14 @@ wipe, with the device in `America/Los_Angeles`.
 ### Board: four-day overview & week view (T-18, T-30b)
 
 `apps/web/src/board/`: `Board` loads config and agenda, then renders `BoardFrame`
-(`<main>`, header with weekday + date, the countdown (T-19, target in the child's tint) and
-`ChildLegend`; the navigation rail `NavRail` on the right with the `ViewToggle` buttons
+(`<main>`, header with weekday + date, the countdown (T-19) and `ChildLegend`, both
+`h-16` pills; the navigation rail `NavRail` on the right with the `ViewToggle` buttons
 "Today" (☀️, also at night) / "Week" (seven bars) and the "Stand HH:MM" line from the agenda
 query's `dataUpdatedAt`, plain text, not a live region) around `OverviewBoard` or
 `WeekBoard`. The reserved bottom strip holds `DiscreetStatusBanner` and, centred under the
-rail (its bottom slot), the long-press `FullscreenControl`. View state is local to `Board`
+rail (its bottom slot), the long-press `FullscreenControl` (a ring fills while it is
+held, the sweep hidden under reduced motion; a short tap shows a "press and hold" hint for
+2.5 s, no dialog). View state is local to `Board`
 (overview on start). `useAutoReturn` switches back to the overview after
 `config.autoReturnSeconds` (default 120) without `pointerdown`/`pointermove`/`touchstart`/
 `keydown`; every activity restarts the countdown.
@@ -493,19 +499,27 @@ titles for assistive tech, nothing is hidden silently, nothing scrolls).
 and week agree on what belongs to a day. Meals are part of the columns (`MealRows`, no
 extra screen, one glance). **Order of the events** (the first ones get tiles, the rest
 becomes "+N"): 0. events already over today rank **last** (the column answers "what is
-still to come?"; ranking instead of dimming keeps WCAG AA contrast), 1. `countdown`
-events, 2. all-day events, 3. timed events by start (a multi-day event continuing from
-an earlier day counts as the earliest), ties by title.
-**Space-based "+N":** like the overview, the week measures its columns (`useContentHeight`)
-and `fitWeekColumn` decides: `week` tiles while everything fits and there are fewer than 6
-events, else `week-dense`, with as many tiles as fit and a trailing "+N" row only when
-tiles do not fit (never a fixed count). The "+N" row carries the hidden titles as its
-accessible label. Week tiles are the overview's `EventTile` in a stacked form (emoji above
-time, no visible title; the title is in the accessible name): tinted by the child
-(`resolveTileTint`) with edge or stripes and badges per child, so colour is never the only cue;
-events without a child are neutral.
-**Countdown day:** the day the countdown waits for wears the awaited event's child tint
-and edge, and every earlier day shows one 🌙 in its header (the night still to sleep).
+still to come?"), 1. `countdown` events, 2. all-day events, 3. timed events by start (a
+multi-day event continuing from an earlier day counts as the earliest), ties by title.
+**Space-based layout:** like the overview, the week measures its columns
+(`useContentHeight`) and `fitWeekColumn` takes the first that fits: every event as a
+`week` tile (finished ones receded); else *all* finished events fold into the "done"
+strip (check mark, two grey checked icons, "+N", accessible name listing every title) and
+the upcoming tiles shrink `week` → `week-dense` → `week-mini`; only then the least
+important upcoming events are summed up in "+N" (their small emoji plus the count, plain
+text, no button look; the accessible label names the titles). Never a fixed count;
+`shown + folded + summed up` = the day's events. Week tiles are the overview's
+`EventTile` stacked: emoji, a one-line truncated title (CSS container query on the
+column's list: only where it is at least 5.5rem wide; `week-mini` drops it), then the
+1.5rem time-of-day icon and the time; tinted by the child (`resolveTileTint`) with edge or
+stripes and badges per child, so colour is never the only cue; events without a child are
+neutral.
+**Countdown day:** every header has the same slot right of the date (so all dates align):
+one 🌙 on each day before the awaited day (the night still to sleep), the awaited event's
+icon on that day, empty after it. The awaited day gets a ring in the countdown colour
+(`--color-band-evening-accent`, the moons' colour, person-neutral); only when the awaited
+event belongs to exactly one child it also wears that child's tint and shows the child's
+badge next to the icon (shared or nobody's events keep the day's surface).
 `MealRows` is a three-row list (breakfast, lunch, dinner, each led by its time-of-day
 symbol; an empty row for a missing meal; `unspecified` meals in an extra row only when
 present).
@@ -532,9 +546,12 @@ The week uses the board's one agenda query (`AGENDA_DAYS` = 31 since T-19).
 * **Several countdowns on the same (nearest) day** share one countdown: all of them are
   named in the label (localized list), the badge shows up to 3 of their icons; order:
   all-day first, then start time, then title.
-* Rendering: ≤ 14 nights one 🌙 each, in rows of 7 (a week per row); beyond, one 🌙 and
-  "×N". Week view: `full` variant in the header; day view: `compact` badge (smaller
-  icon, but heading-sized moons) in the same place. Today shows 🎉 next to "Today!". The visuals are `aria-hidden`; a region "How many sleeps?" carries
+* Rendering, read from start to goal: the number ("6 ×"), the moons (≤ 14 nights one 🌙
+  each, up to 7 heading-sized in one row, 8 to 14 in two smaller rows of a week; beyond,
+  a single 🌙 after the number), an arrow, the awaited event icon(s) in the child's tint
+  and the first title, short (truncated). As high as the name chips (`h-16`). Week view:
+  `full` variant in the header; day view: `compact` (smaller icon and name) in the same
+  place. Today shows 🎉 and "Today!", then the icon(s) and the title. The visuals are `aria-hidden`; a region "How many sleeps?" carries
   a localized label with i18next plurals (`countdown.nights_one/_other`). Static, no
   animation (nothing to reduce for `prefers-reduced-motion`).
 * Data: the countdown reads the board's agenda (31 days). After midnight without a new

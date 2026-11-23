@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { type FormatContext, formatTime } from "../i18n/format";
 import type { DayBand } from "../time";
 import { ChildBadges } from "./ChildBadges";
+import { CHILD_EDGE_AFTER } from "./childColor";
 import {
   resolveTileTint,
   stripeStyle,
@@ -18,8 +19,8 @@ export type EventStatus = "upcoming" | "current" | "past";
 /**
  * Tile sizes: `large` → `medium` → `dense` in today's column (it shrinks step by step
  * when space is short), `compact` / `compact-dense` on the other days, `week` /
- * `week-dense` for the seven narrow week columns (stacked: emoji above time, no visible
- * title). Heights are fixed, so a column can derive how many tiles fit from its height
+ * `week-dense` → `week-mini` for the seven narrow week columns (stacked: emoji, a one-line title where
+ * the column is wide enough, then the time). Heights are fixed, so a column can derive how many tiles fit from its height
  * ({@link TILE_HEIGHT_REM}, plus {@link PROMINENT_EXTRA_REM} for a prominent tile).
  */
 export type TileSize =
@@ -29,7 +30,8 @@ export type TileSize =
   | "compact"
   | "compact-dense"
   | "week"
-  | "week-dense";
+  | "week-dense"
+  | "week-mini";
 
 /** Tile heights in rem; `large` and `compact` are `--spacing-tile(-compact)`. */
 export const TILE_HEIGHT_REM: Record<TileSize, number> = {
@@ -38,8 +40,9 @@ export const TILE_HEIGHT_REM: Record<TileSize, number> = {
   dense: 3.5,
   compact: 4.75,
   "compact-dense": 3.75,
-  week: 5.75,
-  "week-dense": 4.5,
+  week: 6.5,
+  "week-dense": 5.25,
+  "week-mini": 4.25,
 };
 
 /**
@@ -54,6 +57,7 @@ export const PROMINENT_EXTRA_REM: Record<TileSize, number> = {
   "compact-dense": 0,
   week: 0,
   "week-dense": 0,
+  "week-mini": 0,
 };
 
 export interface SizeClasses {
@@ -76,6 +80,8 @@ export interface SizeClasses {
   badgeFloat: boolean;
   /** Emoji above the time (week columns) instead of beside the title. */
   stacked: boolean;
+  /** Stacked tiles: a one-line title between emoji and time (where the column is wide enough). */
+  stackedTitle: boolean;
 }
 
 // Full class names so Tailwind can see them. Today's large emoji stay >= 3.5rem, medium
@@ -93,6 +99,7 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeOverlap: "-ms-1.5",
     badgeFloat: true,
     stacked: false,
+    stackedTitle: false,
   },
   medium: {
     tile: "h-18 gap-3 ps-3 pe-3",
@@ -105,6 +112,7 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeOverlap: "-ms-1.5",
     badgeFloat: true,
     stacked: false,
+    stackedTitle: false,
   },
   dense: {
     tile: "h-14 gap-2.5 ps-2.5 pe-3",
@@ -117,6 +125,7 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeOverlap: "-ms-1.75",
     badgeFloat: false,
     stacked: false,
+    stackedTitle: false,
   },
   compact: {
     tile: "h-tile-compact gap-1.5 ps-1.5 pe-1.5",
@@ -129,6 +138,7 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeOverlap: "-ms-1.5",
     badgeFloat: true,
     stacked: false,
+    stackedTitle: false,
   },
   "compact-dense": {
     tile: "h-15 gap-1.5 ps-1.5 pe-1.5",
@@ -141,30 +151,50 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badgeOverlap: "-ms-1.5",
     badgeFloat: false,
     stacked: false,
+    stackedTitle: false,
   },
+  // Week tiles stack emoji, a one-line title and the time; the title shows where the
+  // column is wide enough (container query on the column's list), else only the name has it.
   week: {
-    tile: "h-23 flex-col justify-center gap-1 px-1.5",
+    tile: "h-26 flex-col justify-center gap-0.5 px-1.5",
     disc: null,
-    emoji: "text-[2.75rem]",
-    title: "text-tile-compact",
-    timeIcon: "text-[1.25rem]",
+    emoji: "text-[2.5rem]",
+    title: "text-meta",
+    timeIcon: "text-[1.5rem]",
     badge: "size-6",
     badgeText: "text-caption",
     badgeOverlap: "-ms-1.5",
     badgeFloat: false,
     stacked: true,
+    stackedTitle: true,
   },
   "week-dense": {
-    tile: "h-18 flex-col justify-center gap-0.5 px-1.5",
+    tile: "h-21 flex-col justify-center gap-0.5 px-1.5",
     disc: null,
-    emoji: "text-[2.25rem]",
-    title: "text-tile-compact",
-    timeIcon: "text-[1.25rem]",
+    emoji: "text-[2rem]",
+    title: "text-caption",
+    timeIcon: "text-[1.5rem]",
     badge: "size-6",
     badgeText: "text-caption",
     badgeOverlap: "-ms-1.5",
     badgeFloat: false,
     stacked: true,
+    stackedTitle: true,
+  },
+  // Last step before "+N" in a week column: emoji and time only (the title stays in the
+  // accessible name), so no event is hidden just to keep a title line.
+  "week-mini": {
+    tile: "h-17 flex-col justify-center gap-0.5 px-1.5",
+    disc: null,
+    emoji: "text-[2rem]",
+    title: "text-caption",
+    timeIcon: "text-[1.5rem]",
+    badge: "size-6",
+    badgeText: "text-caption",
+    badgeOverlap: "-ms-1.5",
+    badgeFloat: false,
+    stacked: true,
+    stackedTitle: false,
   },
 };
 
@@ -227,7 +257,7 @@ function statusClasses(
   // can never paint over the child's edge.
   const edge =
     tint.edge !== null
-      ? `${EDGE_OVERLAY} after:inset-ring-4 after:inset-ring-(color:--child-color)`
+      ? `${EDGE_OVERLAY} after:inset-ring-4 ${CHILD_EDGE_AFTER}`
       : `${EDGE_OVERLAY} after:inset-ring-2 after:inset-ring-border`;
   const emphasis =
     status === "current"
@@ -254,7 +284,8 @@ export function TileStripes({
       aria-hidden="true"
       data-testid="tile-stripes"
       style={style}
-      className="pointer-events-none absolute inset-y-0 start-0"
+      // Dimmed a quarter at night like the edges and badges (decorative stripes).
+      className="night:brightness-75 pointer-events-none absolute inset-y-0 start-0"
     />
   );
 }
@@ -388,7 +419,7 @@ export function EventTile({
       ) : timeOfDay !== null ? (
         <TimeOfDayIcon timeOfDay={timeOfDay} className={sizes.timeIcon} />
       ) : null}
-      <span className="truncate">{time}</span>
+      <span className="min-w-0 truncate">{time}</span>
     </p>
   );
   return (
@@ -437,8 +468,18 @@ export function EventTile({
       )}
       {sizes.stacked ? (
         <>
-          {/* Week tiles are picture-first: the title is in the accessible name only. */}
-          <div className="min-w-0">{meta}</div>
+          {/* Week tiles are picture-first; the title follows in one line where the column
+              is wide enough (`@container` on the week column's list), else it is only in
+              the accessible name. */}
+          {sizes.stackedTitle && (
+            <p
+              className={`${sizes.title} ${tint.stripes.length > 0 ? "ps-2" : ""} hidden w-full min-w-0 truncate text-center font-extrabold @min-[5.5rem]:block`}
+            >
+              <span data-testid="tile-title">{event.title}</span>
+            </p>
+          )}
+          {/* Full width, so a long word ("Ganztägig") is cut, not pushed out. */}
+          <div className="w-full min-w-0">{meta}</div>
           <span className="pointer-events-none absolute end-1 top-1">
             {badges}
           </span>

@@ -19,8 +19,10 @@ describe("ChildLegend", () => {
       "aria-hidden",
       "true",
     );
-    // Compact chip (40px sign, design spec); not a touch target, it is not interactive.
-    expect(items[0]?.querySelector(".size-10")).not.toBeNull();
+    // As high as the countdown pill (h-16, 48px sign); not a touch target, it is not
+    // interactive.
+    expect(items[0]).toHaveClass("h-16");
+    expect(items[0]?.querySelector(".size-12")).not.toBeNull();
     expect(items[0]?.querySelector("button")).toBeNull();
   });
 

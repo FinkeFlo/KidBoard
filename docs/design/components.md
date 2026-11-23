@@ -6,87 +6,150 @@ German UI strings; every one needs an EN counterpart in the locale files.
 
 ## EventTile
 
-An event as a large picture tile: emoji, title, time-of-day icon with time, and the child's
-sign in the corner.
+An event as a picture tile: emoji on a light disc, a title of up to two lines, the
+children's badges inside the tile, and the time-of-day icon with the time. Heights are
+fixed per size, so a column can compute how many tiles fit.
 
-| | Large (today) | Compact (other days) | Dense (today, 6+ events) |
-|---|---|---|---|
-| Height | `--spacing-tile` (80) | `--spacing-tile-compact` (76) | 60 |
-| Emoji | 50 | 40 | 40 |
-| Title | `--text-tile` (22, 800) | `--text-tile-compact` (19, 800) | `--text-tile-compact` |
-| Badge | `--spacing-badge` (40) | 36 | 32 |
+| Size | Where | Height | Emoji (disc) | Title |
+|---|---|---|---|---|
+| `large` | today | `--spacing-tile` (80) | 56 (68) | `--text-tile`, 2 lines |
+| `medium` | today, 1st step down | 72 | 48 (60) | `--text-tile-compact`, 2 lines |
+| `dense` | today, last step before "+N" | 56 | 44 (50) | `--text-tile-compact`, 1 line |
+| `compact` | other days | `--spacing-tile-compact` (76) | 40 (48) | `--text-tile-compact`, 2 lines |
+| `compact-dense` | other days, last step | 60 | 36 (44) | `--text-tile-compact`, 1 line |
+| `week` | week columns | 104 | 40 (no disc) | `--text-meta`, 1 line |
+| `week-dense` | week, 1st step down | 84 | 32 (no disc) | `--text-caption`, 1 line |
+| `week-mini` | week, last step before "+N" | 68 | 32 (no disc) | none (name only) |
 
-- **One child:** background `--color-child-N-tint`, inset 4px edge `--color-child-N`, one badge.
-- **Several children:** background split hard into the children's tints (child 1 left,
-  child 2 right), no edge, badges overlapping by 12px. 3+ children: `--color-surface-raised`,
-  up to three badges, then "+N".
-- **Badge:** circle `--color-child-N` with the child's emoji, 3px ring `--color-on-child`
-  (night: `--color-surface`), positioned `top: -8px; right: -6px`.
-- **Time row:** time-of-day icon (sunrise `--color-band-morning-accent`, sun outline
-  `--color-band-midday-accent` with `--color-sun` fill, moon `--color-band-evening-accent`)
-  plus time in `--text-meta`, `--color-text-muted`. All-day: "ganztags" with the sun.
-- **States:** upcoming (full), past (`--opacity-past`, night `--opacity-past-night`).
-- **Rules:** title one line, truncated; accessible name = title, time, children
-  ("Ballett, 15:30, Mia"); decorative emoji (`aria-hidden`). Tiles are not interactive.
+- **Prominent (now, else next) in today's column:** about 1.3× taller with a larger emoji
+  (large: 104 high, emoji 72) while space allows; it is the first thing given up.
+- **Disc:** the emoji sits on a `--color-surface-sunken` disc with a 1px `--color-border`
+  ring and `--shadow-card`, so pale glyphs (🦷, 🥛) stay visible, also at night.
+- **One child:** fill `--color-child-N-tint`, 4px inset edge `--color-child-N` (drawn above
+  the content), one badge.
+- **Two or more children:** neutral fill `--color-surface-raised`, one vertical 6px stripe
+  per child on the start edge (side by side, never a half-and-half fill that reads as
+  "half done"), up to three badges, then "+N". No child: neutral fill, 2px `--color-border`
+  edge.
+- **Badges:** circles `--color-child-N` with the child's emoji and a 2px ring
+  (`--color-on-child`, night `--color-surface`), side by side inside the tile, overlapping
+  by at most a quarter. Two-line titles float them at the end of the first line only.
+- **Time row:** time-of-day emoji 🌅 / 🌞 / 🌆 (at least 24px, also in the week; never 🌙)
+  plus the time in `--text-meta`, `--color-text-muted`. All-day: a span icon (a bar
+  between two end marks) and "Ganztägig".
+- **States:** upcoming; **current** ("jetzt"): 4px ring `--color-now` plus a clock cue on
+  the disc; **next**: 3px ring `--color-today-ring` with a 2px offset; **past**:
+  `--color-surface-sunken` fill, `--color-text-muted`, grey emoji, no edge (never opacity:
+  `--opacity-past*` fails AA on text). Now/next colours are person-neutral, never a child's.
+- **Week tiles:** stacked (emoji, one-line truncated title, time row), badges in the top
+  end corner. The title shows only where the column's list is at least 5.5rem wide (CSS
+  container query); `week-mini` drops it.
+- **Night:** avatar discs, child edges and stripes are dimmed a quarter towards the page
+  (`color-mix(in oklab, child 75%, surface)`); emoji are dimmed by the `Emoji` component.
+- **Rules:** accessible name = title, time, children, state ("Ballett, 15:30, Für Mia");
+  emoji, badges and stripes are decorative. Tiles are not interactive.
 
 ## DayColumn
 
 One column per day; events top to bottom in time order, meals at the bottom.
 
-- **Today:** grid share 1.4 (others 1), `--color-surface-raised`, `box-shadow: 0 0 0 5px
-  var(--color-today-ring), var(--shadow-raised)`, header "Heute" (`--text-heading`) with the
-  full date below (`--text-body`, muted).
+- **Today:** grid share 2fr (others 1fr), `--color-surface-raised`, 5px `--color-today-ring`
+  ring and `--shadow-raised`, header "Heute" (`--text-heading`; the full date is in the
+  board header, not repeated).
 - **Other days:** `--color-surface-sunken`, weekday (`--text-title`) and date (muted).
-- Padding 14, gap 10, radius `--radius-column`. Order: header, past events (or the
-  "vorbei" strip), NowLine (today only), upcoming events, MealPlates (`margin-top: auto`).
-- **Week variant (7 equal columns):** tiles show emoji (44) + time-of-day icon + time only,
-  height 92, at most 3, then a "+N" tile (outlined, `--color-border`). A special day
-  (countdown target) gets the child's tint as background and a 4px edge in the child colour.
-  Meals as a three-row list (icon + emoji 26).
-- **Dense rule:** from 6 events today, past ones become the "vorbei" strip (label + 30px
-  emoji, opacity 0.6) and upcoming tiles use the dense size. Never scroll.
+- Padding 14, gap 10, radius `--radius-column`. Order: header, all-day banner, past events
+  (or the "vorbei" strip), NowLine (today only), upcoming events, "+N", MealPlates
+  (`margin-top: auto`).
+- **Space rule (no fixed count):** the list's height is measured. In this order, the first
+  that fits wins: every event as a tile at the largest size (past ones receded); else
+  *all* past events fold into the "vorbei" strip and the rest shrinks step by step
+  (today `large` → `medium` → `dense`, other days `compact` → `compact-dense`), with the
+  prominent tile first; only then the latest upcoming events are summed up in "+N".
+  Never scroll, never hide silently.
+- **"vorbei" strip (36 high):** a check mark and "vorbei" (`--text-meta`), then up to 8 grey
+  30px emoji with a small check badge, then "+N"; its accessible name lists every title.
+- **"+N" row (36 high):** the hidden events' emoji (26px, up to 4) and "+N" in
+  `--text-meta`, muted, plain text: no border or fill, so it does not look like a button.
+  Its screen-reader text names the titles.
+- **Week variant (7 equal columns):** weekday (`--text-tile`) and date; a fixed slot right
+  of the date holds 🌙 (each day before the countdown day), the awaited event's emoji
+  (the countdown day) or nothing, so all dates align. Same space rule with the week sizes
+  (`week` → `week-dense` → `week-mini`); the "vorbei" strip shows only the check mark, up
+  to 2 icons (24px) and "+N"; the "+N" row up to 2 emoji (22px). Weekend columns
+  `--color-surface-weekend`, label `--color-band-morning-accent`.
+- **Countdown day (week):** a 4px ring in `--color-band-evening-accent` (the moons' colour,
+  person-neutral). Only if the awaited event belongs to exactly one child: that child's
+  tint as background and the child's badge next to the emoji in the header.
+- **Meals (week):** a three-row list (time-of-day icon + emoji 26), an empty row for a
+  missing meal, `unspecified` meals in an extra row.
+
+## AllDayBanner
+
+All-day events at the top of a column, not as timed tiles: a row per event with the emoji
+disc, a visible "Ganztägig" label with the span icon above the title, tint, stripes and
+badges as on the tiles; at most two rows, then a named "+N".
 
 ## NowLine
 
-Separates past from upcoming in today's column: 12px dot, 3px line, label "jetzt"
-(`--text-meta`, 900), all `--color-now`. Moves between tiles only, never per minute. Before
-the first event it sits on top, after the last one above the meals. `role="separator"`.
+Separates started from upcoming events in today's column, all in `--color-now` (person
+neutral): a 28px clock disc, a 6px bar and a "jetzt" pill (`--text-meta`, 900, text
+`--color-surface`). Moves between tiles only, never per minute. `role="separator"` named
+"jetzt, 15:18".
 
 ## MealPlates
 
-Three plates (breakfast, lunch, dinner): circles 60 (today) / 52 (other days) in
-`--color-surface-raised`, emoji at 60%, a 22px time-of-day badge bottom-right. The strip has
-radius `--radius-tile` and a translucent white (day) / 4% white (night) background. A missing
-meal leaves its slot empty. There is no separate meal-plan screen (T-18 decision stands).
+Breakfast, lunch, dinner in fixed places: circles up to 60 (today) / 52 (other days) with
+a 1px `--color-border` ring, emoji at 60 % of the circle and a small time-of-day badge
+bottom-right; today on `--color-surface-sunken`, other days on `--color-surface-raised`
+inside a `--color-surface` strip. Captions (`--text-caption`, muted) wrap to two lines. A
+missing meal leaves its place empty. There is no separate meal-plan screen.
 
 ## SleepCountdown
 
-"How many sleeps?" pill in the header: 50px circle with the event emoji in the child's tint
-and edge, then one moon (30px, `--color-band-evening-accent`) per night; more than 7 nights:
-7 moons + "+N". Accessible name "Noch 4 Mal schlafen bis Mias Geburtstag". In the week view
-each column before the target day shows a 22px moon in its header.
+"How many sleeps?" pill in the header (`--color-surface-raised`, `--shadow-card`, 64 high,
+the same height as the name chips), read from start to goal: the number ("6 ×",
+`--text-title`, 900), the moons (up to 7 at 32px in one row; 8 to 14 at 26px in two rows of
+a week; beyond 14 a single moon after the number), an arrow (`--color-text-muted`), the
+event emoji on a disc in the child's tint and edge (neutral with `--color-border` without
+a child; up to 3 for events on the same day), then the first title, truncated. Today: 🎉
+and "Heute!", then the emoji and title, with a 4px `--color-today-ring` ring. Accessible
+name "Wie oft noch schlafen?" and a label "Noch 6 Mal schlafen bis Mias Geburtstag"
+(visuals `aria-hidden`). `full` in the week view, `compact` (smaller emoji and title) in
+the overview. Static.
 
 ## ChildLegend
 
-Header chips: `--color-surface-raised`, 40px circle `--color-child-N` with the child's emoji,
-name in `--text-body` 800. Emoji and colour come from `config.children[]`; children pick their
-own sign.
+Header chips, 64 high like the countdown: `--color-surface-raised`, `--shadow-card`, 48px
+circle `--color-child-N` with the child's emoji (dimmed at night), name in `--text-body`.
+Not interactive.
 
 ## ViewToggle
 
 Navigation rail on the right (`--spacing-nav` wide): buttons 104×120, radius `--radius-nav`,
-label `--text-body` 900. "Heute": sun icon (night: moon in `--color-sun`). "Woche": seven
-bars, the first `--color-sun`, the rest `--color-border`. Active: `--color-nav-active` /
-`--color-on-nav-active`, `aria-current="page"`; inactive: `--color-surface-raised` with a 3px
-inset `--color-border`. Press feedback scale 0.97 over `--duration-fast`. At the bottom of the
-rail: "Stand 15:18" (`--text-caption`, muted) and the lock button for the parent area (64px,
-`--color-control-quiet`). Auto-return to "Heute" after `autoReturnSeconds`.
+label `--text-body` 900. "Heute": ☀️ (also at night; it never becomes a moon). "Woche":
+seven bars, the first `--color-sun`, the rest `--color-border`. Active:
+`--color-nav-active` / `--color-on-nav-active` (night a little dimmer), `aria-pressed`;
+inactive: `--color-surface-raised` with a 3px inset `--color-border`. At the bottom of the
+rail: "Stand 15:18" (`--text-caption`, muted): the time of the last *successful* fetch.
+Below it, in the reserved bottom strip, the long-press fullscreen control (64px target,
+`--color-control-quiet` glyph): while held a ring fills (track `--color-border`, arc
+`--color-text`, 700 ms; under reduced motion only the static track), and a short tap shows
+a small "Gedrückt halten" hint for 2.5 s (no dialog). Auto-return to "Heute" after
+`autoReturnSeconds`.
 
 ## StatusBanner
 
-Offline / stale notice for parents: pill `--color-notice` / `--color-on-notice`, crossed-out
-cloud icon, "Offline · Stand von 14:02", `role="status"`, no blinking, disappears after a
-successful refetch. The board stays fully visible underneath.
+Notice pill for parents in the bottom strip: `--color-notice` / `--color-on-notice`, cloud
+icon (crossed out when offline), no blinking; the board stays fully visible underneath.
+
+- "Offline · Stand von 14:02": the device is offline.
+- "Aktualisieren klappt nicht · Stand von 14:02": the last refresh failed (API
+  unreachable, 5xx); also right after a reload, which always asks the API once.
+- "Vielleicht nicht aktuell · Stand von 14:02": the server sent its last good copy.
+- "Dieses Tablet braucht einen neuen Zugangslink.": access link no longer valid (alert).
+
+The time is always the last successful fetch. Stale states appear only after 5 s (a
+midnight seed must not flash); offline and errors at once. Polite `status`, errors `alert`.
 
 **Loading:** no spinner. First load shows a calm skeleton of the columns in
 `--color-surface-sunken` / `--color-surface-raised` and "Der Tag wird geholt …" with a sun.
@@ -97,9 +160,14 @@ successful refetch. The board stays fully visible underneath.
   `--color-sun` disc at 55%, 🧸 and 🪁; "Heute ist nichts geplant" (`--text-title`), "Zeit zum
   Spielen" (`--text-body`, muted). Meals stay visible below.
 - **Error:** card `--color-soft-error`, 🧸, "Gleich geht's weiter" (`--text-title`), one line
-  for parents ("Der Kalender ist gerade nicht erreichbar. Neuer Versuch in 60 Sekunden."), a
-  64px button "Jetzt neu laden" (`--color-nav-active`), and a small error code below. No red
-  surfaces, no warning icons.
+  for parents ("Der Kalender ist gerade nicht erreichbar. KidBoard versucht es von selbst
+  wieder."; no fixed retry seconds), a 64px button "Jetzt neu laden" (`--color-nav-active`),
+  and a small error code below (`KB-*`). No red surfaces, no warning icons.
+- **Access link no longer valid (401):** the same card on `--color-surface-raised` with a
+  `--color-border` edge, "Ein Erwachsener hilft kurz" and "Eltern: Dieses Tablet braucht
+  einen neuen Zugangslink, der alte gilt nicht mehr. Bitte die Person fragen, die KidBoard
+  eingerichtet hat." No URL syntax or technical words, no retry button; the code `KB-401`
+  below is for parents (the docs explain the `?key=` link).
 
 ## Outlook (M7/M8, sketch only)
 

@@ -11,8 +11,9 @@ export interface StatusBannerProps {
   status: ConnectionStatus;
   errorKind?: ApiErrorKind | undefined;
   /**
-   * When the shown data was fetched, already formatted ("14:02"), for "Offline · Stand
-   * von 14:02"; `undefined` when unknown (e.g. a midnight seed): the pill says less.
+   * When the shown data was last fetched successfully, already formatted ("14:02"), for
+   * "Offline · Stand von 14:02"; `undefined` when unknown (e.g. a midnight seed): the pill
+   * says less.
    */
   time?: string | undefined;
 }
@@ -39,8 +40,10 @@ function CloudIcon({ crossed }: { crossed: boolean }): React.JSX.Element {
 
 /**
  * Notice pill in the board's bottom strip for offline, stale and error states; nothing
- * while loading or ready. "Offline · Stand von 14:02" / "Vielleicht nicht aktuell · Stand
- * von 14:02": the board stays fully visible, the pill only says how old it is. Always the
+ * while loading or ready. "Offline · Stand von 14:02", "Aktualisieren klappt nicht · Stand
+ * von 14:02" (the last refresh failed, `errorKind` set) or "Vielleicht nicht aktuell · Stand
+ * von 14:02" (the worker served last-good data): the board stays fully visible, the pill
+ * only says how old the shown data is (`time`: the last successful fetch). Always the
  * calm notice colours (no red): offline and stale are polite (`status`), an error and an
  * expired link (`unauthorized`, which wins in every state: a parent has to open the link
  * again) are `alert`s. No blinking.
@@ -64,6 +67,12 @@ export function StatusBanner({
       time === undefined
         ? t("status.offlineNoTime")
         : t("status.offline", { time });
+  } else if (status === "stale" && errorKind !== undefined) {
+    // The last refresh itself failed (no network to the API, 5xx, …): say so plainly.
+    message =
+      time === undefined
+        ? t("status.cantUpdateNoTime")
+        : t("status.cantUpdate", { time });
   } else if (status === "stale") {
     message =
       time === undefined

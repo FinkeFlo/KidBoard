@@ -186,6 +186,45 @@ test("API 502 with persisted data: the data stays, with the stale hint", async (
   expect(await persistedTitles(page)).toContain("Swimming");
 });
 
+test("reload while the API is unreachable, soon after a load: last good time and the can't-update pill", async ({
+  page,
+}) => {
+  test.setTimeout(45_000);
+  const api = await mockBoard(page, { agenda: AGENDA });
+  await page.goto("/");
+  await expect(event(page, "Swimming")).toBeVisible();
+  await expectPersisted(page, "Swimming");
+  const updated = page.getByTestId("updated-at");
+  await expect(updated).toHaveText(/^Updated 12:00\sPM$/u);
+
+  // Five minutes later (younger than staleTime) the API can no longer be reached; the
+  // browser itself stays online, so only the failed fetch can tell.
+  await page.unroute("**/api/**");
+  const aborted: string[] = [];
+  await page.route("**/api/**", (route) => {
+    aborted.push(new URL(route.request().url()).pathname);
+    return route.abort("internetdisconnected");
+  });
+  await setNow(page, at("12:05"), { wake: false });
+  const before = api.requests.length;
+  await page.reload();
+
+  // The page load asks the API anyway (restored data is refetched once).
+  await expect.poll(() => aborted.length).toBeGreaterThan(0);
+  await expect(event(page, "Swimming")).toBeVisible();
+  // After the retries and the 5 s stale delay: the plain "can't update" pill with the time
+  // of the last successful fetch, not of the reload.
+  await expect(banner(page)).toHaveAttribute("data-status", "stale", {
+    timeout: 20_000,
+  });
+  await expect(banner(page)).toHaveText(/^Can't update · as of 12:00\sPM$/u);
+  await expect(updated).toHaveText(/^Updated 12:00\sPM$/u);
+  await expect(page.locator("[data-error]")).toHaveCount(0);
+  expect(api.requests.length).toBe(before);
+  // The failure never replaces the persisted last-good agenda.
+  expect(await persistedTitles(page)).toContain("Swimming");
+});
+
 test("API 502 without any data: the calm error state", async ({ page }) => {
   await mockBoard(page, {
     agendaStatus: 502,
@@ -261,7 +300,7 @@ test("401 with persisted data wipes the data, the storage and the token", async 
 
   const alert = page.getByRole("alert");
   await expect(alert).toHaveAttribute("data-error", "unauthorized");
-  await expect(alert).toContainText("?key=");
+  await expect(alert).toContainText("needs a new access link");
   await expect(page.getByTestId("event-tile")).toHaveCount(0);
   await expect.poll(() => persistedTitles(page)).toEqual([]);
   expect(await storedToken()).toBeNull();

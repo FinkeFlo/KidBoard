@@ -1,9 +1,9 @@
 import type { Child } from "@kidboard/shared";
 
-import { childColorStyle } from "./childColor";
+import { CHILD_FILL, childColorStyle } from "./childColor";
 import { Emoji } from "./Emoji";
 
-/** Round avatar in the child's colour. The emoji carries the name, not only colour. */
+/** Round avatar in the child's colour (dimmed at night). The emoji carries the name, not only colour. */
 export function ChildAvatar({
   child,
   className = "size-8 text-body",
@@ -17,7 +17,7 @@ export function ChildAvatar({
   return (
     <span
       style={childColorStyle(child.color)}
-      className={`rounded-pill inline-flex shrink-0 items-center justify-center bg-(--child-color) ${className}`}
+      className={`${CHILD_FILL} rounded-pill inline-flex shrink-0 items-center justify-center ${className}`}
     >
       <Emoji emoji={child.avatar} label={decorative ? undefined : child.name} />
     </span>

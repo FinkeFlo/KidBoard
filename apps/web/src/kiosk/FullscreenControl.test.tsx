@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyLocale } from "../i18n";
 import de from "../i18n/locales/de.json";
 import en from "../i18n/locales/en.json";
-import { FULLSCREEN_HOLD_MS, FullscreenControl } from "./FullscreenControl";
+import {
+  FULLSCREEN_HINT_MS,
+  FULLSCREEN_HOLD_MS,
+  FullscreenControl,
+} from "./FullscreenControl";
 
 const toggle = vi.fn(() => Promise.resolve());
 let state: { available: boolean; active: boolean };
@@ -106,5 +110,77 @@ describe("FullscreenControl", () => {
     fireEvent.pointerDown(screen.getByTestId("fullscreen-control"));
     unmount();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("shows a filling ring while held, gone when released or cancelled", () => {
+    render(<FullscreenControl />);
+    const button = screen.getByTestId("fullscreen-control");
+    expect(screen.queryByTestId("fullscreen-hold-ring")).toBeNull();
+    fireEvent.pointerDown(button);
+    const ring = screen.getByTestId("fullscreen-hold-ring");
+    expect(ring).toHaveAttribute("aria-hidden", "true");
+    expect(button).toHaveAttribute("data-holding", "true");
+    const progress = screen.getByTestId("fullscreen-hold-progress");
+    // The arc fills over exactly the hold time; reduced motion hides the sweep.
+    expect(progress.style.animation).toContain(
+      `${String(FULLSCREEN_HOLD_MS)}ms`,
+    );
+    expect(progress.style.animation).toContain("kb-hold-ring");
+    expect(progress).toHaveClass("motion-reduce:hidden");
+    fireEvent.pointerLeave(button);
+    expect(screen.queryByTestId("fullscreen-hold-ring")).toBeNull();
+    fireEvent.pointerDown(button);
+    fireEvent.pointerCancel(button);
+    expect(screen.queryByTestId("fullscreen-hold-ring")).toBeNull();
+    expect(button).toHaveAttribute("data-holding", "false");
+  });
+
+  it("shows a short 'press and hold' hint after a tap, then hides it", () => {
+    render(<FullscreenControl />);
+    const button = screen.getByTestId("fullscreen-control");
+    fireEvent.pointerDown(button);
+    vi.advanceTimersByTime(150);
+    act(() => {
+      fireEvent.pointerUp(button);
+    });
+    const hint = screen.getByTestId("fullscreen-hint");
+    expect(hint).toHaveTextContent(en.fullscreen.hint);
+    // Not a dialog and not a second name: the button's label already says it.
+    expect(hint).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(toggle).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(FULLSCREEN_HINT_MS);
+    });
+    expect(screen.queryByTestId("fullscreen-hint")).toBeNull();
+  });
+
+  it("shows no hint after a successful hold, and a new press hides an old hint", () => {
+    render(<FullscreenControl />);
+    const button = screen.getByTestId("fullscreen-control");
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
+    expect(screen.getByTestId("fullscreen-hint")).toBeInTheDocument();
+    fireEvent.pointerDown(button);
+    expect(screen.queryByTestId("fullscreen-hint")).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(FULLSCREEN_HOLD_MS);
+    });
+    fireEvent.pointerUp(button);
+    expect(toggle).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("fullscreen-hint")).toBeNull();
+  });
+
+  it("clears the hint timer on unmount", () => {
+    const { unmount } = render(<FullscreenControl />);
+    const button = screen.getByTestId("fullscreen-control");
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("has the hint in German too", () => {
+    expect(de.fullscreen.hint).toBe("Gedrückt halten");
   });
 });

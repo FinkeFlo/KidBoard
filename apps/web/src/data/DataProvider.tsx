@@ -7,6 +7,7 @@ import type { ApiClient } from "./apiClient";
 import { ApiClientContext } from "./apiContext";
 import { createPersistOptions } from "./persister";
 import { useConfig } from "./queries";
+import { invalidateRestoredQueries } from "./queryClient";
 import type { KeyValueStorage } from "./storage";
 
 export interface DataProviderProps {
@@ -30,7 +31,8 @@ function ConfigLocaleSync(): null {
 
 /**
  * Data layer root (ADR-0006): TanStack Query with the localStorage persister, the API
- * client in context, and the config locale applied to i18n. The config query is
+ * client in context, and the config locale applied to i18n. After restoring, every
+ * KidBoard query is refetched once ({@link invalidateRestoredQueries}). The config query is
  * always mounted here, so it is part of the connection status from the start.
  */
 export function DataProvider({
@@ -47,6 +49,8 @@ export function DataProvider({
     <PersistQueryClientProvider
       client={queryClient}
       persistOptions={persistOptions}
+      // A page load always asks the API once, whatever the age of the restored data.
+      onSuccess={() => invalidateRestoredQueries(queryClient)}
     >
       <ApiClientContext value={apiClient}>
         <ConfigLocaleSync />

@@ -94,11 +94,19 @@ test.describe("week view", () => {
     expect(
       account.shown.some((name) => name.startsWith("Birthday party")),
     ).toBe(true);
-    // The countdown day is shown in the child's tint and edge (Mia is child-1, #c2410c).
+    // The countdown day: a person-neutral ring in the countdown colour (the moons',
+    // #5a3c99), Mia's tint (the party is hers) and her badge next to the goal's icon.
     await expect(wednesday).toHaveAttribute("data-countdown-day", "true");
-    expect(
-      await wednesday.evaluate((el) => getComputedStyle(el).boxShadow),
-    ).toContain("rgb(194, 65, 12)");
+    const ring = await wednesday.evaluate(
+      (el) => getComputedStyle(el).boxShadow,
+    );
+    expect(ring).toContain("rgb(90, 60, 153)");
+    expect(ring).not.toContain("rgb(194, 65, 12)");
+    const goal = wednesday.getByTestId("column-target");
+    await expect(goal).toContainText("🎂");
+    await expect(goal).toContainText("🦊");
+    // A busy day shrinks to the last step (emoji and time) before it sums up.
+    await expect(wednesday).toHaveAttribute("data-size", "week-mini");
     // One moon per night still to sleep: in each header before the target day.
     await expect(
       columns.evaluateAll((all) =>
@@ -211,18 +219,28 @@ test.describe("week view", () => {
     const columns = page.getByTestId("day-column");
     const today = columns.first();
     const account = await columnAccount(today);
-    // 8 events in a column that cannot show them all: shown + summed up === 8.
-    expect(account.hidden).toBeGreaterThan(0);
-    expect(account.shown.length + account.hidden).toBe(8);
-    // The finished events are summed up before any upcoming one.
+    // 8 events in a column that cannot show them all as tiles: the two finished ones fold
+    // into the "done" strip first; nothing is lost (shown + folded + summed up === 8).
+    expect(account.folded).toBe(2);
+    expect(account.stripName).toContain("Swimming");
+    expect(account.stripName).toContain("Dentist");
+    expect(account.shown.length + account.folded + account.hidden).toBe(8);
     const statuses = await today
       .getByTestId("event-tile")
       .evaluateAll((all) =>
         all.map((tile) => tile.getAttribute("data-status")),
       );
     expect(statuses).not.toContain("past");
-    expect(account.hiddenText).toContain("Swimming");
-    expect(account.hiddenText).toContain("Dentist");
+    // A "+N", if any, holds only upcoming events and looks like no button.
+    expect(account.hiddenText).not.toContain("Swimming");
+    if (account.hidden > 0) {
+      const more = today.getByTestId("column-more");
+      const look = await more.evaluate((el) => {
+        const css = getComputedStyle(el);
+        return { bg: css.backgroundColor, shadow: css.boxShadow };
+      });
+      expect(look).toEqual({ bg: "rgba(0, 0, 0, 0)", shadow: "none" });
+    }
 
     // Child cue: tint kind, badges (avatar emoji) and the name for assistive tech.
     const tiles = today.getByTestId("event-tile");
@@ -248,9 +266,23 @@ test.describe("week view", () => {
     expect(await today.getByText("🌙").count()).toBe(0);
 
     // Tomorrow nothing is over: the early event keeps its place.
-    await expect(
-      columns.nth(1).getByRole("article", { name: /^Swimming, 7:30 AM/ }),
-    ).toBeVisible();
+    const tomorrow = columns.nth(1).getByRole("article", {
+      name: /^Swimming, 7:30 AM/,
+    });
+    await expect(tomorrow).toBeVisible();
+    // With room, a week tile carries a one-line title (at both tablet sizes).
+    const title = tomorrow.getByTestId("tile-title");
+    await expect(title).toBeVisible();
+    await expect(title).toHaveText("Swimming");
+    const fits = await title.evaluate((el) => {
+      const line = el.parentElement as HTMLElement;
+      return (
+        line.scrollWidth <= line.clientWidth + 1 &&
+        line.getBoundingClientRect().right <=
+          (line.closest("article") as HTMLElement).getBoundingClientRect().right
+      );
+    });
+    expect(fits).toBe(true);
     await expectNoOverflow(page);
   });
 });

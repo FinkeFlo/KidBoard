@@ -1,5 +1,5 @@
 import type { CalendarEvent } from "@kidboard/shared";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { BEN, eventFixture, MIA } from "../components/fixtures.test-utils";
@@ -75,14 +75,68 @@ describe("CountdownBadge", () => {
     expect(max.querySelector('[data-testid="countdown-grouped"]')).toBeNull();
   });
 
-  it("groups beyond 14 nights: one moon and the number", () => {
+  it("groups beyond 14 nights: the number and one moon", () => {
     const badge = renderBadge(15);
     expect(moonCount(badge)).toBe(1);
-    expect(screen.getByTestId("countdown-grouped")).toHaveTextContent("×15");
+    expect(screen.getByTestId("countdown-grouped")).toBeInTheDocument();
+    expect(screen.getByTestId("countdown-count")).toHaveTextContent("15 ×");
     expect(badge).toHaveTextContent("15 more sleeps until Birthday party");
     cleanup();
     renderBadge(30, [party()], "compact");
-    expect(screen.getByTestId("countdown-grouped")).toHaveTextContent("×30");
+    expect(screen.getByTestId("countdown-count")).toHaveTextContent("30 ×");
+  });
+
+  it("reads from start to goal: number, moons, arrow, the goal's icon and short name", () => {
+    const badge = renderBadge(6);
+    const order = [
+      "countdown-count",
+      "countdown-arrow",
+      "countdown-target",
+      "countdown-name",
+    ].map((id) => within(badge).getByTestId(id));
+    const firstMoon = [...badge.querySelectorAll(".font-emoji")].find(
+      (el) => el.textContent === MOON,
+    );
+    const sequence = [order[0], firstMoon, ...order.slice(1)];
+    for (let i = 1; i < sequence.length; i += 1) {
+      const before = sequence[i - 1] as Element;
+      const after = sequence[i] as Element;
+      expect(
+        before.compareDocumentPosition(after) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    expect(within(badge).getByTestId("countdown-count")).toHaveTextContent(
+      /^6 ×$/u,
+    );
+    const name = within(badge).getByTestId("countdown-name");
+    expect(name).toHaveTextContent("Birthday party");
+    // One line, cut short when long; decorative (the label reads the full titles).
+    expect(name).toHaveClass("truncate");
+    expect(name).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("is as high as the name chips in both variants (h-16)", () => {
+    for (const variant of ["full", "compact"] as const) {
+      expect(renderBadge(14, [party()], variant)).toHaveClass("h-16");
+      cleanup();
+    }
+  });
+
+  it("draws 8 to 14 moons in two smaller rows so they fit the pill", () => {
+    const badge = renderBadge(14);
+    const moons = [...badge.querySelectorAll(".font-emoji")].filter(
+      (el) => el.textContent === MOON,
+    );
+    expect(moons).toHaveLength(14);
+    for (const moon of moons) expect(moon).toHaveClass("text-title");
+    cleanup();
+    const week = renderBadge(7);
+    for (const moon of [...week.querySelectorAll(".font-emoji")].filter(
+      (el) => el.textContent === MOON,
+    )) {
+      expect(moon).toHaveClass("text-heading");
+    }
   });
 
   it("shows the today state without moons but with a pictorial 🎉 cue, in both variants", () => {
@@ -116,8 +170,15 @@ describe("CountdownBadge", () => {
     expect(badge).toHaveTextContent(
       "2 more sleeps until Advent, Birthday, Cinema, and Doughnuts",
     );
-    const icons = badge.querySelector('[aria-hidden="true"]');
-    expect(icons?.textContent).toBe("🎄🎂🎉");
+    expect(
+      within(badge)
+        .getAllByTestId("countdown-target")
+        .map((icon) => icon.textContent),
+    ).toEqual(["🎄", "🎂", "🎉"]);
+    // The short name is the first event's title.
+    expect(within(badge).getByTestId("countdown-name")).toHaveTextContent(
+      /^Advent$/u,
+    );
   });
 
   it("hides the visuals from assistive tech; only the label is read", () => {
@@ -148,7 +209,7 @@ describe("CountdownBadge", () => {
       party({ id: "a", title: "Nikolaus" }),
       party({ id: "b", title: "Kino" }),
     ]);
-    expect(many).toHaveTextContent("Noch 4-mal schlafen bis Nikolaus und Kino");
+    expect(many).toHaveTextContent("Noch 4 Mal schlafen bis Nikolaus und Kino");
     cleanup();
     expect(renderBadge(0)).toHaveTextContent(
       "Heute ist es so weit: Birthday party!",

@@ -19,12 +19,13 @@ export function ChildLegend({
       {childList.map((child) => (
         <li
           key={child.id}
-          className="bg-surface-raised text-text rounded-pill shadow-card flex items-center gap-2 py-1 ps-1 pe-4"
+          // As high as the countdown pill beside it (`h-16`).
+          className="bg-surface-raised text-text rounded-pill shadow-card flex h-16 items-center gap-2 ps-2 pe-4"
         >
           <ChildAvatar
             decorative
             child={child}
-            className="text-title size-10"
+            className="text-heading size-12"
           />
           <span className="text-body font-bold">{child.name}</span>
         </li>

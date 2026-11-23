@@ -33,8 +33,9 @@ function parseBlock(css: string, selector: string): TokenMap {
   return tokens;
 }
 
-const light = parseBlock(tokensCss, "@theme static");
-const nightOverrides = parseBlock(tokensCss, '[data-theme="night"]');
+const light = parseBlock(tokensCss, "@theme static {");
+// The selector with its brace: the header comment mentions the selector too.
+const nightOverrides = parseBlock(tokensCss, '[data-theme="night"] {');
 const night: TokenMap = new Map([...light, ...nightOverrides]);
 
 function channel(hex: string, offset: number): number {
@@ -165,6 +166,101 @@ describe.each([
     expect(contrast(color(theme, fg), color(theme, bg))).toBeGreaterThanOrEqual(
       min,
     );
+  });
+});
+
+/** sRGB hex → OKLab (Björn Ottosson's reference matrices). */
+function toOklab(hex: string): [number, number, number] {
+  const [r, g, b] = [1, 3, 5].map((o) => channel(hex, o)) as [
+    number,
+    number,
+    number,
+  ];
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
+/** OKLab → sRGB hex (clamped). */
+function fromOklab([L, A, B]: [number, number, number]): string {
+  const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3;
+  const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3;
+  const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3;
+  const linear = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+  return `#${linear
+    .map((v) => {
+      const c = Math.min(1, Math.max(0, v));
+      const srgb = c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+      return Math.round(srgb * 255)
+        .toString(16)
+        .padStart(2, "0");
+    })
+    .join("")}`;
+}
+
+/** `color-mix(in oklab, a <weight>, b)`. */
+function mixOklab(a: string, b: string, weight: number): string {
+  const [x, y] = [toOklab(a), toOklab(b)];
+  return fromOklab([
+    x[0] * weight + y[0] * (1 - weight),
+    x[1] * weight + y[1] * (1 - weight),
+    x[2] * weight + y[2] * (1 - weight),
+  ]);
+}
+
+describe("night dimming of child colours (avatars, tile edges)", () => {
+  it("round-trips OKLab (the mix helper itself is exact)", () => {
+    for (const hex of ["#000000", "#ffffff", "#56b4e9", "#c2410c"]) {
+      expect(mixOklab(hex, hex, 0.75)).toBe(hex);
+    }
+  });
+
+  it("uses the 75 % strength in every night class", async () => {
+    const { CHILD_EDGE, CHILD_EDGE_AFTER, CHILD_FILL, CHILD_NIGHT_STRENGTH } =
+      await import("../components/childColor");
+    const percent = `_${String(CHILD_NIGHT_STRENGTH * 100)}%,var(--color-surface)`;
+    for (const cls of [CHILD_EDGE, CHILD_EDGE_AFTER, CHILD_FILL]) {
+      expect(cls).toContain(`color-mix(in_oklab,var(--child-color)${percent})`);
+    }
+  });
+
+  it.each(CHILD_TOKENS)(
+    "%s, dimmed a quarter at night, keeps >= 3:1 on the page, raised surface and its tint",
+    (child) => {
+      const surface = color(night, "--color-surface");
+      const dimmed = mixOklab(color(night, child), surface, 0.75);
+      // Visibly dimmer than the full colour.
+      expect(luminance(dimmed)).toBeLessThan(luminance(color(night, child)));
+      for (const bg of [
+        "--color-surface",
+        "--color-surface-raised",
+        "--color-surface-sunken",
+        `${child}-tint`,
+      ]) {
+        expect(contrast(dimmed, color(night, bg)), bg).toBeGreaterThanOrEqual(
+          UI_AA,
+        );
+      }
+    },
+  );
+});
+
+describe("token blocks", () => {
+  it("reads the real night block, not the light one", () => {
+    expect(nightOverrides.size).toBeGreaterThan(10);
+    expect(color(night, "--color-surface")).not.toBe(
+      color(light, "--color-surface"),
+    );
+    expect(nightOverrides.has("--font-sans")).toBe(false);
   });
 });
 

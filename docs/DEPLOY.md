@@ -117,8 +117,8 @@ Then open **`https://<url>/?key=<token>` once on the tablet**. The board stores 
 removes it from the address bar and from then on sends it as a header. Install it as an app
 (browser menu > "Add to home screen") or point your kiosk browser at `https://<url>/`.
 
-Changing the token: set a new `KIDBOARD_ACCESS_TOKEN`; the tablet then says "The access
-link has expired", wipes its stored calendar data and forgets the old token until you open
+Changing the token: set a new `KIDBOARD_ACCESS_TOKEN`; the tablet then says "This tablet
+needs a new access link", wipes its stored calendar data and forgets the old token until you open
 a new `?key=` link.
 
 ## 6. Optional: custom domain
@@ -176,7 +176,7 @@ which Workers Static Assets applies to all static responses:
 
 | Symptom | Cause and fix |
 | --- | --- |
-| Board says "The access link has expired" | Wrong or changed token: open `https://<url>/?key=<token>` again. |
+| Board says "This tablet needs a new access link" | Wrong or changed token: open `https://<url>/?key=<token>` again. |
 | `/api/config` answers `500 server_misconfigured` | `KIDBOARD_CONFIG` missing or invalid (Workers Logs list the validation errors), or `KIDBOARD_ACCESS_TOKEN` still contains `REPLACE_ME`. |
 | A calendar is missing, `sources[].status` is `error` | Secret name does not match the calendar id (`CAL_<ID>_URL`, upper case) or the iCal address is wrong. |
 | Build fails with a pnpm error | Add the build variable `PNPM_VERSION=10.28.0` (Worker > Settings > Build). |

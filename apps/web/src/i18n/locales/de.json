@@ -34,8 +34,10 @@
     "offlineNoTime": "Offline",
     "stale": "Vielleicht nicht aktuell · Stand von {{time}}",
     "staleNoTime": "Vielleicht nicht aktuell",
+    "cantUpdate": "Aktualisieren klappt nicht · Stand von {{time}}",
+    "cantUpdateNoTime": "Aktualisieren klappt nicht",
     "error": "Der Plan konnte nicht geladen werden.",
-    "unauthorized": "Link neu öffnen: Bitte den Tablet-Link mit ?key=… auf diesem Tablet noch einmal öffnen."
+    "unauthorized": "Dieses Tablet braucht einen neuen Zugangslink."
   },
   "day": {
     "meals": "Essen",
@@ -49,7 +51,7 @@
       "offline": "Eltern: Kein Internet und noch kein gespeicherter Plan. KidBoard lädt, sobald das Netz zurück ist.",
       "unauthorized": {
         "title": "Ein Erwachsener hilft kurz",
-        "hint": "Eltern: Link neu öffnen. Der Zugangslink ist abgelaufen; bitte den neuen Link mit ?key=… auf diesem Tablet öffnen."
+        "hint": "Eltern: Dieses Tablet braucht einen neuen Zugangslink, der alte gilt nicht mehr. Bitte die Person fragen, die KidBoard eingerichtet hat."
       }
     },
     "hidden": {
@@ -68,7 +70,8 @@
   },
   "fullscreen": {
     "enter": "Vollbild an (gedrückt halten)",
-    "exit": "Vollbild aus (gedrückt halten)"
+    "exit": "Vollbild aus (gedrückt halten)",
+    "hint": "Gedrückt halten"
   },
   "board": {
     "viewGroup": "Ansicht",
@@ -80,15 +83,14 @@
   "week": {
     "label": "Die nächsten sieben Tage",
     "more": "{{count}} weitere: {{titles, list}}",
-    "meals": "Essen",
-    "moreBadge": "+{{count}}"
+    "meals": "Essen"
   },
   "countdown": {
     "label": "Wie oft noch schlafen?",
     "nights_one": "Noch einmal schlafen bis {{titles, list}}",
-    "nights_other": "Noch {{count}}-mal schlafen bis {{titles, list}}",
+    "nights_other": "Noch {{count}} Mal schlafen bis {{titles, list}}",
     "todayLabel": "Heute ist es so weit: {{titles, list}}!",
     "today": "Heute!",
-    "grouped": "×{{count}}"
+    "count": "{{count}} ×"
   }
 }

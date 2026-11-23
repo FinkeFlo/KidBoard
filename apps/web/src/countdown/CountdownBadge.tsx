@@ -1,6 +1,7 @@
 import type { Child } from "@kidboard/shared";
 import { useTranslation } from "react-i18next";
 
+import { CHILD_EDGE } from "../components/childColor";
 import { resolveTileTint, tileTintStyle } from "../components/childTint";
 import { Emoji } from "../components/Emoji";
 import { childrenOf } from "../components/EventTile";
@@ -20,25 +21,38 @@ export const TODAY_CUE = "🎉";
 
 export type CountdownVariant = "full" | "compact";
 
-// Full class names so Tailwind can see them.
+// Full class names so Tailwind can see them. Both variants are as high as the name chips
+// next to them (`h-16`, see `ChildLegend`); 8 to 14 moons take two smaller rows.
 const SIZES: Record<
   CountdownVariant,
-  { icon: string; disc: string; moon: string; text: string; box: string }
+  {
+    icon: string;
+    disc: string;
+    moon: string;
+    moonTwoRows: string;
+    count: string;
+    name: string;
+    box: string;
+  }
 > = {
   full: {
     icon: "text-heading",
-    disc: "size-14",
+    disc: "size-12",
     moon: "text-heading",
-    text: "text-title",
-    box: "gap-3 py-2 ps-2 pe-5",
+    moonTwoRows: "text-title",
+    count: "text-title",
+    name: "text-title max-w-[10rem]",
+    box: "gap-3 ps-5 pe-5",
   },
   // Moons are the part a child counts at a glance, so they stay big (heading, not body).
   compact: {
     icon: "text-title",
-    disc: "size-12",
+    disc: "size-11",
     moon: "text-heading",
-    text: "text-body",
-    box: "gap-2 py-1.5 ps-1.5 pe-4",
+    moonTwoRows: "text-title",
+    count: "text-title",
+    name: "text-body max-w-[8rem]",
+    box: "gap-2 ps-4 pe-4",
   },
 };
 
@@ -51,6 +65,7 @@ export function moonRows(nights: number): number[] {
   return rows;
 }
 
+/** One 🌙 per night (rows of a week), or a single 🌙 beyond {@link MAX_INDIVIDUAL_MOONS}. */
 function Moons({
   nights,
   variant,
@@ -58,29 +73,45 @@ function Moons({
   nights: number;
   variant: CountdownVariant;
 }): React.JSX.Element {
-  const { t } = useTranslation();
   const size = SIZES[variant];
   if (nights > MAX_INDIVIDUAL_MOONS) {
     return (
-      <span
-        data-testid="countdown-grouped"
-        className={`${size.text} flex items-center gap-1 font-extrabold`}
-      >
+      <span data-testid="countdown-grouped" className="flex items-center">
         <Emoji emoji={MOON} className={size.moon} />
-        {t("countdown.grouped", { count: nights })}
       </span>
     );
   }
+  const rows = moonRows(nights);
+  const moon = rows.length > 1 ? size.moonTwoRows : size.moon;
   return (
     <span className="flex flex-col gap-0.5">
-      {moonRows(nights).map((count, row) => (
+      {rows.map((count, row) => (
         <span key={row} className="flex gap-0.5">
           {Array.from({ length: count }, (_, index) => (
-            <Emoji key={index} emoji={MOON} className={size.moon} />
+            <Emoji key={index} emoji={MOON} className={moon} />
           ))}
         </span>
       ))}
     </span>
+  );
+}
+
+/** "→" between the moons and the goal: count towards it. Decorative, `currentColor`. */
+function TowardsArrow(): React.JSX.Element {
+  return (
+    <svg
+      aria-hidden="true"
+      data-testid="countdown-arrow"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="text-text-muted size-6 shrink-0 rtl:-scale-x-100"
+    >
+      <path d="M4 12h15M13 6l6 6-6 6" />
+    </svg>
   );
 }
 
@@ -93,10 +124,12 @@ export interface CountdownBadgeProps {
 }
 
 /**
- * "How many sleeps?" (T-19): the awaited event icon(s) and one 🌙 per night (up to
- * {@link MAX_INDIVIDUAL_MOONS}, in rows of a week), or 🌙 ×N beyond. Today: the icons, 🎉 and
- * "Today!". The visuals are hidden from assistive tech; a localized, pluralized label
- * says the same in words. Static (no animation), so reduced motion needs nothing extra.
+ * "How many sleeps?" (T-19), read from start to goal: the number of nights ("6 ×"), one
+ * 🌙 per night (up to {@link MAX_INDIVIDUAL_MOONS}, in rows of a week; beyond, a single 🌙
+ * after the number), an arrow, the awaited event icon(s) and the first event's title,
+ * short. Today: 🎉 "Today!", then the icon(s) and the title. The visuals are hidden from
+ * assistive tech; a localized, pluralized label says the same in words. As high as the
+ * name chips beside it. Static (no animation), so reduced motion needs nothing extra.
  */
 export function CountdownBadge({
   countdown,
@@ -111,16 +144,41 @@ export function CountdownBadge({
       ? t("countdown.todayLabel", { titles })
       : t("countdown.nights", { count: countdown.nights, titles });
   const isToday = countdown.nights === 0;
+  const name = countdown.events[0]?.title;
   return (
     <section
       aria-label={t("countdown.label")}
       data-testid="countdown"
       data-variant={variant}
       data-nights={countdown.nights}
-      className={`${isToday ? "ring-today-ring ring-4" : ""} bg-surface-raised text-text rounded-pill shadow-card flex shrink-0 items-center ${size.box}`}
+      className={`${isToday ? "ring-today-ring ring-4" : ""} bg-surface-raised text-text rounded-pill shadow-card flex h-16 min-w-0 items-center ${size.box}`}
     >
       <p className="sr-only">{label}</p>
-      <span aria-hidden="true" className="flex items-center">
+      <span aria-hidden="true" className="flex shrink-0 items-center gap-2">
+        {isToday ? (
+          <span
+            data-testid="countdown-today"
+            className="flex items-center gap-2"
+          >
+            <Emoji emoji={TODAY_CUE} className={size.moon} />
+            <span className={`${size.count} font-extrabold`}>
+              {t("countdown.today")}
+            </span>
+          </span>
+        ) : (
+          <>
+            <span
+              data-testid="countdown-count"
+              className={`${size.count} font-black whitespace-nowrap`}
+            >
+              {t("countdown.count", { count: countdown.nights })}
+            </span>
+            <Moons nights={countdown.nights} variant={variant} />
+            <TowardsArrow />
+          </>
+        )}
+      </span>
+      <span aria-hidden="true" className="flex shrink-0 items-center">
         {countdown.events.slice(0, MAX_COUNTDOWN_ICONS).map((event) => {
           // The awaited event in its children's tint, with the child's edge (one child).
           const tint = resolveTileTint(childrenOf(event, childList));
@@ -131,9 +189,7 @@ export function CountdownBadge({
               data-tint={tint.kind}
               style={tileTintStyle(tint)}
               className={`${
-                tint.edge === null
-                  ? "inset-ring-border"
-                  : "inset-ring-(color:--child-color)"
+                tint.edge === null ? "inset-ring-border" : CHILD_EDGE
               } rounded-pill -ms-2 inline-flex shrink-0 items-center justify-center inset-ring-3 first:ms-0 ${size.disc}`}
             >
               <Emoji emoji={event.icon} className={size.icon} />
@@ -141,21 +197,15 @@ export function CountdownBadge({
           );
         })}
       </span>
-      <span aria-hidden="true" className="flex items-center">
-        {isToday ? (
-          <span
-            data-testid="countdown-today"
-            className="flex items-center gap-2"
-          >
-            <Emoji emoji={TODAY_CUE} className={size.moon} />
-            <span className={`${size.text} font-extrabold`}>
-              {t("countdown.today")}
-            </span>
-          </span>
-        ) : (
-          <Moons nights={countdown.nights} variant={variant} />
-        )}
-      </span>
+      {name !== undefined && (
+        <span
+          aria-hidden="true"
+          data-testid="countdown-name"
+          className={`${size.name} min-w-0 truncate font-extrabold`}
+        >
+          {name}
+        </span>
+      )}
     </section>
   );
 }

@@ -123,8 +123,8 @@ Token, entfernt ihn aus der Adresszeile und sendet ihn ab dann als Header. Als A
 installieren (Browsermenü > "Zum Startbildschirm hinzufügen") oder den Kiosk-Browser auf
 `https://<url>/` einstellen.
 
-Token wechseln: neues `KIDBOARD_ACCESS_TOKEN` setzen; das Tablet meldet dann "Der
-Zugangslink ist abgelaufen", löscht die gespeicherten Kalenderdaten und vergisst den alten
+Token wechseln: neues `KIDBOARD_ACCESS_TOKEN` setzen; das Tablet meldet dann "Dieses
+Tablet braucht einen neuen Zugangslink", löscht die gespeicherten Kalenderdaten und vergisst den alten
 Token, bis du einen neuen `?key=`-Link öffnest.
 
 ## 6. Optional: eigene Domain
@@ -186,7 +186,7 @@ Workers Static Assets auf alle statischen Antworten anwendet:
 
 | Symptom | Ursache und Lösung |
 | --- | --- |
-| Board meldet "Der Zugangslink ist abgelaufen" | Falscher oder geänderter Token: `https://<url>/?key=<token>` erneut öffnen. |
+| Board meldet "Dieses Tablet braucht einen neuen Zugangslink" | Falscher oder geänderter Token: `https://<url>/?key=<token>` erneut öffnen. |
 | `/api/config` antwortet `500 server_misconfigured` | `KIDBOARD_CONFIG` fehlt oder ist ungültig (Workers Logs nennen die Fehler), oder `KIDBOARD_ACCESS_TOKEN` enthält noch `REPLACE_ME`. |
 | Ein Kalender fehlt, `sources[].status` ist `error` | Secret-Name passt nicht zur Kalender-ID (`CAL_<ID>_URL`, Großbuchstaben) oder die iCal-Adresse ist falsch. |
 | Build bricht mit pnpm-Fehler ab | Build-Variable `PNPM_VERSION=10.28.0` setzen (Worker > Settings > Build). |

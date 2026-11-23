@@ -2,6 +2,7 @@ import type { Child } from "@kidboard/shared";
 import { useTranslation } from "react-i18next";
 
 import { ChildBadges } from "../components/ChildBadges";
+import { CHILD_EDGE } from "../components/childColor";
 import { resolveTileTint, tileTintStyle } from "../components/childTint";
 import {
   childrenOf,
@@ -73,7 +74,7 @@ export function AllDayBanner({
               className={`${
                 tint.edge === null
                   ? "inset-ring-border inset-ring-2"
-                  : "inset-ring-4 inset-ring-(color:--child-color)"
+                  : `inset-ring-4 ${CHILD_EDGE}`
               } text-text rounded-tile relative flex items-center gap-2 overflow-hidden ${large ? "h-14 ps-2.5" : "h-13 ps-2"} pe-2.5`}
             >
               <TileStripes tint={tint} />

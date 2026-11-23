@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./apiClient";
 import {
   createQueryClient,
+  invalidateRestoredQueries,
   MAX_RETRIES,
   PERSIST_MAX_AGE_MS,
   refreshIntervalMs,
@@ -11,6 +12,7 @@ import {
   shouldRetry,
   STALE_TIME_MS,
 } from "./queryClient";
+import { queryKeys } from "./queryKeys";
 
 describe("shouldRetry", () => {
   it.each(["network", "timeout", "upstream", "server"] as const)(
@@ -140,5 +142,40 @@ describe("seedOnlineState", () => {
   it("reads navigator.onLine by default", () => {
     seedOnlineState();
     expect(onlineManager.isOnline()).toBe(navigator.onLine);
+  });
+});
+
+describe("invalidateRestoredQueries", () => {
+  it("marks every KidBoard query outdated without fetching or touching its data", async () => {
+    const client = createQueryClient({ retry: false });
+    const updatedAt = Date.now() - 60_000;
+    client.setQueryData(queryKeys.config(), { locale: "en" }, { updatedAt });
+    const agendaKey = queryKeys.agenda({ from: "2026-11-22", days: 31 });
+    client.setQueryData(agendaKey, { events: [] }, { updatedAt });
+    client.setQueryData(["other"], 1, { updatedAt });
+    const queryFn = vi.fn(() => Promise.resolve({ locale: "de" }));
+
+    await invalidateRestoredQueries(client);
+
+    const state = (key: readonly unknown[]) =>
+      client.getQueryCache().find({ queryKey: key, exact: true })?.state;
+    expect(state(queryKeys.config())?.isInvalidated).toBe(true);
+    expect(state(agendaKey)?.isInvalidated).toBe(true);
+    expect(state(["other"])?.isInvalidated).toBe(false);
+    // Data and the time of the last successful fetch stay as restored.
+    expect(state(queryKeys.config())?.data).toEqual({ locale: "en" });
+    expect(state(agendaKey)?.dataUpdatedAt).toBe(updatedAt);
+    expect(state(agendaKey)?.fetchStatus).toBe("idle");
+
+    // A new observer (the board mounting) refetches although the data is younger than
+    // staleTime.
+    const observer = new QueryObserver(client, {
+      queryKey: queryKeys.config(),
+      queryFn,
+    });
+    const unsubscribe = observer.subscribe(() => undefined);
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    unsubscribe();
+    client.clear();
   });
 });

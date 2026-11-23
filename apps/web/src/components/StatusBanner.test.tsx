@@ -47,6 +47,26 @@ describe("StatusBanner", () => {
     expect(screen.getByRole("status")).toHaveTextContent(en.status.staleNoTime);
   });
 
+  it.each(["network", "server", "timeout"] as const)(
+    "says it can't update when the last refresh failed (%s), with the last good time",
+    (errorKind) => {
+      const view = render(
+        <StatusBanner status="stale" errorKind={errorKind} time="2:02 PM" />,
+      );
+      const pill = screen.getByRole("status");
+      expect(pill).toHaveTextContent(/^Can't update · as of 2:02 PM$/u);
+      expect(pill).toHaveAttribute("data-status", "stale");
+      view.rerender(<StatusBanner status="stale" errorKind={errorKind} />);
+      expect(screen.getByRole("status")).toHaveTextContent(/^Can't update$/u);
+    },
+  );
+
+  it("has the can't-update pill in German too", () => {
+    expect(de.status.cantUpdate.replace("{{time}}", "14:02")).toBe(
+      "Aktualisieren klappt nicht · Stand von 14:02",
+    );
+  });
+
   it("has the German pill of the hand-off", () => {
     expect(de.status.offline.replace("{{time}}", "14:02")).toBe(
       "Offline · Stand von 14:02",
@@ -76,19 +96,24 @@ describe("StatusBanner", () => {
   });
 
   it.each(["error", "stale", "offline"] as const)(
-    "tells an expired access link apart (%s)",
+    "tells an access link that is no longer valid apart (%s)",
     (status) => {
       render(<StatusBanner status={status} errorKind="unauthorized" />);
       const alert = screen.getByRole("alert");
-      expect(alert).toHaveTextContent(en.status.unauthorized);
-      expect(alert).toHaveTextContent("?key=");
+      expect(alert).toHaveTextContent(
+        /^This tablet needs a new access link\.$/u,
+      );
       expect(alert).toHaveAttribute("data-status", "unauthorized");
     },
   );
 
-  it("has the unauthorized message in German too", () => {
-    expect(de.status.unauthorized).toContain("?key=");
-    expect(de.status.unauthorized).not.toBe(en.status.unauthorized);
+  it("words the unauthorized pill without technical details, in both languages", () => {
+    expect(de.status.unauthorized).toBe(
+      "Dieses Tablet braucht einen neuen Zugangslink.",
+    );
+    for (const text of [en.status.unauthorized, de.status.unauthorized]) {
+      expect(text).not.toMatch(/\?key|key=|token|401/iu);
+    }
   });
 });
 

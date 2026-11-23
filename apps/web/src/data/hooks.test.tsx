@@ -223,16 +223,49 @@ describe("useAgenda + useConnectionStatus", () => {
     expect(fake.calls.length).toBe(fetchesBefore);
   });
 
-  it("restored data younger than staleTime is not refetched on mount", async () => {
+  it("restored data younger than staleTime is still refetched once after a page load", async () => {
     await loadAndPersist();
     const fetchesBefore = fake.calls.length;
+    fake.setReplies("/api/agenda", {
+      status: 200,
+      body: agendaFixture({}, "Football"),
+    });
 
     const { result } = renderBoard();
     await waitFor(() => {
-      expect(result.current.status).toBe("ready");
+      expect(result.current.agenda.data?.events[0]?.title).toBe("Football");
     });
+    expect(result.current.status).toBe("ready");
+    const paths = fake.calls
+      .slice(fetchesBefore)
+      .map((call) => new URL(call.url, "http://x").pathname);
+    // Once per query, not more (the restored data only got marked outdated).
+    expect(paths.sort()).toEqual(["/api/agenda", "/api/config"]);
+  });
+
+  it("reload while the API is unreachable: keeps the last good data and time, reports stale", async () => {
+    await loadAndPersist();
+    const persistedAt = storedClient()?.clientState.queries.find(
+      (q) => q.queryKey[1] === "agenda",
+    )?.state.dataUpdatedAt;
+    expect(persistedAt).toBeGreaterThan(0);
+    const fetchesBefore = fake.calls.length;
+    // Data younger than staleTime, as right after a first load; the API is gone.
+    fake.setReplies("/api/config", "network-error");
+    fake.setReplies("/api/agenda", "network-error");
+
+    const { result } = renderBoard();
+    await waitFor(() => {
+      expect(result.current.status).toBe("stale");
+    });
+    expect(fake.calls.length).toBeGreaterThan(fetchesBefore);
+    expect(result.current.errorKind).toBe("network");
     expect(result.current.agenda.data?.events[0]?.title).toBe("Swimming");
-    expect(fake.calls.length).toBe(fetchesBefore);
+    // "Stand" stays the last successful fetch, not the failed attempt or render time.
+    expect(result.current.agenda.dataUpdatedAt).toBe(persistedAt);
+    // The failure never replaces the persisted last-good agenda.
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(storedTitles()).toEqual(["Swimming"]);
   });
 
   it("offline without persisted data reports offline", async () => {

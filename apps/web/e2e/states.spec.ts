@@ -169,7 +169,7 @@ test.describe("error card", () => {
     await expect(page.getByRole("alert")).toHaveCount(0);
   });
 
-  test("401: the calm 'open the link again' variant, no retry, no red", async ({
+  test("401: the calm 'new access link' variant, no retry, no red, no jargon", async ({
     page,
   }) => {
     await mockBoard(page, {
@@ -181,8 +181,10 @@ test.describe("error card", () => {
     await expect(card).toHaveAttribute("data-error", "unauthorized");
     await expect(card).toHaveAttribute("data-variant", "unauthorized");
     await expect(card).toContainText("A grown-up can fix this");
-    await expect(card).toContainText("open the link again");
-    await expect(card).toContainText("?key=");
+    await expect(card).toContainText("This tablet needs a new access link");
+    await expect(card).toContainText("no longer valid");
+    await expect(card).not.toContainText("?key=");
+    await expect(card).not.toContainText(/expired|token/iu);
     await expect(page.getByTestId("error-code")).toHaveText(
       "Error code for parents: KB-401",
     );

@@ -345,7 +345,7 @@ describe("EventTile", () => {
     );
   });
 
-  it("week sizes stack emoji over time, hide the visible title and keep the name", () => {
+  it("week sizes stack emoji, a one-line title and the time, and keep the name", () => {
     render(
       <EventTile
         event={eventFixture({ childIds: ["mia"] })}
@@ -357,15 +357,81 @@ describe("EventTile", () => {
     );
     expect(tile()).toHaveAttribute("data-size", "week");
     expect(tile().className).toContain("flex-col");
-    expect(screen.queryByText("Swimming")).toBeNull();
+    // One truncated line, shown only where the week column is wide enough.
+    const title = within(tile()).getByTestId("tile-title");
+    expect(title).toHaveTextContent("Swimming");
+    const line = title.parentElement as HTMLElement;
+    expect(line).toHaveClass("truncate", "hidden", "@min-[5.5rem]:block");
     expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For Mia");
-    expect(within(tile()).getByText("🌞")).toBeInTheDocument();
+    const icon = within(tile()).getByText("🌞");
+    // The time-of-day icon is as large as in the overview (>= 1.5rem).
+    expect(icon).toHaveClass("text-[1.5rem]");
     // No disc on the narrow week tiles; the badges sit inside the tile's corner.
     expect(within(tile()).queryByTestId("emoji-disc")).toBeNull();
     expect(tile()).toContainElement(badges());
     expect(TILE_HEIGHT_REM["week-dense"]).toBeLessThan(TILE_HEIGHT_REM.week);
-    // The stacked emoji and time row fit the dense height (emoji 2.25rem + meta 1rem).
-    expect(TILE_HEIGHT_REM["week-dense"]).toBeGreaterThanOrEqual(2.25 + 1.3);
+    // Emoji + title line + time row (1.5rem icon) + gaps fit both heights:
+    // week 2.5 + 1.3 + 1.5, dense 2 + 1.09 + 1.5 (rem).
+    expect(TILE_HEIGHT_REM.week).toBeGreaterThanOrEqual(2.5 + 1.3 + 1.5 + 0.25);
+    expect(TILE_HEIGHT_REM["week-dense"]).toBeGreaterThanOrEqual(
+      2 + 1.09 + 1.5 + 0.25,
+    );
+  });
+
+  it("drops the title line at the last week step (mini), keeping it in the name", () => {
+    render(
+      <EventTile
+        event={eventFixture()}
+        childList={[]}
+        format={format}
+        timeOfDay="midday"
+        size="week-mini"
+      />,
+    );
+    expect(within(tile()).queryByTestId("tile-title")).toBeNull();
+    expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For everyone");
+    expect(within(tile()).getByText("🌞")).toHaveClass("text-[1.5rem]");
+    expect(TILE_HEIGHT_REM["week-mini"]).toBeLessThan(
+      TILE_HEIGHT_REM["week-dense"],
+    );
+    // Emoji 2rem + time row 1.5rem + gap fit.
+    expect(TILE_HEIGHT_REM["week-mini"]).toBeGreaterThanOrEqual(
+      2 + 1.5 + 0.125,
+    );
+  });
+
+  it("cuts a long time label in a narrow week tile instead of pushing it out", () => {
+    render(
+      <EventTile
+        event={eventFixture({
+          allDay: true,
+          start: "2026-11-22",
+          end: "2026-11-23",
+        })}
+        childList={[]}
+        format={format}
+        size="week-mini"
+      />,
+    );
+    const label = within(tile()).getByText("All day");
+    expect(label).toHaveClass("min-w-0", "truncate");
+    // The row spans the tile, so truncation has a width to work with.
+    expect(label.parentElement?.parentElement).toHaveClass("w-full", "min-w-0");
+  });
+
+  it("keeps a shared week tile's title clear of its stripes", () => {
+    render(
+      <EventTile
+        event={eventFixture({ childIds: ["mia", "ben"] })}
+        childList={[MIA, BEN]}
+        format={format}
+        size="week-dense"
+      />,
+    );
+    const line = within(tile()).getByTestId("tile-title")
+      .parentElement as HTMLElement;
+    expect(line).toHaveClass("ps-2", "text-caption");
+    expect(within(tile()).getByTestId("tile-stripes")).toBeInTheDocument();
   });
 
   it("renders an HTML-looking title as text, never as markup", () => {

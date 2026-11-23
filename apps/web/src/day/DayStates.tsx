@@ -140,8 +140,9 @@ export type DayErrorKind = "unauthorized" | "offline" | "failed";
  * Nothing to show and no cached state: the friendly {@link ErrorCard}. `failed` and
  * `offline`: 🧸 "Gleich geht's weiter", one line for parents and a "reload now" button
  * that refetches at once (the data layer keeps retrying on its own as well); `failed`
- * shows the API failure's code (`KB-502`, …). `unauthorized`: the calm variant ("open
- * the link again"), no retry, no alarm colour; the 401 wipe already forgot the token.
+ * shows the API failure's code (`KB-502`, …). `unauthorized`: the calm variant ("this
+ * tablet needs a new access link", no technical details; the `KB-401` code is for
+ * parents), no retry, no alarm colour; the 401 wipe already forgot the token.
  */
 export function DayError({
   kind,

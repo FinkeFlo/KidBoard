@@ -42,7 +42,7 @@ If `KIDBOARD_ACCESS_TOKEN` is set, the board needs the token to load data:
 3. Later visits need no `?key=`. A new `?key=` replaces the stored token (use it after
    rotating the token).
 4. After a **`401`** (token revoked or wrong) the tablet **forgets** the stored token and shows
-   "Open the link again" (error code `KB-401`): open the tablet link with the current
+   "This tablet needs a new access link" (error code `KB-401`): open the tablet link with the current
    `?key=<token>` once more.
 
 Without a configured token nothing of this is needed. The token is not a user login, only a
@@ -121,7 +121,7 @@ Start-URL in Fully Kiosk). Die Seite speichert das Token im lokalen Speicher des
 **entfernt `?key=` sofort aus der Adresszeile**; danach ruft sie die API mit
 `Authorization: Bearer` auf. Spätere Besuche brauchen kein `?key=`; ein neues `?key=` ersetzt
 das gespeicherte Token (nach einem Token-Wechsel). Nach einem **`401`** (Token ungültig oder
-widerrufen) **vergisst** das Tablet das Token und zeigt "Link neu öffnen" (Fehlercode
+widerrufen) **vergisst** das Tablet das Token und zeigt "Dieses Tablet braucht einen neuen Zugangslink" (Fehlercode
 `KB-401`): den Tablet-Link mit dem aktuellen `?key=<token>` noch einmal öffnen. Ohne
 konfiguriertes Token ist das alles nicht nötig.
 

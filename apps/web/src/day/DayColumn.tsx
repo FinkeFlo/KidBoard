@@ -2,9 +2,7 @@ import type { Child } from "@kidboard/shared";
 import { useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Emoji } from "../components/Emoji";
 import { EventTile } from "../components/EventTile";
-import { CheckIcon } from "../components/TimeOfDayIcon";
 import {
   type FormatContext,
   formatDayMonth,
@@ -14,108 +12,11 @@ import { AllDayBanner } from "./AllDayBanner";
 import type { DayEvent } from "./buildDayModel";
 import type { OverviewDay } from "./buildOverviewModel";
 import { COLUMN_GAP_REM, fitColumn } from "./columnCapacity";
+import { MoreLater, PastStrip } from "./ColumnSummaries";
 import { DayEmpty } from "./DayStates";
 import { MealPlates } from "./MealPlates";
 import { NOW_LINE_REM, NowLine } from "./NowLine";
 import { useContentHeight } from "./useContentHeight";
-
-/** Hidden upcoming events the "+N" row draws as small icons; the count covers all. */
-export const MORE_ICONS_MAX = 4;
-
-/**
- * "vorbei" strip: past events folded into small grey emoji with a check mark (oldest
- * first). Its accessible name lists every folded title (merge rule 2), also those beyond
- * the drawn icons.
- */
-function PastStrip({
-  items,
-  icons,
-  hidden,
-}: {
-  items: readonly DayEvent[];
-  icons: readonly DayEvent[];
-  hidden: number;
-}): React.JSX.Element {
-  const { t } = useTranslation();
-  return (
-    <div
-      role="group"
-      aria-label={t("day.past.list", {
-        titles: items.map((item) => item.event.title),
-      })}
-      data-testid="past-strip"
-      data-count={items.length}
-      className="text-text-muted flex h-9 shrink-0 items-center gap-2.5 overflow-hidden ps-2"
-    >
-      <span
-        aria-hidden="true"
-        className="text-meta flex shrink-0 items-center gap-1 font-black"
-      >
-        <CheckIcon className="size-4" />
-        {t("day.past.label")}
-      </span>
-      {icons.map(({ event }) => (
-        <span key={event.id} className="relative inline-flex shrink-0">
-          <Emoji emoji={event.icon} className="text-[1.875rem] grayscale" />
-          <span className="bg-text-muted text-surface rounded-pill absolute -end-1 -bottom-0.5 grid size-3.5 place-items-center">
-            <CheckIcon className="size-2.5" />
-          </span>
-        </span>
-      ))}
-      {hidden > 0 && (
-        <span className="text-meta shrink-0 font-black">
-          <span aria-hidden="true">
-            {t("day.hidden.badge", { count: hidden })}
-          </span>
-          <span className="sr-only">
-            {t("day.hidden.earlier", { count: hidden })}
-          </span>
-        </span>
-      )}
-    </div>
-  );
-}
-
-/**
- * The latest upcoming events that do not fit: their emoji in small, then "+N" – plain
- * text, no border or fill, so it does not look like a button (it is not interactive).
- * Names every summed-up title for assistive tech.
- */
-function MoreLater({
-  items,
-}: {
-  items: readonly DayEvent[];
-}): React.JSX.Element {
-  const { t } = useTranslation();
-  return (
-    <li
-      data-testid="column-more"
-      data-count={items.length}
-      className="text-text-muted flex h-9 min-w-0 items-center gap-2 overflow-hidden ps-2"
-    >
-      {items.slice(0, MORE_ICONS_MAX).map(({ event }) => (
-        <Emoji
-          key={event.id}
-          emoji={event.icon}
-          className="shrink-0 text-[1.625rem]"
-        />
-      ))}
-      <span
-        aria-hidden="true"
-        data-testid="column-more-count"
-        className="text-meta shrink-0 font-black"
-      >
-        {t("day.hidden.badge", { count: items.length })}
-      </span>
-      <span className="sr-only">
-        {t("day.hidden.later", {
-          count: items.length,
-          titles: items.map((item) => item.event.title),
-        })}
-      </span>
-    </li>
-  );
-}
 
 export interface DayColumnProps {
   day: OverviewDay;
@@ -222,8 +123,8 @@ export function DayColumn({
           <>
             {layout.pastStrip.length > 0 && (
               <PastStrip
-                items={layout.pastStrip}
-                icons={layout.stripIcons}
+                items={layout.pastStrip.map((item) => item.event)}
+                icons={layout.stripIcons.map((item) => item.event)}
                 hidden={layout.hiddenEarlier}
               />
             )}
@@ -234,7 +135,9 @@ export function DayColumn({
             {(after.length > 0 || hiddenLater.length > 0) && (
               <ol className="flex flex-col gap-2">
                 {after.map(tile)}
-                {hiddenLater.length > 0 && <MoreLater items={hiddenLater} />}
+                {hiddenLater.length > 0 && (
+                  <MoreLater items={hiddenLater.map((item) => item.event)} />
+                )}
               </ol>
             )}
           </>

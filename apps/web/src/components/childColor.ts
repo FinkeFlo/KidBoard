@@ -90,6 +90,24 @@ export function resolveChildColor(color: string | undefined): string {
   return isCssColor(value) ? value : FALLBACK;
 }
 
+/**
+ * How much of a child colour stays at night: avatar discs and tile edges are mixed a
+ * quarter towards the page, so the saturated colours do not dominate the dark board (the
+ * emoji are dimmed the same way). `tokens.test.ts` checks the dimmed colours' contrast.
+ */
+export const CHILD_NIGHT_STRENGTH = 0.75;
+
+// Full class names so Tailwind can see them; 75 % = CHILD_NIGHT_STRENGTH.
+/** Fill in the child colour (`--child-color`), dimmed at night. */
+export const CHILD_FILL =
+  "bg-(--child-color) night:bg-[color-mix(in_oklab,var(--child-color)_75%,var(--color-surface))]";
+/** Inset edge in the child colour (pair with an `inset-ring-N` width), dimmed at night. */
+export const CHILD_EDGE =
+  "inset-ring-(color:--child-color) night:inset-ring-[color-mix(in_oklab,var(--child-color)_75%,var(--color-surface))]";
+/** {@link CHILD_EDGE} on the `::after` overlay of a tile. */
+export const CHILD_EDGE_AFTER =
+  "after:inset-ring-(color:--child-color) night:after:inset-ring-[color-mix(in_oklab,var(--child-color)_75%,var(--color-surface))]";
+
 /** Inline style that defines `--child-color` for a child (or the neutral fallback). */
 export function childColorStyle(color: string | undefined): CSSProperties {
   // React's CSSProperties has no index signature for custom properties.

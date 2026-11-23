@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -147,8 +147,14 @@ describe("WeekBoard", () => {
     expect(within(wrapper(tiles[0])).getByText("🦊")).toBeInTheDocument();
     expect(within(tiles[0] as HTMLElement).getByText("🌅")).toBeInTheDocument();
     expect(within(wrapper(tiles[1])).getByText("🐻")).toBeInTheDocument();
-    // The title is picture-first: only in the accessible name.
-    expect(within(monday).queryByText("Event 0")).toBeNull();
+    // A one-line title under the picture (shown where the column is wide enough).
+    expect(
+      tiles.map((tile) => within(tile).getByTestId("tile-title").textContent),
+    ).toEqual(["Event 0", "Event 1", "Event 2"]);
+    // The list is the container the title's width query refers to.
+    expect(within(monday).getByTestId("column-events")).toHaveClass(
+      "@container",
+    );
   });
 
   it("uses the dusk symbol for evening events, never the moon (rule 1)", () => {
@@ -191,34 +197,75 @@ describe("WeekBoard", () => {
     expect(within(monday).queryByTestId("column-more")).toBeNull();
   });
 
-  it("sums up what does not fit as +N with a screen reader text naming the titles", () => {
-    // Dense tiles: three plus the +N row (3 * 4.5 + 3 * 0.5 + 2.25 = 17.25 rem).
-    stubListHeight(17.5);
+  it("sums up what does not fit as a quiet +N with small icons and a screen reader text", () => {
+    // Mini tiles: three plus the +N row (3 * 4.25 + 3 * 0.5 + 2.25 = 16.5 rem).
+    stubListHeight(16.75);
     const monday = renderWeek(hourly("2026-11-23", 6))[1] as HTMLElement;
     expect(tilesOf(monday)).toHaveLength(3);
-    expect(monday).toHaveAttribute("data-size", "week-dense");
+    expect(monday).toHaveAttribute("data-size", "week-mini");
     const more = within(monday).getByTestId("column-more");
     expect(more).toHaveAttribute("data-count", "3");
     expect(within(more).getByText("+3")).toHaveAttribute("aria-hidden", "true");
     expect(
       within(more).getByText("3 more: Event 3, Event 4, and Event 5"),
     ).toHaveClass("sr-only");
+    // Small icons of the first hidden events (decorative), no button look.
+    expect(
+      within(more)
+        .getAllByText("🏊")
+        .every((el) => el.getAttribute("aria-hidden") === "true"),
+    ).toBe(true);
+    expect(within(more).getAllByText("🏊")).toHaveLength(2);
+    expect(more.className).not.toMatch(/ring|border|bg-/u);
+    expect(more.tagName).toBe("LI");
     // shown + hidden === all events.
     expect(tilesOf(monday).length + Number(more.dataset["count"])).toBe(6);
   });
 
-  it("lets already finished events of today yield first: they are the ones summed up", () => {
-    stubListHeight(17.5);
+  it("folds today's finished events into the done strip first, so upcoming ones keep their tiles", () => {
+    // Room for four dense tiles and the strip (4 * 5.25 + 0.5 * 4 + 2.25 = 25.25 rem).
+    stubListHeight(25.5);
     // Now is 12:00: Events 0..4 (07:00..11:00) are over, 12:00 is current, 13:00+ upcoming.
-    const events = hourly("2026-11-22", 9);
-    const today = renderWeek(events)[0] as HTMLElement;
+    const today = renderWeek(hourly("2026-11-22", 9))[0] as HTMLElement;
     const statuses = tilesOf(today).map((tile) => tile.dataset["status"]);
-    // Three tiles: all upcoming/current ones win the slots over the finished ones.
-    expect(statuses).toHaveLength(3);
-    expect(statuses).not.toContain("past");
+    expect(statuses).toEqual(["current", "upcoming", "upcoming", "upcoming"]);
+    const strip = within(today).getByTestId("past-strip");
+    expect(strip).toHaveAttribute("data-count", "5");
+    // Names every finished title; draws two checked icons and counts the rest.
+    expect(strip).toHaveAccessibleName(
+      "Already over: Event 0, Event 1, Event 2, Event 3, and Event 4",
+    );
+    expect(within(strip).getByText("+3")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    // Nothing upcoming is hidden while finished events could fold.
+    expect(within(today).queryByTestId("column-more")).toBeNull();
+    // The strip sits above the tiles.
+    const list = within(today).getByTestId("column-events");
+    expect(list.firstElementChild).toContainElement(strip);
+  });
+
+  it("hides only upcoming events after the strip, the least important last", () => {
+    // Two mini tiles, the strip and +N (2 * 4.25 + 3 * 0.5 + 2 * 2.25 = 14.5 rem).
+    stubListHeight(14.75);
+    const today = renderWeek(hourly("2026-11-22", 9))[0] as HTMLElement;
+    expect(tilesOf(today).map((tile) => tile.dataset["status"])).toEqual([
+      "current",
+      "upcoming",
+    ]);
     const more = within(today).getByTestId("column-more");
-    expect(more.textContent).toContain("6 more");
-    expect(within(more).getByText(/Event 0/)).toBeInTheDocument();
+    expect(more).toHaveAttribute("data-count", "2");
+    expect(within(more).getByText("2 more: Event 7 and Event 8")).toHaveClass(
+      "sr-only",
+    );
+    const strip = within(today).getByTestId("past-strip");
+    // shown + folded + hidden === all events (merge rule 2).
+    expect(
+      tilesOf(today).length +
+        Number(strip.dataset["count"]) +
+        Number(more.dataset["count"]),
+    ).toBe(9);
   });
 
   it("lets finished events recede through tokens, not opacity", () => {
@@ -238,11 +285,12 @@ describe("WeekBoard", () => {
     expect(tile?.getAttribute("aria-label")).toContain("over");
   });
 
-  it("shows a moon in every header before the countdown day and none from it on", () => {
+  it("shows a moon in every header before the countdown day, the goal's icon on it, an empty slot after", () => {
     const columns = renderWeek(
       [
         eventFixture({
           title: "Party",
+          icon: "🎂",
           childIds: ["mia"],
           start: "2026-11-26T15:00:00+01:00",
           end: "2026-11-26T16:00:00+01:00",
@@ -255,6 +303,7 @@ describe("WeekBoard", () => {
         events: [
           eventFixture({
             title: "Party",
+            icon: "🎂",
             childIds: ["mia"],
             countdown: true,
           }),
@@ -264,6 +313,19 @@ describe("WeekBoard", () => {
     expect(
       columns.map((c) => within(c).queryAllByTestId("column-moon").length),
     ).toEqual([1, 1, 1, 1, 0, 0, 0]);
+    expect(
+      columns.map((c) => within(c).queryAllByTestId("column-target").length),
+    ).toEqual([0, 0, 0, 0, 1, 0, 0]);
+    const target = within(columns[4] as HTMLElement).getByTestId(
+      "column-target",
+    );
+    expect(within(target).getByText("🎂")).toBeInTheDocument();
+    // Every column keeps the same slot, so all dates sit on one line.
+    for (const column of columns) {
+      const slot = within(column).getByTestId("column-slot");
+      expect(slot).toHaveAttribute("aria-hidden", "true");
+      expect(slot.parentElement).toHaveClass("h-8");
+    }
     // The moon is decorative: the countdown pill carries the spoken count.
     const moon = within(columns[0] as HTMLElement).getByText("🌙");
     expect(moon).toHaveAttribute("aria-hidden", "true");
@@ -272,6 +334,7 @@ describe("WeekBoard", () => {
   it("puts no moons in the headers without a countdown", () => {
     renderWeek([eventFixture()]);
     expect(screen.queryAllByTestId("column-moon")).toHaveLength(0);
+    expect(screen.queryAllByTestId("column-target")).toHaveLength(0);
   });
 
   it("puts a moon on every day up to a far target and on none of today when it is today", () => {
@@ -285,29 +348,54 @@ describe("WeekBoard", () => {
     expect(far.every((c) => c.dataset["countdownDay"] === "false")).toBe(true);
   });
 
-  it("shows the countdown day in the child's tint and edge", () => {
+  it("marks a one-child countdown day with a neutral ring, the child's tint and badge", () => {
     const columns = renderWeek([], [], {
       date: "2026-11-26",
       events: [eventFixture({ childIds: ["mia"], countdown: true })],
     });
     const target = columns[4] as HTMLElement;
     expect(target).toHaveAttribute("data-countdown-day", "true");
-    expect(target.style.getPropertyValue("--child-color")).toBe(
-      "var(--color-child-1)",
-    );
-    expect(target.className).toContain("inset-ring-(color:--child-color)");
+    // The ring is the countdown colour (the moons'), never a child's colour.
+    expect(target).toHaveClass("ring-band-evening-accent", "ring-4");
+    expect(target.className).not.toContain("--child-color");
+    expect(target.style.background).toBe("var(--color-child-1-tint)");
     expect(target.className).not.toContain("bg-surface");
-    // Other days keep their plain surface and no edge.
-    expect(columns[3]?.style.getPropertyValue("--child-color")).toBe("");
+    // The badge says whose day it is.
+    const header = within(target).getByTestId("column-target");
+    expect(within(header).getByText("🦊")).toBeInTheDocument();
+    // Other days keep their plain surface and no ring.
+    expect(columns[3]?.style.background).toBe("");
     expect(columns[3]?.className).toContain("bg-surface-sunken");
+    expect(columns[3]?.className).not.toContain("ring-band-evening-accent");
   });
 
-  it("survives a countdown without events: the day stays untinted, the moons stay", () => {
+  it("keeps a shared or nobody's countdown day neutral: no tint, no badge, the same ring", () => {
+    for (const childIds of [["mia", "ben"], []]) {
+      const columns = renderWeek([], [], {
+        date: "2026-11-26",
+        events: [eventFixture({ childIds, countdown: true })],
+      });
+      const target = columns[4] as HTMLElement;
+      expect(target).toHaveAttribute("data-countdown-day", "true");
+      expect(target).toHaveClass(
+        "bg-surface-sunken",
+        "ring-band-evening-accent",
+      );
+      expect(target.style.background).toBe("");
+      const header = within(target).getByTestId("column-target");
+      expect(within(header).queryByText("🦊")).toBeNull();
+      expect(within(header).queryByText("🐻")).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("survives a countdown without events: the day stays unmarked, the moons stay", () => {
     const columns = renderWeek([], [], { date: "2026-11-26", events: [] });
     const target = columns[4] as HTMLElement;
     expect(target).toHaveAttribute("data-countdown-day", "true");
-    expect(target.style.getPropertyValue("--child-color")).toBe("");
-    expect(target.className).not.toContain("inset-ring");
+    expect(target.style.background).toBe("");
+    expect(target.className).not.toContain("ring-band-evening-accent");
+    expect(within(target).queryByTestId("column-target")).toBeNull();
     expect(
       columns
         .slice(0, 4)
@@ -315,14 +403,16 @@ describe("WeekBoard", () => {
     ).toEqual([1, 1, 1, 1]);
   });
 
-  it("keeps the plain surface on a countdown day without a child", () => {
+  it("keeps the today ring when the countdown day is today, with the goal's icon", () => {
     const columns = renderWeek([], [], {
-      date: "2026-11-26",
-      events: [eventFixture({ countdown: true })],
+      date: "2026-11-22",
+      events: [eventFixture({ icon: "🎂", countdown: true })],
     });
-    expect(columns[4]).toHaveAttribute("data-countdown-day", "true");
-    expect(columns[4]?.className).toContain("bg-surface-sunken");
-    expect(columns[4]?.className).not.toContain("inset-ring");
+    expect(columns[0]).toHaveClass("ring-today-ring");
+    expect(columns[0]?.className).not.toContain("ring-band-evening-accent");
+    expect(
+      within(columns[0] as HTMLElement).getByTestId("column-target"),
+    ).toHaveTextContent("🎂");
   });
 
   it("shows meals as a three-row list in slot order, with an empty place for a missing one", () => {

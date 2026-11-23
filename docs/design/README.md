@@ -14,6 +14,12 @@ artifacts of the maintainer; everything an implementer needs is copied into this
 
 ## What changes against the current app
 
+This is the hand-off as delivered. The built app refined some points after the merge rules
+(docs/PLAN.md, M5b) and the UI/UX dummy test (T-27a): shared tiles use colour stripes
+instead of a split tint, the evening icon is 🌆 (🌙 only counts sleeps), columns shrink by
+measured space instead of "from 6 events", and the week marks the countdown day with a
+neutral ring. [`components.md`](components.md) describes the current state.
+
 1. **Main screen = overview of four days, not three day bands.** Today plus the next three
    days are columns side by side (today 1.4× wider). Inside each column events run **top to
    bottom in time order**; meals sit at the bottom of the column. There is no separate detail
@@ -91,15 +97,16 @@ Example data (Mia 🦊, Ben 🐻, meals Monday–Wednesday) is illustrative only
   belongs in the component, not in every caller.
 - **Missing emoji:** title emoji first, then `FALLBACK_ICON_TABLE`, then 📅 (already in
   `packages/shared/src/title/fallbackIcons.ts`).
-- **Long titles:** one line, `truncate`; full title (plus time and children) in the tile's
+- **Long titles:** up to two lines where the tile has the height, else one line,
+  truncated; full title (plus time and children) in the tile's
   accessible name.
-- **Split tint for several children:** hard-stop gradient
-  `linear-gradient(90deg, var(--color-child-1-tint) 50%, var(--color-child-2-tint) 50%)`,
-  built from the configured children; for 3+ children use `--color-surface-raised` and up
-  to three badges, then "+N".
+- **Several children:** neutral `--color-surface-raised` tile with one colour stripe per
+  child on the start edge (side by side; a split tint read as "half done"), up to three
+  badges, then "+N" (see components.md).
 - **No scrolling:** columns are flex columns with the meal strip at `margin-top: auto`;
-  density rules (compact tiles from 6 events, "vorbei" strip, "+N") keep 8 events + 3 meals
-  inside 1280×800 (existing e2e density matrix applies).
+  measured space decides (past events fold into the "vorbei" strip first, then tiles shrink
+  step by step, then "+N"), keeping 8 events + 3 meals inside 1280×800 (e2e density
+  matrix applies).
 - **Now line:** jumps between tiles (no per-minute positioning), so nothing moves every
   minute.
 - **Motion:** only `--duration-*` tokens; view change is a fade (max 8px offset), night mode

@@ -1,6 +1,11 @@
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
-import { agenda, fixClock, waitForServiceWorker } from "./mockApi";
+import {
+  agenda,
+  fixClock,
+  persistedTitles,
+  waitForServiceWorker,
+} from "./mockApi";
 
 /** Low-entropy synthetic token (gitleaks-friendly). */
 const TOKEN = "TESTONLY-not-a-secret";
@@ -182,6 +187,9 @@ test("loads the app shell offline after the first visit and never caches API or 
     stored.filter((url) => url.includes(TOKEN) || url.includes("key=")),
   ).toEqual([]);
 
+  // The persister saves throttled: wait until the agenda is stored before going offline
+  // (every page load refetches once, so the save may come a moment later).
+  await expect.poll(() => persistedTitles(page)).toContain("Swimming");
   await context.setOffline(true);
   await page.reload();
   // The cached shell renders the persisted day with the discreet offline hint.

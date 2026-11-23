@@ -202,15 +202,16 @@ pins the burn-in shift to one of eight positions instead of following the clock.
 
 ## Troubleshooting
 
-| What you see                                                   | What to do                                                                                                         |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| "Open the link again" / "A grown-up can fix this" (**KB-401**) | The access token is missing, wrong or was changed. Open the tablet link with `?key=<token>` once more.             |
-| "Offline · as of ..." (**KB-OFF** if there is no saved plan)   | No internet. The last good plan stays visible; the board reloads by itself when the network is back.               |
-| "Maybe not current · as of ..."                                | The server could not reach Google and shows the last good copy (up to 7 days). Check the calendar link, see below. |
-| "Back in a moment" with an error code                          | A reload usually fixes it ("Reload now"). The code tells a helper what happened, see the list below.               |
-| Wrong day, or times shifted by hours                           | Set `timeZone` in `KIDBOARD_CONFIG` (e.g. `Europe/Berlin`). The tablet's own time zone is ignored on purpose.      |
-| A calendar is empty or missing                                 | Is `CAL_<ID>_URL` set and does the `<ID>` match the calendar `id`? Is it the secret iCal address? See DEPLOY.md.   |
-| New events do not show                                         | Feeds are cached (default one hour) and Google updates the feed with a delay. Wait, or lower `KIDBOARD_CACHE_TTL`. |
+| What you see                                                 | What to do                                                                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| "This tablet needs a new access link" (**KB-401**)           | The access token is missing, wrong or was changed. Open the tablet link with `?key=<token>` once more.             |
+| "Offline · as of ..." (**KB-OFF** if there is no saved plan) | No internet. The last good plan stays visible; the board reloads by itself when the network is back.               |
+| "Can't update · as of ..."                                   | The tablet cannot reach the server; the last good plan stays. Check Wi-Fi and the server, it retries by itself.    |
+| "Maybe not current · as of ..."                              | The server could not reach Google and shows the last good copy (up to 7 days). Check the calendar link, see below. |
+| "Back in a moment" with an error code                        | A reload usually fixes it ("Reload now"). The code tells a helper what happened, see the list below.               |
+| Wrong day, or times shifted by hours                         | Set `timeZone` in `KIDBOARD_CONFIG` (e.g. `Europe/Berlin`). The tablet's own time zone is ignored on purpose.      |
+| A calendar is empty or missing                               | Is `CAL_<ID>_URL` set and does the `<ID>` match the calendar `id`? Is it the secret iCal address? See DEPLOY.md.   |
+| New events do not show                                       | Feeds are cached (default one hour) and Google updates the feed with a delay. Wait, or lower `KIDBOARD_CACHE_TTL`. |
 
 Error codes shown on the error card ("Error code for parents"):
 

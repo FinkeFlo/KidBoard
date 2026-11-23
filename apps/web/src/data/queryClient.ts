@@ -80,6 +80,23 @@ function wipeOnUnauthorized(client: QueryClient, error: ApiError): void {
   }
 }
 
+/**
+ * Runs once after the persisted cache was restored, i.e. on every page load: marks every
+ * KidBoard query as outdated (TanStack `invalidate`, no refetch yet), so each one fetches
+ * as soon as its observer subscribes, even when its restored data is younger than
+ * `staleTime`. Without it a reload within 15 min of the last fetch would show the
+ * restored data as `ready` without ever asking the API, so a reload while the API is
+ * unreachable would look current (UI/UX test, T-27a). The restored `dataUpdatedAt` stays
+ * (it is the last successful fetch: "Stand"); a failing refetch keeps the data and turns
+ * the status `stale` (offline: the fetch waits for the network, the status is `offline`).
+ */
+export function invalidateRestoredQueries(client: QueryClient): Promise<void> {
+  return client.invalidateQueries({
+    predicate: (query) => queryKindOf(query.queryKey) !== undefined,
+    refetchType: "none",
+  });
+}
+
 /** `refreshMinutes` (config) → refetch interval in ms. */
 export function refreshIntervalMs(refreshMinutes: number | undefined): number {
   return (refreshMinutes ?? DEFAULT_REFRESH_MINUTES) * MINUTE_MS;
