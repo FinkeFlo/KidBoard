@@ -720,7 +720,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
   "Done"; board auto-return paused while open; i18n DE + EN; component tests and an e2e
   with the mock API (unlock, wrong PIN, lockout, auto-lock).
 
-- [ ] **T-45 Web: editor screens** (risk: **high** → Opus, deps: T-43, T-44)
+- [x] **T-45 Web: editor screens** (risk: **high** → Opus, deps: T-43, T-44)
   Goal: adding a weekly swimming lesson for one child takes under 20 seconds and no typing
   except the optional name.
   Acceptance:
@@ -769,10 +769,8 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
   2. Playwright e2e at 1280×800 and 2000×1200 against the mock API (create once, create
      weekly, edit one vs series, delete, meal, template, export/import, lockout,
      auto-lock, offline); screenshots `docs/screenshots/editor-*` (light/night).
-  3. README + README.de "Edit on the tablet" section (what is stored where, Google entries
-     stay read-only, backup, phone feed); `docs/DEPLOY.md` + `DEPLOY.de.md`: PIN in the
-     deploy form, D1 provisioned automatically, Time Travel restore, changing the PIN;
-     CONFIG EN + DE; troubleshooting (lockout, editor button missing, conflict).
+  3. ~~User docs~~ deferred by the maintainer until the editor is final (README/DEPLOY/CONFIG
+     sections for the editor, PIN, D1, backup and phone feed follow in a later task).
 
 **M11 exit:** milestone review by `reviewer-opus` (write auth, lockout, D1 data integrity,
 privacy, conventions round trip, board parity of app entries), a T-27a-style UI/UX click
@@ -842,6 +840,7 @@ stored in D1 instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-23 | T-46: user docs for the editor (README, DEPLOY, CONFIG EN + DE) deferred | Maintainer: the feature is not final yet, docs would change too much |
 | 2026-11-23 | T-46 split: T-46a (worker phone feed) and T-46 (link in the parent area, e2e, docs); the feed token moves from a path segment to the query (`/api/feed.ics?token=`) | Workers Logs redact query strings (`redact_query_string`) but not path segments; the worker part could be built in parallel to T-45 |
 | 2026-11-23 | T-43: Google template suggestions use the cached feed window (today − 1 to today + 28) instead of 8 weeks back | Looking 8 weeks back would need a second feed expansion per request, outside the Workers CPU budget (ADR-0003); app entries still count 8 weeks back |
 | 2026-11-23 | T-42/T-43: PIN errors answer 403 (`wrong_pin`, `parent_locked`), 401 stays reserved for the access token; unlock attempts are reserved before the PIN compare (a success deletes its reservation) | The board client wipes its access token on any 401; reserving first closes the parallel-request bypass of the lockout (T-42 review) |
