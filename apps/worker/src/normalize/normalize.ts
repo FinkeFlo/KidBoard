@@ -4,6 +4,7 @@ import {
   type CalendarSource,
   type Meal,
   type MealSlot,
+  parseBringList,
   type ParsedTitle,
   parseTitle,
 } from "@kidboard/shared";
@@ -201,6 +202,8 @@ export function compareMeals(a: Meal, b: Meal): number {
  *   their start in `config.timeZone`, slot by title prefix, else by `config.bands`).
  * - Occurrences whose title is empty and that carry no emoji are dropped: there is
  *   nothing a child could recognize and the placeholder icon would be noise.
+ * - Events get `bring` from the description's `Mitbringen:` / `Bring:` lines (ADR-0010),
+ *   omitted when empty; meals never do. Nothing else of the description is emitted.
  * - Ids are stable hashes of source, uid and recurrence id (plus the date for meals).
  * - Output order: events all-day first, then by start, title, id; meals by date, slot
  *   (breakfast, lunch, dinner, unspecified), title, id.
@@ -213,6 +216,16 @@ export function normalize(
 ): NormalizeResult {
   const events: CalendarEvent[] = [];
   const meals: Meal[] = [];
+  // A series shares one description: parse each distinct description once.
+  const bringByDescription = new Map<string, string[]>();
+  const bringOf = (description: string): string[] => {
+    let bring = bringByDescription.get(description);
+    if (bring === undefined) {
+      bring = parseBringList(description);
+      bringByDescription.set(description, bring);
+    }
+    return bring;
+  };
 
   for (const o of occurrences) {
     const parsed = parseTitle(o.summary, {
@@ -227,6 +240,7 @@ export function normalize(
     if (source.kind === "meals") {
       meals.push(...mealsFor(o, parsed, source, config, options));
     } else {
+      const bring = bringOf(o.description);
       events.push({
         id: stableId(...occurrenceKey(source, o)),
         sourceId: source.id,
@@ -238,6 +252,7 @@ export function normalize(
         start: o.start,
         end: o.end,
         countdown: parsed.countdown,
+        ...(bring.length > 0 ? { bring: [...bring] } : {}),
       });
     }
   }

@@ -39,6 +39,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | T-32 States and night mode per hand-off | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; error card on unchanged boundary logic, calm 401, no-flash measurement, review follow-ups a-g; dense emoji tuck under edge (open for M5b review / T-27a) |
 | 2026-11-22 | T-27 Documentation | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; title rules, KB-* codes, token flow checked against code; links verified by script |
 | 2026-11-23 | T-27a UI/UX dummy test loop | Opus 5.5 (builder-opus, 4 fix batches) | Sonnet (reviewer) + Opus (reviewer-opus, Batch B) | 4 test rounds | Round 1: Haiku 7/5, Sonnet 8/7, Opus 6.5/6 (children/parents), 22 findings (A1–A12 overview/tiles, B1–B10 week/countdown/states). Fixed in batches A and B, then Sonnet re-checks: round 2 8/8.5, round 3 8.5/8, round 4 8.5/9, no blockers or majors since round 2; round 4 verdict release-ready. Remaining minor week polish in issue #5. |
+| 2026-11-23 | T-33 Bring list: parsing and event DTO | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; emoji-only output, bounded linear parsing, cache entry v2 with v1 last-good fallback; nits: rollback note, extra VS16 |
 
 ## Escalations
 

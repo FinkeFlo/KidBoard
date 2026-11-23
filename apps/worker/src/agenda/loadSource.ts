@@ -8,6 +8,7 @@ import { sha256Hex } from "../config/loadConfig";
 import type { Env } from "../env";
 import { FEED_TIMEOUT_MS, FeedFetchError, fetchFeed } from "../feeds/fetchFeed";
 import {
+  SOURCE_ENTRY_VERSION,
   type SourceEntry,
   sourceKey,
   type SourceStore,
@@ -81,9 +82,13 @@ function resolveFeedUrl(raw: string): string | null {
   }
 }
 
-/** Fresh = expanded for the current window and younger than the TTL. */
+/**
+ * Fresh = written by this version of the normalizer, expanded for the current window
+ * and younger than the TTL. Entries of an older version are last-good only.
+ */
 function isFresh(entry: SourceEntry, ctx: LoadSourceContext): boolean {
   return (
+    entry.v === SOURCE_ENTRY_VERSION &&
     entry.window.from === ctx.window.from &&
     entry.window.to === ctx.window.to &&
     ctx.nowMs - Date.parse(entry.fetchedAt) < ctx.freshTtlSeconds * 1000
@@ -142,7 +147,7 @@ async function fetchAndNormalize(
     },
   );
   return {
-    v: 1,
+    v: SOURCE_ENTRY_VERSION,
     sourceId: source.id,
     fetchedAt: new Date(ctx.nowMs).toISOString(),
     window: { ...ctx.window },

@@ -247,6 +247,86 @@ describe("normalize events", () => {
   });
 });
 
+describe("normalize bring lists (T-33)", () => {
+  it("sets bring on events from the description, omits it when empty", () => {
+    const result = normalize(
+      [
+        occ({
+          uid: "a",
+          summary: "🤸 Turnen",
+          description: "Halle 2\nMitbringen: 👟 Turnschuhe, 🩱 🧴",
+        }),
+        occ({ uid: "b", summary: "🏫 Kita", description: "Nur Text" }),
+        occ({ uid: "c", summary: "Malen", description: "Bring: Kittel" }),
+        occ({ uid: "d", summary: "Musik" }),
+      ],
+      family,
+      config,
+    );
+    const byTitle = new Map(result.events.map((e) => [e.title, e]));
+    expect(byTitle.get("Turnen")?.bring).toEqual(["👟", "🩱", "🧴"]);
+    for (const title of ["Kita", "Malen", "Musik"]) {
+      expect(byTitle.get(title)).not.toHaveProperty("bring");
+    }
+    validate(result);
+    // Nothing else of the description reaches the DTO.
+    const json = JSON.stringify(result);
+    for (const fragment of ["Halle", "Mitbringen", "Turnschuhe", "Kittel"]) {
+      expect(json).not.toContain(fragment);
+    }
+  });
+
+  it("supports #countdown and a bring line in one description", () => {
+    const { events } = normalize(
+      [
+        occ({
+          summary: "Ausflug",
+          description: "#countdown\nBring: 🥪 🧢",
+        }),
+      ],
+      family,
+      config,
+    );
+    expect(events[0]).toMatchObject({ countdown: true, bring: ["🥪", "🧢"] });
+  });
+
+  it("gives each occurrence of a series its own copy of the list", () => {
+    const description = "Bring: 👟";
+    const { events } = normalize(
+      [
+        occ({ recurrenceId: "r1", description, summary: "Sport" }),
+        occ({
+          recurrenceId: "r2",
+          description,
+          summary: "Sport",
+          start: "2026-03-17T15:00:00+01:00",
+          end: "2026-03-17T16:00:00+01:00",
+        }),
+      ],
+      family,
+      config,
+    );
+    expect(events.map((e) => e.bring)).toEqual([["👟"], ["👟"]]);
+    expect(events[0]?.bring).not.toBe(events[1]?.bring);
+  });
+
+  it("never sets bring on meals", () => {
+    const { meals } = normalize(
+      [
+        occ({ summary: "Mittag: 🍝 Nudeln", description: "Bring: 🥄 🍴" }),
+        allDay("🍲 Suppe", "2026-03-11", "2026-03-13"),
+      ],
+      essen,
+      config,
+    );
+    expect(meals).toHaveLength(3);
+    for (const meal of meals) {
+      expect(meal).not.toHaveProperty("bring");
+    }
+    expect(JSON.stringify(meals)).not.toContain("🥄");
+  });
+});
+
 describe("normalize meals", () => {
   it("never produces meals for events sources and no events for meals sources", () => {
     expect(

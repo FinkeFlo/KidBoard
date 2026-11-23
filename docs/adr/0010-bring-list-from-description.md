@@ -55,3 +55,21 @@ convention is ours, the emoji detection reuses the existing helpers). Rules:
   changing keywords later is a breaking change.
 * A recurring series shares one description; a single changed occurrence
   (`RECURRENCE-ID`) carries its own bring list.
+
+## Implementation notes (T-33)
+* `parseBringList` lives in `packages/shared/src/title/parseBringList.ts`; `normalize`
+  (worker) calls it for `events` sources only, once per distinct description.
+* The 8 KB bound is counted in UTF-16 code units (8 192); of a bring line only graphemes
+  that start within its first 500 code units are read, so an emoji sequence at the limit is
+  kept whole instead of being cut.
+* Besides the tags above, `<script>` and `<style>` elements are removed with their
+  content (emoji inside code are not part of the line), in one linear forward pass. Every
+  regular expression is free of nested or overlapping quantifiers; adversarial inputs
+  (5 MB descriptions, 100 000 emoji, unclosed tags, long bullet or whitespace runs) are
+  covered by tests with a time budget.
+* ical.js unescapes TEXT values (`\n`/`\N` → line break, `\,` `\;` `\\`) and unfolds
+  lines before the description reaches the parser (fixture `fixtures/ics/bring.ics`).
+* The worker cache entry carries a version (`SOURCE_ENTRY_VERSION`, now 2). Entries of
+  version 1 (written before `bring` existed) are never served as fresh, so bring lists
+  appear on the first request after a deploy; they stay valid as last-good under the same
+  key until the next successful refresh overwrites them.

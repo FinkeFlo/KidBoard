@@ -6,9 +6,17 @@ import {
 } from "@kidboard/shared";
 import { z } from "zod";
 
+/**
+ * Version of the normalized data in an entry. Bumped whenever `normalize` emits new
+ * fields, so entries written by an older deploy are never served as *fresh* (they lack
+ * the new fields) but stay usable as last-good. 2: events carry `bring` (T-33).
+ */
+export const SOURCE_ENTRY_VERSION = 2;
+
 /** Normalized data of one source for a fixed window (what the caches hold). */
 export const SourceEntrySchema = z.object({
-  v: z.literal(1),
+  /** {@link SOURCE_ENTRY_VERSION} of the deploy that wrote it; older versions are last-good only. */
+  v: z.union([z.literal(1), z.literal(SOURCE_ENTRY_VERSION)]),
   sourceId: z.string().min(1),
   fetchedAt: DateTimeStringSchema,
   /** `[from, to)` the data was expanded for, `YYYY-MM-DD` in the config zone. */
@@ -27,8 +35,10 @@ const MEMORY_LIMIT = 64;
 
 /**
  * Logical key of a source's entry. One entry per source serves both roles: it is
- * *fresh* while younger than the TTL and expanded for the current window, and
- * *last-good* for 7 days (one write per refresh, which matters for KV's write quota).
+ * *fresh* while younger than the TTL, expanded for the current window and of the current
+ * {@link SOURCE_ENTRY_VERSION}, and *last-good* for 7 days (one write per refresh, which
+ * matters for KV's write quota). The key does not carry the entry version, so a new deploy
+ * still finds the old entry as last-good and overwrites it on the next refresh.
  */
 export function sourceKey(sourceId: string, hash: string): string {
   return `v1/source/${sourceId}/${hash}`;

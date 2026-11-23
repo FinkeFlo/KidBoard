@@ -11,7 +11,9 @@ choice and titles, and be forgiving.
 * Data model `Child`, `CalendarSource`, `CalendarEvent`, `Meal`, `AgendaResponse` as in
   [ARCHITECTURE.md](../ARCHITECTURE.md), defined once in `packages/shared` with zod schemas.
 * Title rules (child prefix, meal prefix DE/EN, leading emoji as icon, keyword fallback,
-  countdown flag) exactly as specified in ARCHITECTURE.md → "Title conventions".
+  countdown flag, bring list from the description) exactly as specified in
+  ARCHITECTURE.md → "Title conventions". The bring list (rule 7, optional
+  `CalendarEvent.bring`) is decided in [ADR-0010](0010-bring-list-from-description.md).
 * Children: either one calendar per child (`childId` on the source) or `Name:` prefix,
   both combinable; no match → event is for everyone.
 * Everything is plain text; the UI renders titles as React text nodes only

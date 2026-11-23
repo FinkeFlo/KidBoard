@@ -450,7 +450,7 @@ occurrences, EXDATE already works). Decisions: [ADR-0010](adr/0010-bring-list-fr
 (emoji baseline Emoji 13.0 for built-in icons). Merge rules 1–6 of M5b apply to every M10
 task; 🎒 means only "tomorrow bring" (rule 1).
 
-- [ ] **T-33 Bring list: parsing and event DTO** (risk: **high** → Opus, deps: M5b)
+- [x] **T-33 Bring list: parsing and event DTO** (risk: **high** → Opus, deps: M5b)
   Goal: a `Mitbringen:` / `Bring:` description line becomes an icon list on `CalendarEvent`,
   and nothing else of the description reaches the client (ADR-0010).
   Acceptance:

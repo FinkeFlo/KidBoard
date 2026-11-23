@@ -99,6 +99,8 @@ export interface CalendarEvent {
   start: string;         // ISO 8601 with offset (timed) or YYYY-MM-DD (all-day)
   end: string;           // exclusive end, same format as start
   countdown: boolean;    // special event for the "how many sleeps?" countdown
+  bring?: string[];      // bring list from the description (rule 7), each one emoji,
+                         // max 8; omitted when empty (old data without it stays valid)
 }
 
 export interface Meal {
@@ -147,6 +149,18 @@ Order of operations on the raw `SUMMARY`:
    "Geburtstag"/"birthday"→🎂, "Arzt"/"doctor"→🩺), else 📅 for events and 🍽️ for meals.
 6. **Countdown flag** – `true` if the icon is in `config.countdown.emojis`
    (default 🎂 🎉 🎁 🎄 🐣 ✈️ 🏖️) or the event description contains `#countdown`.
+7. **Bring list** (events only, ADR-0010) – `parseBringList(description)` in
+   `packages/shared`: a description line that starts (after optional whitespace and
+   `-`/`*`/`•` bullets) with `Mitbringen:` or `Bring:` (case-insensitive, whole word,
+   optional space before the colon) contributes its emoji graphemes (same detection as
+   rule 4) to `bring`; words, digits and text-style symbols are dropped, duplicates
+   (ignoring VS16) removed, at most 8 icons, several bring lines merged in order. Simple
+   HTML of formatted descriptions is understood for matching only (`<br>`, `</p>`,
+   `</div>`, `</li>` = line break; `<script>`/`<style>` with content and all other tags
+   removed; `&nbsp;`/`&amp;` decoded). Bounded: first 8 KB (8 192 UTF-16 code units) of
+   the description, graphemes starting in the first 500 code units of a bring line.
+   Meals ignore bring lines; `#countdown` and a bring line can share a description.
+   Nothing else of the description is ever part of a response, log or error.
 
 | Raw `SUMMARY` (calendar) | icon | title | children | slot |
 |---|---|---|---|---|
@@ -158,6 +172,13 @@ Order of operations on the raw `SUMMARY`:
 | `Mittag: 🍝 Spaghetti` (Essen) | 🍝 | Spaghetti | – | lunch |
 | `Dinner: Pizza` (Essen) | 🍕 (fallback) | Pizza | – | dinner |
 | `🥣 Müsli` (Essen) | 🥣 | Müsli | – | unspecified |
+
+| Description line (event) | `bring` |
+|---|---|
+| `Mitbringen: 👟 Turnschuhe, 🩱` | 👟 🩱 |
+| `- bring : 🧴 🧢` | 🧴 🧢 |
+| `<b>Mitbringen:</b>&nbsp;🎨` (formatted) | 🎨 |
+| `Bitte mitbringen: 👟` / `Bringdienst: 👟` | – (no match) |
 
 ## Time handling
 
@@ -603,8 +624,11 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
   `today + 31`); anything reaching past `today + 32` is a `400`. No on-demand expansion outside it (CPU budget, ADR-0003).
 - **Storage (ADR-0006):** one JSON entry per source (validated with the shared zod
   schemas on read) under the key `v1/source/<sourceId>/<hash>`, kept 7 days. It is
-  *fresh* while it was expanded for the current window and is younger than the TTL, and
-  serves as *last-good* otherwise. `<hash>` = SHA-256 (truncated) of the validated
+  *fresh* while it carries the current entry version `v` (`SOURCE_ENTRY_VERSION`, bumped
+  when `normalize` emits new fields; 2 since T-33 added `bring`), was expanded for the
+  current window and is younger than the TTL, and serves as *last-good* otherwise (an
+  entry of an older version is found under the same key after a deploy, served only as
+  last-good and overwritten by the next refresh). `<hash>` = SHA-256 (truncated) of the validated
   config, the source id and the feed URL: a config or URL change starts with an empty
   cache; the URL itself never appears in a key, log or response. Backend: Workers KV
   (`KIDBOARD_CACHE`, auto-provisioned) when bound, else the Cache API (synthetic key

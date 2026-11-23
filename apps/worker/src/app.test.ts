@@ -22,6 +22,7 @@ import {
 
 import eventsIcs from "../../../fixtures/ics/api-events.ics?raw";
 import mealsIcs from "../../../fixtures/ics/api-meals.ics?raw";
+import bringIcs from "../../../fixtures/ics/bring.ics?raw";
 import runawayIcs from "../../../fixtures/ics/runaway.ics?raw";
 import { type AppOptions, createApp } from "./app";
 import type { Env } from "./env";
@@ -446,6 +447,144 @@ describe.each<[Backend]>([["cache"], ["kv"]])(
     });
   },
 );
+
+describe("GET /api/agenda – bring lists (T-33)", () => {
+  /** Description fragments that must never leave the worker (ADR-0010). */
+  const DESCRIPTION_FRAGMENTS = [
+    "TESTONLY-private-note",
+    "Mitbringen",
+    "mitbringen",
+    "Turnschuhe",
+    "Badeanzug",
+    "Halle 2",
+    "Kittel",
+    "onerror",
+    "<script",
+    "<img",
+    "&nbsp",
+  ];
+
+  function expectNoDescriptionLeak(): void {
+    const everything = [...seenResponses, ...consoleOutput].join("\n");
+    for (const fragment of DESCRIPTION_FRAGMENTS) {
+      expect(everything).not.toContain(fragment);
+    }
+  }
+
+  it("sets bring per occurrence, never on meals, and leaks nothing else of the description", async () => {
+    // The same feed as events and as meals source: meals ignore bring lines.
+    serveIcs(KINDER_URL, bringIcs);
+    serveIcs(ESSEN_URL, bringIcs);
+    const h = harness();
+    const { status, body } = await agenda(h, "?from=2026-03-09&days=31");
+    expect(status).toBe(200);
+    expect(
+      body.events.map((e) => [e.title, e.start, e.bring ?? null, e.countdown]),
+    ).toEqual([
+      ["Ausflug", "2026-03-13", ["🥪", "🧃", "🧢"], true],
+      ["Turnen", "2026-03-10T15:00:00+01:00", ["👟", "🩱"], false],
+      ["Malen", "2026-03-11T10:00:00+01:00", ["🥼", "🧻"], false],
+      ["Mittag: 🍝 Nudeln", "2026-03-12T12:00:00+01:00", ["🥄", "🍴"], false],
+      ["Elternabend", "2026-03-12T19:00:00+01:00", null, false],
+      // RECURRENCE-ID override (moved by an hour) with its own list; 03-17 is an EXDATE.
+      ["Turnen", "2026-03-24T16:00:00+01:00", ["🧴", "🧢"], false],
+      ["Turnen", "2026-03-31T15:00:00+02:00", ["👟", "🩱"], false],
+      ["Turnen", "2026-04-07T15:00:00+02:00", ["👟", "🩱"], false],
+    ]);
+    const elternabend = body.events.find((e) => e.title === "Elternabend");
+    expect(elternabend).not.toHaveProperty("bring");
+    expect(body.meals.length).toBeGreaterThan(0);
+    for (const meal of body.meals) {
+      expect(meal).not.toHaveProperty("bring");
+    }
+    // The raw JSON (not only the parsed body) holds no description text.
+    expectNoDescriptionLeak();
+  });
+
+  it("never logs description text when sources fail (last-good keeps bring)", async () => {
+    serveIcs(KINDER_URL, bringIcs);
+    fail(ESSEN_URL, 500);
+    const h = harness();
+    await agenda(h);
+    h.clock.now = NOW + 2 * HOUR;
+    fail(KINDER_URL, 503);
+    const { body } = await agenda(h);
+    expect(body.sources[0]?.status).toBe("stale");
+    expect(body.events.find((e) => e.title === "Malen")?.bring).toEqual([
+      "🥼",
+      "🧻",
+    ]);
+    expect(consoleOutput.length).toBeGreaterThan(0);
+    expectNoDescriptionLeak();
+  });
+
+  describe("cache entries written before bring lists (entry version 1)", () => {
+    /** Rewrites every stored KV entry as a deploy before T-33 would have written it. */
+    async function downgradeStoredEntries(): Promise<void> {
+      const { keys } = await testEnv.KIDBOARD_CACHE.list();
+      expect(keys.length).toBeGreaterThan(0);
+      for (const { name } of keys) {
+        const raw = (await testEnv.KIDBOARD_CACHE.get(name)) ?? "";
+        const entry = JSON.parse(raw) as {
+          v: number;
+          events: Record<string, unknown>[];
+        };
+        expect(entry.v).toBe(2);
+        entry.v = 1;
+        for (const event of entry.events) {
+          delete event.bring;
+        }
+        await testEnv.KIDBOARD_CACHE.put(name, JSON.stringify(entry));
+      }
+    }
+
+    it("are not served as fresh: a new isolate refetches and shows bring lists", async () => {
+      serveIcs(KINDER_URL, bringIcs);
+      serveIcs(ESSEN_URL, mealsIcs);
+      await agenda(harness({ backend: "kv" }));
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      await downgradeStoredEntries();
+
+      // Same time, well within the TTL: only the version makes the entry not fresh.
+      const after = await agenda(harness({ backend: "kv" }));
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
+      expect(after.body.sources.map((s) => s.status)).toEqual(["ok", "ok"]);
+      expect(
+        after.body.events.find((e) => e.title === "Turnen")?.bring,
+      ).toEqual(["👟", "🩱"]);
+      // The refresh overwrote the old entry under the same key.
+      const { keys } = await testEnv.KIDBOARD_CACHE.list();
+      for (const { name } of keys) {
+        const raw = (await testEnv.KIDBOARD_CACHE.get(name)) ?? "";
+        expect((JSON.parse(raw) as { v: number }).v).toBe(2);
+      }
+      // A third isolate is served fresh from the rewritten entries.
+      await agenda(harness({ backend: "kv" }));
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
+    });
+
+    it("still serve as last-good (without bring) when upstream fails", async () => {
+      serveIcs(KINDER_URL, bringIcs);
+      serveIcs(ESSEN_URL, mealsIcs);
+      await agenda(harness({ backend: "kv" }));
+      await downgradeStoredEntries();
+      fail(KINDER_URL, 503);
+      fail(ESSEN_URL, 500);
+
+      const { status, body } = await agenda(harness({ backend: "kv" }));
+      expect(status).toBe(200);
+      expect(body.stale).toBe(true);
+      expect(body.sources.map((s) => [s.status, s.fetchedAt])).toEqual([
+        ["stale", new Date(NOW).toISOString()],
+        ["stale", new Date(NOW).toISOString()],
+      ]);
+      expect(body.events.map((e) => e.title)).toContain("Turnen");
+      for (const event of body.events) {
+        expect(event).not.toHaveProperty("bring");
+      }
+    });
+  });
+});
 
 describe("KV backend", () => {
   it("stores one entry per source, without URLs, under hashed keys", async () => {

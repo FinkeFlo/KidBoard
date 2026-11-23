@@ -65,6 +65,37 @@ describe("CalendarEventSchema", () => {
   });
 });
 
+describe("CalendarEventSchema – bring (T-33)", () => {
+  it("accepts an event without bring (old persisted data, old cache entries)", () => {
+    const parsed = CalendarEventSchema.parse(timedEvent);
+    expect(parsed).not.toHaveProperty("bring");
+  });
+
+  it("accepts up to 8 single emoji, ZWJ/flag/keycap included", () => {
+    const bring = ["👟", "🩱", "🧴", "👨‍👩‍👧", "🇩🇪", "1️⃣", "👋🏽", "☀️"];
+    expect(CalendarEventSchema.parse({ ...timedEvent, bring }).bring).toEqual(
+      bring,
+    );
+  });
+
+  it.each([
+    [
+      "more than 8 icons",
+      ["👟", "🩱", "🧴", "🎨", "🧦", "🍎", "🥤", "📚", "🧢"],
+    ],
+    ["text", ["Turnschuhe"]],
+    ["two emoji in one item", ["👟🩱"]],
+    ["a text-style symbol", ["©"]],
+    ["HTML", ["<img src=x>"]],
+    ["an empty string", [""]],
+    ["a non-array", "👟"],
+  ])("rejects %s", (_name, bring) => {
+    expect(
+      CalendarEventSchema.safeParse({ ...timedEvent, bring }).success,
+    ).toBe(false);
+  });
+});
+
 describe("MealSchema / ChildSchema", () => {
   it("validates a meal", () => {
     const meal = {
@@ -112,6 +143,13 @@ describe("AgendaResponseSchema", () => {
       meals: [],
     };
     expect(AgendaResponseSchema.safeParse(response).success).toBe(true);
+    // Mixed old (no `bring`) and new events in one agenda.
+    expect(
+      AgendaResponseSchema.safeParse({
+        ...response,
+        events: [timedEvent, { ...timedEvent, id: "e2", bring: ["👟"] }],
+      }).success,
+    ).toBe(true);
     expect(
       AgendaResponseSchema.safeParse({
         ...response,

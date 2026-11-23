@@ -7,6 +7,7 @@ import {
   SlugSchema,
   TimeZoneSchema,
 } from "./primitives";
+import { BRING_MAX } from "./title/parseBringList";
 
 /** A configured child. Color is a design-token name or a CSS color. */
 export const ChildSchema = z.strictObject({
@@ -54,6 +55,12 @@ export const CalendarEventSchema = z
     /** Exclusive end, same format as `start`. */
     end: DateOrDateTimeSchema,
     countdown: z.boolean(),
+    /**
+     * Icons from the description's `Mitbringen:` / `Bring:` lines (ADR-0010), each a
+     * single emoji, at most `BRING_MAX`. Omitted when there are none; data without the
+     * field (persisted client data, old worker cache entries) stays valid.
+     */
+    bring: z.array(EmojiSchema).max(BRING_MAX).optional(),
   })
   .superRefine((event, ctx) => {
     const schema = event.allDay ? DateStringSchema : DateTimeStringSchema;

@@ -1,6 +1,7 @@
 import ICAL from "ical.js";
 import { describe, expect, it } from "vitest";
 
+import bringIcs from "../../../../fixtures/ics/bring.ics?raw";
 import dstIcs from "../../../../fixtures/ics/dst.ics?raw";
 import edgeCasesIcs from "../../../../fixtures/ics/edge-cases.ics?raw";
 import emptyIcs from "../../../../fixtures/ics/empty.ics?raw";
@@ -82,6 +83,32 @@ describe("expandCalendar – single events (AC 1)", () => {
       uid("allday-no-dtend"),
     ]);
     expect(only(result, "allday-single")[0]?.description).toBe("");
+  });
+});
+
+describe("expandCalendar – description unescaping (T-33)", () => {
+  const result = expand(bringIcs, "2026-03-09", "2026-04-09");
+
+  it("unescapes \\n and \\, and unfolds lines (ical.js TEXT values)", () => {
+    const series = only(result, "bring-gym");
+    expect(series.map((o) => o.start)).toEqual([
+      "2026-03-10T15:00:00+01:00",
+      "2026-03-24T16:00:00+01:00",
+      "2026-03-31T15:00:00+02:00",
+      "2026-04-07T15:00:00+02:00",
+    ]);
+    expect(series[0]?.description).toBe(
+      "Halle 2, Eingang Süd\nMitbringen: 👟 Turnschuhe, 🩱 Badeanzug 👟\nTESTONLY-private-note",
+    );
+    expect(series[1]?.description).toBe(
+      "Heute draußen\n- Bring: 🧴 🧢\nTESTONLY-private-note",
+    );
+  });
+
+  it("unescapes \\; and keeps HTML as raw text", () => {
+    expect(only(result, "bring-art")[0]?.description).toBe(
+      "<p>Kittel nicht vergessen</p><p><b>Mitbringen:</b>&nbsp;🥼 <img src=x onerror=alert(1)> 🧻<script>alert('🐛')</script></p><p>TESTONLY-private-note</p>",
+    );
   });
 });
 
