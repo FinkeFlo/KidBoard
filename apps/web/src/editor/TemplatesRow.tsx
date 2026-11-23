@@ -10,7 +10,7 @@ import { FOCUS_RING } from "./ui";
 const CARD = `min-h-touch-parent rounded-tile bg-surface-raised text-text inset-ring-border flex shrink-0 items-center gap-3 px-4 py-2 text-start inset-ring-2 ${FOCUS_RING}`;
 
 /**
- * The "Again" row (T-45 criterion 3): suggestions from recent entries (T-43
+ * The "Again" row (T-45 criterion 3): suggestions from recent events (T-43
  * `/templates`, most frequent first) and the built-in quick picks, each pre-filling a
  * new entry with one tap.
  */
@@ -26,6 +26,8 @@ export function TemplatesRow({
   onQuickPick: (pick: QuickPick) => void;
 }): React.JSX.Element {
   const { t } = useTranslation();
+  // The row starts new entries (events); meal suggestions would open the event form.
+  const events = templates.filter((template) => template.kind === "event");
   return (
     <section
       aria-labelledby="editor-again"
@@ -40,7 +42,7 @@ export function TemplatesRow({
         className="-m-2 flex gap-3 overflow-x-auto p-2"
         data-testid={TID.templatesList}
       >
-        {templates.map((template, index) => {
+        {events.map((template, index) => {
           const kids = template.childIds.flatMap((id) => {
             const child = childList.find((c) => c.id === id);
             return child === undefined ? [] : [child];

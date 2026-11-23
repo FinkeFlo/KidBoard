@@ -27,11 +27,17 @@ export function sameIcon(a: string, b: string): boolean {
 export function OwnEmojiInput({
   label,
   onEmoji,
+  onTextChange,
   buttonLabel,
   "data-testid": testId,
 }: {
   label: string;
   onEmoji: (emoji: string) => void;
+  /**
+   * Every change of the typed text (also when it is no emoji), so a form can refuse to
+   * save while the field holds something it would silently ignore.
+   */
+  onTextChange?: ((text: string) => void) | undefined;
   /** With a button the emoji is taken on press (and the field cleared), else on input. */
   buttonLabel?: string;
   "data-testid"?: string;
@@ -46,6 +52,7 @@ export function OwnEmojiInput({
     if (value === "" || invalid) return;
     onEmoji(value);
     setText("");
+    onTextChange?.("");
   };
   return (
     <div className="flex flex-wrap items-center gap-3" data-testid={testId}>
@@ -63,6 +70,7 @@ export function OwnEmojiInput({
         onChange={(event) => {
           const next = event.target.value;
           setText(next);
+          onTextChange?.(next);
           if (buttonLabel === undefined && isEmoji(next)) {
             onEmoji(next.trim());
           }
@@ -123,11 +131,11 @@ export function IconChoice({
       checked={checked}
       onChange={onChange}
       disabled={disabled}
-      className="rounded-tile w-28 flex-col gap-0.5 px-1 py-2"
+      className="rounded-tile w-32 flex-col gap-0.5 px-2 py-2"
       data-testid={`icon-${item.id}`}
     >
       <Emoji emoji={item.icon} className="text-[2rem]" />
-      <span className="text-meta line-clamp-2 text-center leading-tight">
+      <span className="text-meta line-clamp-2 w-full text-center leading-tight break-words hyphens-auto">
         {label}
       </span>
     </ChoiceChip>
@@ -142,10 +150,13 @@ export function IconChoice({
 export function IconPicker({
   icon,
   onPick,
+  onOwnText,
   error,
 }: {
   icon: string;
   onPick: (icon: string, label: string | null) => void;
+  /** The text typed into "your own emoji" (see {@link OwnEmojiInput}). */
+  onOwnText?: ((text: string) => void) | undefined;
   error?: string | undefined;
 }): React.JSX.Element {
   const { t } = useTranslation();
@@ -187,6 +198,7 @@ export function IconPicker({
         aria-label={t(`editor.group.${group}`)}
         className="flex flex-wrap gap-2"
         data-testid={TID.activityIcons}
+        data-invalid-focus=""
       >
         {activitiesOf(group).map((activity) => {
           const label = t(`editor.activity.${activity.id}`);
@@ -219,6 +231,7 @@ export function IconPicker({
           onEmoji={(emoji) => {
             onPick(emoji, null);
           }}
+          onTextChange={onOwnText}
           data-testid={TID.ownEmoji}
         />
       </div>

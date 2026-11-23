@@ -30,6 +30,7 @@ import { useToday } from "../time";
 import { activityById, type QuickPick } from "./catalogue";
 import { type ChosenBackup, DataSection } from "./DataSection";
 import {
+  defaultStart,
   type EventDraft,
   eventDraftFromEntry,
   eventDraftFromGoogle,
@@ -48,13 +49,20 @@ import { EventForm } from "./EventForm";
 import { type EditorFailure, STORAGE_FAILURE, toFailure } from "./failure";
 import { dateLabel, dayLabel } from "./labels";
 import { entriesOfBackup, planMealCopy } from "./mealCopy";
-import { MealForm } from "./MealForm";
+import { MealForm, type TakenMeal } from "./MealForm";
 import { FailureNotice, Toast } from "./Notice";
 import { PhoneFeed } from "./PhoneFeed";
+import { jumpTo } from "./reveal";
 import { TemplatesRow } from "./TemplatesRow";
 import { TID } from "./testIds";
-import { ConfirmDialog, EditorButton } from "./ui";
+import { ConfirmDialog, EditorButton, FOCUS_RING } from "./ui";
 import { useEditorData } from "./useEditorData";
+
+/** The jump bar: section headings of the home view and their labels. */
+const JUMP_TARGETS = [
+  { id: "editor-list", label: "editor.jump.list" },
+  { id: "editor-data", label: "editor.jump.data" },
+] as const;
 
 /** What an edit form changes: the stored entry and which of its days was opened. */
 export interface EditTarget {
@@ -532,20 +540,8 @@ function EditorBody({
     });
   };
 
+  /** A suggestion of the "Again" row (events only, see `TemplatesRow`). */
   const fromTemplate = (template: EditorTemplate): void => {
-    if (template.kind === "meal") {
-      open({
-        kind: "meal",
-        key: nextKey(),
-        target: null,
-        draft: {
-          ...newMealDraft(today, template.slot ?? "unspecified"),
-          icon: template.icon,
-          title: template.title,
-        },
-      });
-      return;
-    }
     open({
       kind: "event",
       key: nextKey(),
@@ -698,10 +694,24 @@ function EditorBody({
     );
   } else if (view.kind === "meal") {
     const target = view.target;
+    // Meals of the 14-day list other than the edited entry, for the "already planned" hint.
+    const takenMeals: TakenMeal[] = (data.list?.items ?? []).flatMap((item) =>
+      item.kind === "meal" &&
+      !(item.origin === "app" && item.entryId === target?.entryId)
+        ? [
+            {
+              date: item.date,
+              slot: item.slot ?? "unspecified",
+              title: item.title,
+            },
+          ]
+        : [],
+    );
     content = (
       <MealForm
         key={view.key}
         {...shell}
+        takenMeals={takenMeals}
         heading={t(
           target === null ? "editor.meal.newTitle" : "editor.meal.editTitle",
         )}
@@ -776,111 +786,139 @@ function EditorBody({
   } else {
     content = (
       <div
-        className="flex h-full min-h-0 flex-col gap-8 overflow-y-auto pe-2 pb-8"
+        className="h-full min-h-0 overflow-y-auto pe-2 pb-8"
         data-testid={TID.editorHome}
       >
-        <div className="flex flex-wrap gap-3">
-          <EditorButton
-            tone="primary"
-            className="text-title"
-            data-testid={TID.newEntry}
-            onClick={() => {
-              open({
-                kind: "event",
-                key: nextKey(),
-                target: null,
-                draft: newEventDraft(today),
-              });
-            }}
-          >
-            <Emoji emoji="➕" className="text-[1.5rem]" />
-            {t("editor.home.newEntry")}
-          </EditorButton>
-          <EditorButton
-            className="text-title"
-            data-testid={TID.newMeal}
-            onClick={() => {
-              open({
-                kind: "meal",
-                key: nextKey(),
-                target: null,
-                draft: newMealDraft(today, "dinner"),
-              });
-            }}
-          >
-            <Emoji emoji="🍽️" className="text-[1.5rem]" />
-            {t("editor.home.newMeal")}
-          </EditorButton>
-        </div>
-        <TemplatesRow
-          templates={data.templates}
-          childList={config.children}
-          onTemplate={fromTemplate}
-          onQuickPick={fromQuickPick}
-        />
-        <section aria-labelledby="editor-list" className="flex flex-col gap-4">
-          <h3 id="editor-list" className="text-heading">
-            {t("editor.list.title")}
-          </h3>
-          {listFailure !== null && (
-            <FailureNotice
-              failure={listFailure}
-              onRetry={data.reload}
-              onUnlock={() => {
-                setRelockFor(token);
-              }}
-            />
-          )}
-          {data.list?.storageUnavailable === true && (
-            <FailureNotice
-              failure={STORAGE_FAILURE}
-              onRetry={data.reload}
-              data-testid={TID.storageUnavailable}
-            />
-          )}
-          {data.list === null ? (
-            listFailure === null && (
-              <p className="text-body text-text-muted" role="status">
-                {t("editor.list.loading")}
-              </p>
-            )
-          ) : (
-            <EntryList
-              data={data.list}
-              config={config}
-              today={today}
-              format={format}
-              onEdit={editItem}
-              onTemplate={fromGoogle}
-              onFix={fixUnresolved}
-              onDeleteUnresolved={(entry) => {
-                setPending({
-                  kind: "delete",
-                  title: entry.entry.title,
-                  target: {
-                    entryId: entry.entryId,
-                    revision: entry.revision,
-                    master: entry.entry,
-                    occurrenceDate: null,
-                    shownDate: entry.entry.date,
-                    hasOverride: false,
-                  },
+        <div className="mx-auto flex w-full max-w-[64rem] flex-col gap-8">
+          <div className="flex flex-wrap gap-3">
+            <EditorButton
+              tone="primary"
+              className="text-title"
+              data-testid={TID.newEntry}
+              onClick={() => {
+                const start = defaultStart(today, Date.now(), config.timeZone);
+                open({
+                  kind: "event",
+                  key: nextKey(),
+                  target: null,
+                  draft: newEventDraft(start.date, start.startTime),
                 });
               }}
-            />
-          )}
-        </section>
-        {failure !== null && <FailureNotice failure={failure} />}
-        <DataSection
-          busy={busy}
-          failure={dataFailure}
-          onExport={() => {
-            void exportBackup();
-          }}
-          onImport={importBackup}
-        >
-          <PhoneFeed key={token} api={api} token={token} />
-        </DataSection>
+            >
+              <Emoji emoji="➕" className="text-[1.5rem]" />
+              {t("editor.home.newEntry")}
+            </EditorButton>
+            <EditorButton
+              className="text-title"
+              data-testid={TID.newMeal}
+              onClick={() => {
+                open({
+                  kind: "meal",
+                  key: nextKey(),
+                  target: null,
+                  draft: newMealDraft(today, "dinner"),
+                });
+              }}
+            >
+              <Emoji emoji="🍽️" className="text-[1.5rem]" />
+              {t("editor.home.newMeal")}
+            </EditorButton>
+          </div>
+          <nav
+            aria-labelledby="editor-jump"
+            className="flex flex-wrap items-center gap-3"
+            data-testid={TID.jumpBar}
+          >
+            <span id="editor-jump" className="text-meta text-text-muted">
+              {t("editor.jump.label")}
+            </span>
+            {JUMP_TARGETS.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                className={`min-h-touch-parent rounded-pill text-body text-text px-3 font-extrabold underline underline-offset-4 ${FOCUS_RING}`}
+                onClick={() => {
+                  const target = document.getElementById(id);
+                  if (target !== null) jumpTo(target);
+                }}
+              >
+                {t(label)}
+              </button>
+            ))}
+          </nav>
+          <TemplatesRow
+            templates={data.templates}
+            childList={config.children}
+            onTemplate={fromTemplate}
+            onQuickPick={fromQuickPick}
+          />
+          <section
+            aria-labelledby="editor-list"
+            className="flex flex-col gap-4"
+          >
+            <h3 id="editor-list" className="text-heading">
+              {t("editor.list.title")}
+            </h3>
+            {listFailure !== null && (
+              <FailureNotice
+                failure={listFailure}
+                onRetry={data.reload}
+                onUnlock={() => {
+                  setRelockFor(token);
+                }}
+              />
+            )}
+            {data.list?.storageUnavailable === true && (
+              <FailureNotice
+                failure={STORAGE_FAILURE}
+                onRetry={data.reload}
+                data-testid={TID.storageUnavailable}
+              />
+            )}
+            {data.list === null ? (
+              listFailure === null && (
+                <p className="text-body text-text-muted" role="status">
+                  {t("editor.list.loading")}
+                </p>
+              )
+            ) : (
+              <EntryList
+                data={data.list}
+                config={config}
+                today={today}
+                format={format}
+                onEdit={editItem}
+                onTemplate={fromGoogle}
+                onFix={fixUnresolved}
+                onDeleteUnresolved={(entry) => {
+                  setPending({
+                    kind: "delete",
+                    title: entry.entry.title,
+                    target: {
+                      entryId: entry.entryId,
+                      revision: entry.revision,
+                      master: entry.entry,
+                      occurrenceDate: null,
+                      shownDate: entry.entry.date,
+                      hasOverride: false,
+                    },
+                  });
+                }}
+              />
+            )}
+          </section>
+          {failure !== null && <FailureNotice failure={failure} />}
+          <DataSection
+            busy={busy}
+            failure={dataFailure}
+            onExport={() => {
+              void exportBackup();
+            }}
+            onImport={importBackup}
+          >
+            <PhoneFeed key={token} api={api} token={token} />
+          </DataSection>
+        </div>
       </div>
     );
   }
@@ -939,7 +977,7 @@ function EditorBody({
               ? [
                   {
                     label: t("editor.action.delete"),
-                    tone: "primary",
+                    tone: "danger",
                     "data-testid": TID.confirmDelete,
                     onSelect: () => {
                       setPending(null);
@@ -960,7 +998,8 @@ function EditorBody({
                     },
                   },
                   {
-                    label: t("editor.scope.series"),
+                    label: t("editor.delete.series"),
+                    tone: "danger",
                     "data-testid": TID.deleteSeries,
                     onSelect: () => {
                       setPending(null);
@@ -996,7 +1035,11 @@ function EditorBody({
           ]}
         />
       )}
-      <Toast message={toast} onDone={clearToast} />
+      <Toast
+        message={toast}
+        onDone={clearToast}
+        hidden={pending !== null || relockFor === token}
+      />
       {relockFor === token && <PinPad />}
     </div>
   );

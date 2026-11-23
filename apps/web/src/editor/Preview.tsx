@@ -51,7 +51,9 @@ export function EventPreview({
           {t("editor.form.previewEmpty")}
         </p>
       ) : (
-        <div className="bg-surface-raised rounded-tile @container p-2">
+        // The emoji a little smaller than on the board's disc, so wide glyphs (🏊)
+        // stay inside their circle in the narrow preview instead of touching its edge.
+        <div className="bg-surface-raised rounded-tile @container p-2 [&_[data-testid=emoji-disc]>span]:text-[2.75rem]">
           <EventTile
             event={event}
             childList={childList}

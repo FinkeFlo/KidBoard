@@ -115,10 +115,11 @@ describe("Editor: home", () => {
       expect.stringContaining("Pizza"),
     ]);
     // Swimming repeats every Sunday: marked on each occurrence, single entries are not.
-    expect(within(first).getAllByTestId("series-mark")).toHaveLength(1);
-    expect(
-      within(first).getByRole("img", { name: en.editor.list.everyWeek }),
-    ).toBeInTheDocument();
+    const marks = within(first).getAllByTestId("series-mark");
+    expect(marks).toHaveLength(1);
+    // The repeat is visible text (the form's words), not only an icon.
+    expect(marks[0]).toHaveTextContent(en.editor.form.everyWeek);
+    expect(within(first).queryByTestId("changed-tag")).toBeNull();
     expect(
       within(days[1] as HTMLElement).queryByTestId("series-mark"),
     ).toBeNull();
@@ -1246,5 +1247,441 @@ describe("Editor: phone feed (T-46)", () => {
     expect(screen.getByTestId("phone-feed").outerHTML).not.toMatch(
       /#[0-9a-f]{3,8}\b/iu,
     );
+  });
+});
+
+describe("Editor: refused saves show where (M11 click test)", () => {
+  let scrolled: Element[] = [];
+  beforeEach(() => {
+    scrolled = [];
+    HTMLElement.prototype.scrollIntoView = function scrollIntoView(
+      this: HTMLElement,
+    ): void {
+      scrolled.push(this);
+    };
+  });
+  afterEach(() => {
+    delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView;
+  });
+
+  it("scrolls to the first invalid field and focuses it: picture, then name", async () => {
+    const h = renderEditor();
+    await home();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newEntry }),
+    );
+    await save();
+    const what = screen.getByRole("group", { name: en.editor.form.what });
+    expect(what).toHaveAccessibleDescription(en.editor.problem.icon);
+    expect(scrolled.at(-1)).toBe(what);
+    // The first picture of the shown group, not the group chip.
+    expect(screen.getByRole("radio", { name: "Swimming" })).toHaveFocus();
+
+    await user.click(screen.getByRole("radio", { name: "Swimming" }));
+    const name = screen.getByLabelText(en.editor.form.name);
+    await user.clear(name);
+    await user.type(name, "   ");
+    await save();
+    expect(name).toHaveFocus();
+    expect(name).toHaveAttribute("aria-invalid", "true");
+    expect(scrolled.at(-1)).toBe(name.closest("[data-editor-field]"));
+    expect(h.editor.writes).toEqual([]);
+  });
+
+  it("a meal without a dish focuses the dish choices", async () => {
+    const h = renderEditor();
+    await home();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newMeal }),
+    );
+    await save();
+    const dish = screen.getByRole("group", { name: en.editor.meal.dish });
+    expect(dish).toHaveAccessibleDescription(en.editor.problem.icon);
+    expect(scrolled.at(-1)).toBe(dish);
+    expect(screen.getByRole("radio", { name: "Spaghetti" })).toHaveFocus();
+    expect(h.editor.writes).toEqual([]);
+  });
+
+  it("an own emoji that is none blocks the save instead of using another picture", async () => {
+    const h = renderEditor();
+    await home();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newEntry }),
+    );
+    await user.click(screen.getByRole("radio", { name: "Swimming" }));
+    const own = screen.getByRole("textbox", { name: en.editor.form.ownEmoji });
+    await user.type(own, "abc");
+    await save();
+    expect(h.editor.writes).toEqual([]);
+    const message = screen.getByText(en.editor.problem.ownEmoji);
+    expect(
+      screen
+        .getByRole("group", { name: en.editor.form.what })
+        .getAttribute("aria-describedby")
+        ?.split(" "),
+    ).toContain(message.id);
+    expect(own).toHaveFocus();
+    await user.clear(own);
+    await save();
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      en.editor.toast.saved,
+    );
+    expect(h.editor.entries()[0]?.data.icon).toBe("🏊");
+  });
+});
+
+describe("Editor: forms (M11 click test)", () => {
+  it("Cancel with changes asks once; keep editing stays, discard leaves", async () => {
+    const h = renderEditor();
+    await home();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newEntry }),
+    );
+    await user.click(screen.getByRole("radio", { name: "Swimming" }));
+    await user.click(
+      screen.getByRole("button", { name: en.editor.action.cancel }),
+    );
+    const ask = screen.getByRole("alertdialog", {
+      name: en.editor.discard.title,
+    });
+    expect(ask).toHaveAccessibleDescription(en.editor.discard.text);
+    // The safe choice has the focus.
+    expect(
+      within(ask).getByRole("button", { name: en.editor.discard.keep }),
+    ).toHaveFocus();
+    await user.click(
+      within(ask).getByRole("button", { name: en.editor.discard.keep }),
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByLabelText(en.editor.form.name)).toHaveValue("Swimming");
+    await user.click(
+      screen.getByRole("button", { name: en.editor.action.cancel }),
+    );
+    const discard = within(screen.getByRole("alertdialog")).getByRole(
+      "button",
+      { name: en.editor.discard.action },
+    );
+    expect(discard).toHaveClass("bg-danger", "text-on-danger");
+    await user.click(discard);
+    expect(await screen.findByTestId("editor-home")).toBeInTheDocument();
+    expect(h.editor.writes).toEqual([]);
+  });
+
+  it("text left in 'your own emoji' counts as a change", async () => {
+    renderEditor();
+    await home();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newMeal }),
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: en.editor.form.ownEmoji }),
+      "x",
+    );
+    await user.click(
+      screen.getByRole("button", { name: en.editor.action.cancel }),
+    );
+    expect(
+      screen.getByRole("alertdialog", { name: en.editor.discard.title }),
+    ).toBeInTheDocument();
+  });
+
+  it("editing: the name follows a new picture while it is the old picture's name", async () => {
+    renderEditor({
+      setup: (editor) => {
+        editor.seed({ ...DENTIST, icon: "⚽", title: "Football" });
+        editor.seed({ ...DENTIST, icon: "🎾", title: "Tennis match" });
+        editor.seed({ ...PIZZA, title: "Pizza" });
+      },
+    });
+    await home();
+    await user.click(screen.getByRole("button", { name: "Change Football" }));
+    const name = (): HTMLElement => screen.getByLabelText(en.editor.form.name);
+    await user.click(screen.getByRole("radio", { name: "Judo" }));
+    expect(name()).toHaveValue("Judo");
+    await user.click(screen.getByRole("radio", { name: "Tennis" }));
+    expect(name()).toHaveValue("Tennis");
+    await user.click(
+      screen.getByRole("button", { name: en.editor.action.cancel }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: en.editor.discard.action }),
+    );
+
+    // A name the parent typed stays.
+    await user.click(
+      await screen.findByRole("button", { name: "Change Tennis match" }),
+    );
+    await user.click(screen.getByRole("radio", { name: "Judo" }));
+    expect(name()).toHaveValue("Tennis match");
+    await user.click(
+      screen.getByRole("button", { name: en.editor.action.cancel }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: en.editor.discard.action }),
+    );
+
+    // Same for a meal's dish.
+    await user.click(
+      await screen.findByRole("button", { name: "Change Pizza" }),
+    );
+    await user.click(screen.getByRole("radio", { name: "Soup" }));
+    expect(name()).toHaveValue("Soup");
+  });
+
+  it("a new entry starts at the next full hour once 15:00 has passed", async () => {
+    vi.setSystemTime(Date.parse("2026-11-22T16:20:00+01:00"));
+    renderEditor();
+    await home();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newEntry }),
+    );
+    expect(screen.getByLabelText(en.editor.form.start)).toHaveValue("17:00");
+    expect(screen.getByTestId("when-notice")).toBeEmptyDOMElement();
+  });
+
+  it("a new entry keeps 15:00 before then", async () => {
+    renderEditor();
+    await home();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newEntry }),
+    );
+    expect(screen.getByLabelText(en.editor.form.start)).toHaveValue("15:00");
+  });
+
+  it("a one-off start in the past gets a gentle hint and still saves", async () => {
+    const h = renderEditor();
+    await home();
+    // Dentist at 09:00 today, it is 12:00.
+    await user.click(
+      screen.getByRole("button", { name: en.editor.templates.quick.dentist }),
+    );
+    const notice = screen.getByTestId("when-notice");
+    expect(notice).toHaveTextContent(en.editor.form.pastHint);
+    await user.click(screen.getByRole("radio", { name: "Tomorrow" }));
+    expect(notice).toBeEmptyDOMElement();
+    await user.click(screen.getByRole("radio", { name: "Today" }));
+    expect(notice).toHaveTextContent(en.editor.form.pastHint);
+    await save();
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      en.editor.toast.saved,
+    );
+    expect(h.editor.entries()).toHaveLength(1);
+  });
+});
+
+describe("Editor: list and dialogs (M11 click test)", () => {
+  const LATER = {
+    ...SWIM,
+    date: "2026-11-29",
+    startTime: "16:00",
+    endTime: "17:00",
+    repeat: "none" as const,
+  };
+
+  it("rows say how they repeat and which day was changed on its own", async () => {
+    renderEditor({
+      setup: (editor) => {
+        editor.seed(SWIM, { overrides: { "2026-11-29": LATER } });
+        editor.seed({
+          ...DENTIST,
+          icon: "🎨",
+          title: "Painting",
+          date: TODAY,
+          repeat: { weekly: { weekdays: [7], interval: 2 } },
+        });
+        editor.seed(PIZZA);
+      },
+      google: () => ({
+        events: [
+          eventFixture({
+            id: "g-piano",
+            title: "Piano",
+            icon: "🎹",
+            start: "2026-11-22T16:30:00+01:00",
+            end: "2026-11-22T17:15:00+01:00",
+          }),
+        ],
+        meals: [],
+      }),
+    });
+    await home();
+    const row = (date: string, title: string): HTMLElement => {
+      const day = screen
+        .getAllByTestId("editor-day")
+        .find((d) => d.dataset["date"] === date);
+      const found = within(day as HTMLElement)
+        .getAllByTestId("editor-item")
+        .find((item) => item.textContent.includes(title));
+      if (found === undefined) throw new Error(`no row ${title} on ${date}`);
+      return found;
+    };
+    const swimToday = row(TODAY, "Swimming");
+    expect(within(swimToday).getByTestId("series-mark")).toHaveTextContent(
+      en.editor.form.everyWeek,
+    );
+    expect(within(swimToday).queryByTestId("changed-tag")).toBeNull();
+    expect(
+      within(row("2026-11-29", "Swimming")).getByTestId("changed-tag"),
+    ).toHaveTextContent(en.editor.list.changed);
+    expect(
+      within(row(TODAY, "Painting")).getByTestId("series-mark"),
+    ).toHaveTextContent(en.editor.form.everyOtherWeek);
+    // Meal rows name the slot with the form's word.
+    expect(row(TODAY, "Pizza")).toHaveTextContent(
+      `${en.editor.meal.slots.dinner}Pizza`,
+    );
+    // App and Google rows put their action in one column of the same width.
+    const actions = screen.getAllByTestId("row-action");
+    expect(actions.length).toBeGreaterThanOrEqual(4);
+    for (const action of actions)
+      expect(action).toHaveClass("w-56", "shrink-0");
+    expect(
+      within(row(TODAY, "Piano")).getByTestId("row-action"),
+    ).toContainElement(
+      screen.getByRole("button", { name: "Use Piano as template" }),
+    );
+  });
+
+  it("series questions speak of the whole series; deleting it is marked as destructive", async () => {
+    renderEditor({
+      setup: (editor) => {
+        editor.seed({
+          ...SWIM,
+          repeat: { weekly: { weekdays: [7], interval: 2 } },
+        });
+      },
+    });
+    await home();
+    await user.click(screen.getByRole("button", { name: "Change Swimming" }));
+    await save();
+    const change = screen.getByRole("alertdialog");
+    expect(
+      within(change).getByRole("button", { name: en.editor.scope.series }),
+    ).toBeInTheDocument();
+    expect(change).not.toHaveTextContent(/every week/iu);
+    await user.click(
+      within(change).getByRole("button", { name: en.editor.action.cancel }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: en.editor.action.delete }),
+    );
+    const ask = screen.getByRole("alertdialog");
+    expect(ask).toHaveAccessibleDescription(en.editor.delete.seriesText);
+    expect(
+      within(ask).getByRole("button", { name: en.editor.delete.series }),
+    ).toHaveClass("bg-danger", "text-on-danger");
+    expect(
+      within(ask).getByRole("button", { name: "Only on Sun, Nov 22" }),
+    ).not.toHaveClass("bg-danger");
+  });
+
+  it("the jump bar moves the focus to the list and to the backup section", async () => {
+    renderEditor();
+    await home();
+    const bar = screen.getByRole("navigation", { name: en.editor.jump.label });
+    await user.click(
+      within(bar).getByRole("button", { name: en.editor.jump.data }),
+    );
+    expect(
+      screen.getByRole("heading", { name: en.editor.data.title }),
+    ).toHaveFocus();
+    await user.click(
+      within(bar).getByRole("button", { name: en.editor.jump.list }),
+    );
+    expect(
+      screen.getByRole("heading", { name: en.editor.list.title }),
+    ).toHaveFocus();
+  });
+
+  it("the toast closes on request and hides while a question is open", async () => {
+    renderEditor({
+      setup: (editor) => {
+        editor.seed(DENTIST);
+      },
+    });
+    await home();
+    await user.click(screen.getByRole("button", { name: "Change Dentist" }));
+    await save();
+    const toast = screen.getByTestId("editor-toast");
+    await waitFor(() => {
+      expect(toast).toHaveTextContent(en.editor.toast.saved);
+    });
+    await user.click(
+      await screen.findByRole("button", { name: "Change Dentist" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: en.editor.action.delete }),
+    );
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(toast).toBeEmptyDOMElement();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.delete.keep }),
+    );
+    expect(toast).toHaveTextContent(en.editor.toast.saved);
+    await user.click(
+      within(toast).getByRole("button", { name: en.editor.toast.close }),
+    );
+    expect(toast).toBeEmptyDOMElement();
+  });
+});
+
+describe("Editor: meals (M11 click test)", () => {
+  it("the 'Again' row offers events only", async () => {
+    renderEditor({
+      setup: (editor) => {
+        editor.seed(SWIM);
+        editor.seed(PIZZA);
+      },
+    });
+    await home();
+    const suggestions = within(screen.getByTestId("templates-row"))
+      .getAllByTestId("template")
+      .map((card) => card.textContent);
+    expect(suggestions).toEqual([expect.stringContaining("Swimming")]);
+  });
+
+  it("names a meal already planned in the chosen slot and saves anyway", async () => {
+    const h = renderEditor({
+      setup: (editor) => {
+        editor.seed(PIZZA);
+      },
+    });
+    await home();
+    await user.click(
+      screen.getByRole("button", { name: en.editor.home.newMeal }),
+    );
+    const hint = screen.getByTestId("meal-taken");
+    // Tonight's dinner (the form's default) is Pizza already.
+    expect(hint).toHaveTextContent(
+      en.editor.meal.taken.replace("{{titles}}", "Pizza"),
+    );
+    await user.click(
+      screen.getByRole("radio", { name: en.editor.meal.slots.lunch }),
+    );
+    expect(hint).toBeEmptyDOMElement();
+    await user.click(
+      screen.getByRole("radio", { name: en.editor.meal.slots.dinner }),
+    );
+    await user.click(screen.getByRole("radio", { name: "Soup" }));
+    expect(hint).not.toBeEmptyDOMElement();
+    await save();
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      en.editor.toast.saved,
+    );
+    expect(h.editor.entries().map((e) => e.data.title)).toEqual([
+      "Pizza",
+      "Soup",
+    ]);
+  });
+
+  it("does not name the edited meal itself", async () => {
+    renderEditor({
+      setup: (editor) => {
+        editor.seed(PIZZA);
+      },
+    });
+    await home();
+    await user.click(screen.getByRole("button", { name: "Change Pizza" }));
+    expect(screen.getByTestId("meal-taken")).toBeEmptyDOMElement();
   });
 });

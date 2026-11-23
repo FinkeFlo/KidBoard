@@ -1,29 +1,42 @@
 import type { PublicConfig } from "@kidboard/shared";
-import { useId, useMemo, useState } from "react";
+import {
+  type RefObject,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { Emoji } from "../components/Emoji";
 import type { FormatContext } from "../i18n/format";
+import { useNow } from "../time";
 import { BringPicker } from "./BringPicker";
+import { ACTIVITIES } from "./catalogue";
 import { ChildPicker } from "./ChildPicker";
 import {
+  draftChanged,
   type DraftProblem,
   type EventDraft,
   eventDraftProblems,
   isCountdownIcon,
+  isEmoji,
   previewEvent,
   problemsOf,
   ruleDate,
+  startsInPast,
   toggleWeekday,
   withDate,
 } from "./draft";
 import type { EditorFailure } from "./failure";
-import { IconPicker } from "./IconPicker";
+import { IconPicker, sameIcon } from "./IconPicker";
 import { FailureNotice } from "./Notice";
 import { EventPreview } from "./Preview";
 import { RepeatPicker } from "./RepeatPicker";
+import { revealFirstInvalid } from "./reveal";
 import { TID } from "./testIds";
-import { ChoiceChip, EditorButton, Field } from "./ui";
+import { ChoiceChip, ConfirmDialog, EditorButton, Field } from "./ui";
 import { WhenPicker } from "./WhenPicker";
 
 export interface FormShellProps {
@@ -64,7 +77,7 @@ export function TitleInput({
   const hintId = useId();
   const errorId = useId();
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex scroll-mt-4 flex-col gap-2" data-editor-field="">
       <label htmlFor={id} className="text-title">
         {t("editor.form.name")}
       </label>
@@ -106,16 +119,96 @@ export function useProblemMessages(
   return messages;
 }
 
+/** True when `text` (typed into "your own emoji") is something that is no emoji. */
+export function ownEmojiInvalid(text: string): boolean {
+  return text.trim() !== "" && !isEmoji(text);
+}
+
+/**
+ * Whether a newly picked catalogue icon may replace the title: it is empty, still the
+ * label of the picked icon, or still the default name of the previous icon (`previous`,
+ * e.g. an edited entry that kept the catalogue name), never a name the parent typed.
+ */
+export function titleFollowsPicture(
+  current: { title: string; titleFromLabel: boolean },
+  previous: string | null,
+): boolean {
+  const title = current.title.trim();
+  return (
+    title === "" ||
+    current.titleFromLabel ||
+    (previous !== null && title === previous)
+  );
+}
+
+/**
+ * Cancel of a form: leaves at once when nothing changed, otherwise asks once whether
+ * to drop the changes (the safe choice keeps editing).
+ */
+export function useDiscardGuard(
+  changed: boolean,
+  onCancel: () => void,
+): { cancel: () => void; dialog: React.ReactNode } {
+  const { t } = useTranslation();
+  const [asking, setAsking] = useState(false);
+  const cancel = (): void => {
+    if (changed) setAsking(true);
+    else onCancel();
+  };
+  const dialog = asking ? (
+    <ConfirmDialog
+      title={t("editor.discard.title")}
+      text={t("editor.discard.text")}
+      cancelLabel={t("editor.discard.keep")}
+      onCancel={() => {
+        setAsking(false);
+      }}
+      actions={[
+        {
+          label: t("editor.discard.action"),
+          tone: "danger",
+          "data-testid": TID.confirmDiscard,
+          onSelect: () => {
+            setAsking(false);
+            onCancel();
+          },
+        },
+      ]}
+    />
+  ) : null;
+  return { cancel, dialog };
+}
+
+/**
+ * After a save that was refused (by the form, `attempts` counts them, or by the worker
+ * as `invalid`): the first invalid field is scrolled into view and focused.
+ */
+export function useRevealInvalid(
+  form: RefObject<HTMLFormElement | null>,
+  attempts: number,
+  failure: EditorFailure | null,
+): void {
+  useEffect(() => {
+    if (attempts > 0) revealFirstInvalid(form.current);
+  }, [form, attempts]);
+  useEffect(() => {
+    if (failure?.kind === "invalid") revealFirstInvalid(form.current);
+  }, [form, failure]);
+}
+
 /** Save / Cancel / Delete, the failure notice and the preview beside the form. */
 export function FormAside({
   preview,
   shell,
+  onCancel,
   general,
   saveLabel,
   children,
 }: {
   preview: React.ReactNode;
   shell: FormShellProps;
+  /** Cancel (asks first when the form has changes, see {@link useDiscardGuard}). */
+  onCancel: () => void;
   /** A problem that belongs to no single field. */
   general?: string | undefined;
   saveLabel: string;
@@ -144,7 +237,11 @@ export function FormAside({
         >
           {shell.busy ? t("editor.action.saving") : saveLabel}
         </EditorButton>
-        <EditorButton onClick={shell.onCancel} disabled={shell.busy}>
+        <EditorButton
+          onClick={onCancel}
+          disabled={shell.busy}
+          data-testid={TID.editorCancel}
+        >
           {t("editor.action.cancel")}
         </EditorButton>
       </div>
@@ -173,8 +270,12 @@ export function FormAside({
 export function EventForm(props: EventFormProps): React.JSX.Element {
   const { initial, config, today, format, failure, onSubmit, heading } = props;
   const { t } = useTranslation();
+  const now = useNow();
+  const formRef = useRef<HTMLFormElement>(null);
   const [draft, setDraft] = useState(initial);
   const [attempted, setAttempted] = useState(false);
+  const [refused, setRefused] = useState(0);
+  const [ownText, setOwnText] = useState("");
   const update = (patch: Partial<EventDraft>): void => {
     setDraft((current) => ({ ...current, ...patch }));
   };
@@ -182,6 +283,7 @@ export function EventForm(props: EventFormProps): React.JSX.Element {
     () => eventDraftProblems(draft, config),
     [draft, config],
   );
+  const ownInvalid = ownEmojiInvalid(ownText);
   const problems: DraftProblem[] = [
     ...new Set([
       ...(attempted ? local : []),
@@ -189,20 +291,34 @@ export function EventForm(props: EventFormProps): React.JSX.Element {
     ]),
   ];
   const messages = useProblemMessages(problems);
+  const whatError =
+    messages.icon ??
+    (attempted && ownInvalid ? t("editor.problem.ownEmoji") : undefined);
   const forcedCountdown = isCountdownIcon(draft.icon, config);
   const fallbackTitle = t("editor.form.previewTitle");
   const preview = previewEvent(draft, config.timeZone, fallbackTitle);
+  const past = startsInPast(draft, today, now, config.timeZone);
   const headingId = useId();
+  const guard = useDiscardGuard(
+    draftChanged(draft, initial) || ownText.trim() !== "",
+    props.onCancel,
+  );
+  useRevealInvalid(formRef, refused, failure);
 
   return (
     <form
+      ref={formRef}
       aria-labelledby={headingId}
       noValidate
       data-testid={TID.eventForm}
       onSubmit={(event) => {
         event.preventDefault();
         setAttempted(true);
-        if (local.length === 0 && !props.busy) onSubmit(draft);
+        if (local.length > 0 || ownInvalid) {
+          setRefused((count) => count + 1);
+          return;
+        }
+        if (!props.busy) onSubmit(draft);
       }}
       className="gap-gutter grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]"
     >
@@ -220,12 +336,21 @@ export function EventForm(props: EventFormProps): React.JSX.Element {
         />
         <IconPicker
           icon={draft.icon}
-          error={messages.icon}
+          error={whatError}
+          onOwnText={setOwnText}
           onPick={(icon, label) => {
             setDraft((current) => {
+              const previous = ACTIVITIES.find((activity) =>
+                sameIcon(activity.icon, current.icon),
+              );
               const replaceTitle =
                 label !== null &&
-                (current.title.trim() === "" || current.titleFromLabel);
+                titleFollowsPicture(
+                  current,
+                  previous === undefined
+                    ? null
+                    : t(`editor.activity.${previous.id}`),
+                );
               return {
                 ...current,
                 icon,
@@ -262,6 +387,7 @@ export function EventForm(props: EventFormProps): React.JSX.Element {
             update({ duration });
           }}
           error={messages.time}
+          notice={past ? t("editor.form.pastHint") : undefined}
         />
         <RepeatPicker
           format={format}
@@ -316,6 +442,7 @@ export function EventForm(props: EventFormProps): React.JSX.Element {
       </div>
       <FormAside
         shell={props}
+        onCancel={guard.cancel}
         saveLabel={t("editor.action.save")}
         general={messages.invalid}
         preview={
@@ -327,6 +454,7 @@ export function EventForm(props: EventFormProps): React.JSX.Element {
           />
         }
       />
+      {guard.dialog}
     </form>
   );
 }

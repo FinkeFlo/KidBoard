@@ -59,8 +59,11 @@ export interface EntryListProps {
   onDeleteUnresolved: (entry: EditorUnresolvedEntry) => void;
 }
 
-/** Repeat marker of a series occurrence: 🔁 with its rule as the accessible name. */
-function SeriesMark({
+/**
+ * The line below an app row: 🔁 with the repeat in words ("Every week" / "Every 2
+ * weeks", as in the form) and, for a series day changed on its own, a tag saying so.
+ */
+function SeriesNote({
   item,
 }: {
   item: EditorAppItem;
@@ -69,24 +72,45 @@ function SeriesMark({
   if (item.occurrenceDate === null || item.entry.repeat === "none") return null;
   const label =
     item.entry.repeat.weekly.interval === 2
-      ? t("editor.list.everyOtherWeek")
-      : t("editor.list.everyWeek");
+      ? t("editor.form.everyOtherWeek")
+      : t("editor.form.everyWeek");
   return (
-    <span data-testid={TID.seriesMark} className="shrink-0">
-      <Emoji emoji="🔁" label={label} className="text-[1.75rem]" />
-    </span>
+    <p
+      data-testid={TID.seriesMark}
+      className="text-meta text-text-muted mt-1 flex flex-wrap items-center gap-2"
+    >
+      <Emoji emoji="🔁" className="text-[1.25rem]" />
+      <span>{label}</span>
+      {item.override !== null && (
+        <span
+          data-testid={TID.changedTag}
+          className="bg-notice text-on-notice rounded-pill px-3"
+        >
+          {t("editor.list.changed")}
+        </span>
+      )}
+    </p>
   );
 }
 
 function GoogleNote(): React.JSX.Element {
   const { t } = useTranslation();
   return (
-    <p className="text-meta text-text-muted" data-testid={TID.googleNote}>
+    <p className="text-meta text-text-muted mt-1" data-testid={TID.googleNote}>
       {t("editor.list.fromGoogle")}
     </p>
   );
 }
 
+/** What goes below a row's tile: where it comes from or how it repeats. */
+function RowNote({ item }: { item: EditorListItem }): React.JSX.Element | null {
+  return item.origin === "google" ? <GoogleNote /> : <SeriesNote item={item} />;
+}
+
+/**
+ * The action of a row ("Change" or "Use as template") in a column of one width, so the
+ * buttons of app and Google rows line up.
+ */
 function ItemActions({
   item,
   onEdit,
@@ -97,26 +121,32 @@ function ItemActions({
   onTemplate: (item: EditorGoogleItem) => void;
 }): React.JSX.Element {
   const { t } = useTranslation();
-  return item.origin === "app" ? (
-    <EditorButton
-      aria-label={t("editor.list.editNamed", { title: item.title })}
-      onClick={() => {
-        onEdit(item);
-      }}
-      data-testid={TID.editEntry}
-    >
-      {t("editor.list.edit")}
-    </EditorButton>
-  ) : (
-    <EditorButton
-      aria-label={t("editor.list.templateNamed", { title: item.title })}
-      onClick={() => {
-        onTemplate(item);
-      }}
-      data-testid={TID.useTemplate}
-    >
-      {t("editor.list.template")}
-    </EditorButton>
+  return (
+    <div className="flex w-56 shrink-0" data-testid={TID.rowAction}>
+      {item.origin === "app" ? (
+        <EditorButton
+          className="w-full"
+          aria-label={t("editor.list.editNamed", { title: item.title })}
+          onClick={() => {
+            onEdit(item);
+          }}
+          data-testid={TID.editEntry}
+        >
+          {t("editor.list.edit")}
+        </EditorButton>
+      ) : (
+        <EditorButton
+          className="w-full"
+          aria-label={t("editor.list.templateNamed", { title: item.title })}
+          onClick={() => {
+            onTemplate(item);
+          }}
+          data-testid={TID.useTemplate}
+        >
+          {t("editor.list.template")}
+        </EditorButton>
+      )}
+    </div>
   );
 }
 
@@ -150,9 +180,8 @@ function EventRow({
           timeOfDay={timeOfDayOf(event, config)}
           size="compact"
         />
-        {item.origin === "google" && <GoogleNote />}
+        <RowNote item={item} />
       </div>
-      {item.origin === "app" && <SeriesMark item={item} />}
       <ItemActions item={item} onEdit={onEdit} onTemplate={onTemplate} />
     </li>
   );
@@ -176,21 +205,20 @@ function MealRow({
       data-kind="meal"
       className="flex items-center gap-3"
     >
-      <div className="bg-surface-raised rounded-tile flex min-w-0 flex-1 items-center gap-3 px-3 py-2">
-        <span className="bg-surface-sunken rounded-pill flex size-12 shrink-0 items-center justify-center">
-          <Emoji emoji={item.icon} className="text-[1.75rem]" />
-        </span>
-        <div className="min-w-0">
+      <div className="min-w-0 flex-1">
+        <div className="bg-surface-raised rounded-tile flex min-w-0 items-center gap-3 px-3 py-2">
+          <span className="bg-surface-sunken rounded-pill flex size-12 shrink-0 items-center justify-center">
+            <Emoji emoji={item.icon} className="text-[1.75rem]" />
+          </span>
           <p className="text-tile-compact min-w-0 truncate">
             <span className="text-text-muted text-meta me-2">
-              {t(`meal.slot.${slot}`)}
+              {t(`editor.meal.slots.${slot}`)}
             </span>
             {item.title}
           </p>
-          {item.origin === "google" && <GoogleNote />}
         </div>
+        <RowNote item={item} />
       </div>
-      {item.origin === "app" && <SeriesMark item={item} />}
       <ItemActions item={item} onEdit={onEdit} onTemplate={onTemplate} />
     </li>
   );

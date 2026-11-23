@@ -134,7 +134,7 @@
   "editor": {
     "home": {
       "newEntry": "New entry",
-      "newMeal": "What's for dinner?"
+      "newMeal": "Add a meal"
     },
     "form": {
       "newTitle": "New entry",
@@ -181,7 +181,8 @@
       "countdownToggle": "Count the sleeps",
       "preview": "This is how it looks",
       "previewEmpty": "Pick a picture to see the tile.",
-      "previewTitle": "Name"
+      "previewTitle": "Name",
+      "pastHint": "This is in the past. You can still save it."
     },
     "group": {
       "sport": "Sport",
@@ -306,15 +307,14 @@
       "editNamed": "Change {{title}}",
       "template": "Use as template",
       "templateNamed": "Use {{title}} as template",
-      "everyWeek": "Repeats every week",
-      "everyOtherWeek": "Repeats every 2 weeks",
       "meals": "Meals",
       "unresolved": "Needs a look",
       "unresolvedChild": "A child of this entry is no longer set up. Change or delete it.",
       "unresolvedOther": "This entry no longer fits the settings. Change or delete it.",
       "fix": "Change",
       "fixNamed": "Change {{title}}",
-      "deleteNamed": "Delete {{title}}"
+      "deleteNamed": "Delete {{title}}",
+      "changed": "This day changed"
     },
     "problem": {
       "icon": "Pick a picture or enter your own emoji.",
@@ -322,15 +322,16 @@
       "time": "The end has to be after the start.",
       "until": "The last day must not be before the first day.",
       "children": "Pick children that are set up.",
-      "invalid": "Something in this entry does not fit. Please check it."
+      "invalid": "Something in this entry does not fit. Please check it.",
+      "ownEmoji": "The “Your own emoji” field holds no single emoji. Please fix or clear it."
     },
     "error": {
       "offline": "No connection. Your entry is still here – try again when the network is back.",
       "timeout": "That took too long. Your entry is still here – please try again.",
       "unauthorized": "This tablet needs a new access link.",
       "locked": "For safety the editor locked itself. Enter the PIN again – your entry stays.",
-      "conflict": "This entry was changed elsewhere in the meantime. Save again to keep your version, or cancel to see the current one.",
-      "conflictDelete": "This entry was changed elsewhere in the meantime. Check it in the list, then delete again if you still want to.",
+      "conflict": "This entry was changed somewhere else in the meantime. Save keeps your version, Cancel shows the current one.",
+      "conflictDelete": "This entry was changed somewhere else in the meantime. Look at it in the list and delete it once more if you want.",
       "limitEntries": "The editor is full (1,000 entries). Delete old entries first.",
       "limitSize": "This entry is too large. Please shorten it.",
       "invalid": "Please check the marked fields.",
@@ -354,23 +355,25 @@
       "imported_one": "{{count}} entry imported.",
       "imported_other": "{{count}} entries imported.",
       "copied_one": "{{count}} meal copied.",
-      "copied_other": "{{count}} meals copied."
+      "copied_other": "{{count}} meals copied.",
+      "close": "Close message"
     },
     "scope": {
       "title": "Change “{{title}}”",
       "text": "This entry repeats. What should change?",
       "one": "Only on {{day}}",
-      "series": "Every week",
-      "overrideText": "This day was changed on its own before; “Every week” gives it your entry too."
+      "series": "Whole series",
+      "overrideText": "This day was changed on its own before; “Whole series” gives it your entry too."
     },
     "delete": {
       "title": "Delete “{{title}}”?",
       "text": "It disappears from the board.",
-      "seriesText": "This entry repeats. Delete only this day or every week?",
-      "keep": "Keep"
+      "seriesText": "Delete only this day or the whole series?",
+      "keep": "Keep",
+      "series": "Delete whole series"
     },
     "meal": {
-      "newTitle": "What's for dinner?",
+      "newTitle": "Add a meal",
       "editTitle": "Change meal",
       "day": "Which day?",
       "slot": "Which meal?",
@@ -380,8 +383,9 @@
         "dinner": "Dinner",
         "unspecified": "Any time"
       },
-      "dish": "What is there?",
-      "previewEmpty": "Pick a dish to see the plate."
+      "dish": "Which dish?",
+      "previewEmpty": "Pick a dish to see the plate.",
+      "taken": "Already planned on this day: {{titles}}. Saving adds yours as well."
     },
     "copy": {
       "title": "Repeat last week's meals",
@@ -424,6 +428,17 @@
         "replaceText": "All entries made here are deleted first. Google entries stay.",
         "replaceAction": "Replace all"
       }
+    },
+    "discard": {
+      "title": "Discard changes?",
+      "text": "What you changed here is not saved.",
+      "action": "Discard",
+      "keep": "Keep editing"
+    },
+    "jump": {
+      "label": "Jump to",
+      "list": "Entries",
+      "data": "Backup & phone"
     }
   }
 }

@@ -1,9 +1,10 @@
 import { addCalendarDays, type MealSlot } from "@kidboard/shared";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { DISHES } from "./catalogue";
 import {
+  draftChanged,
   type DraftProblem,
   isEmoji,
   type MealDraft,
@@ -13,8 +14,12 @@ import {
 import {
   FormAside,
   type FormShellProps,
+  ownEmojiInvalid,
+  titleFollowsPicture,
   TitleInput,
+  useDiscardGuard,
   useProblemMessages,
+  useRevealInvalid,
 } from "./EventForm";
 import { IconChoice, OwnEmojiInput, sameIcon } from "./IconPicker";
 import { dayLabel } from "./labels";
@@ -33,22 +38,37 @@ export const MEAL_SLOTS: readonly MealSlot[] = [
 /** Day chips of the meal form: today and the next six days. */
 const MEAL_DAY_CHIPS = 7;
 
+/** A meal already planned on a day (in the editor's 14-day window). */
+export interface TakenMeal {
+  date: string;
+  slot: MealSlot;
+  title: string;
+}
+
 export interface MealFormProps extends FormShellProps {
   initial: MealDraft;
   onSubmit: (draft: MealDraft) => void;
+  /**
+   * Meals already planned (without the edited one): when the chosen day and slot
+   * already hold one, a gentle hint names it; saving stays possible.
+   */
+  takenMeals?: readonly TakenMeal[];
   /** "Repeat last week's meals" (new meals only). */
   copyAction?: React.ReactNode;
 }
 
 /**
- * "What's for dinner?" (T-45 criterion 4): day and slot chips, the dish catalogue,
+ * "Add a meal" (T-45 criterion 4): day and slot chips, the dish catalogue,
  * own emoji and name, the plate preview. Meals are all-day entries in a slot.
  */
 export function MealForm(props: MealFormProps): React.JSX.Element {
   const { initial, config, today, format, failure, onSubmit, heading } = props;
   const { t } = useTranslation();
+  const formRef = useRef<HTMLFormElement>(null);
   const [draft, setDraft] = useState(initial);
   const [attempted, setAttempted] = useState(false);
+  const [refused, setRefused] = useState(0);
+  const [ownText, setOwnText] = useState("");
   const dayName = useId();
   const slotName = useId();
   const dishName = useId();
@@ -57,6 +77,7 @@ export function MealForm(props: MealFormProps): React.JSX.Element {
     () => mealDraftProblems(draft, config),
     [draft, config],
   );
+  const ownInvalid = ownEmojiInvalid(ownText);
   const problems: DraftProblem[] = [
     ...new Set([
       ...(attempted ? local : []),
@@ -64,30 +85,52 @@ export function MealForm(props: MealFormProps): React.JSX.Element {
     ]),
   ];
   const messages = useProblemMessages(problems);
+  const dishError =
+    messages.icon ??
+    (attempted && ownInvalid ? t("editor.problem.ownEmoji") : undefined);
   const days = Array.from({ length: MEAL_DAY_CHIPS }, (_, i) =>
     addCalendarDays(today, i),
   );
   const pick = (icon: string, label: string | null): void => {
-    setDraft((current) => ({
-      ...current,
-      icon,
-      ...(label !== null &&
-      (current.title.trim() === "" || current.titleFromLabel)
-        ? { title: label, titleFromLabel: true }
-        : {}),
-    }));
+    setDraft((current) => {
+      const previous = DISHES.find((dish) => sameIcon(dish.icon, current.icon));
+      const replaceTitle =
+        label !== null &&
+        titleFollowsPicture(
+          current,
+          previous === undefined ? null : t(`editor.dish.${previous.id}`),
+        );
+      return {
+        ...current,
+        icon,
+        ...(replaceTitle ? { title: label, titleFromLabel: true } : {}),
+      };
+    });
   };
   const currentDish = DISHES.find((dish) => sameIcon(dish.icon, draft.icon));
+  const taken = (props.takenMeals ?? [])
+    .filter((meal) => meal.date === draft.date && meal.slot === draft.slot)
+    .map((meal) => meal.title);
+  const guard = useDiscardGuard(
+    draftChanged(draft, initial) || ownText.trim() !== "",
+    props.onCancel,
+  );
+  useRevealInvalid(formRef, refused, failure);
 
   return (
     <form
+      ref={formRef}
       aria-labelledby={headingId}
       noValidate
       data-testid={TID.mealForm}
       onSubmit={(event) => {
         event.preventDefault();
         setAttempted(true);
-        if (local.length === 0 && !props.busy) onSubmit(draft);
+        if (local.length > 0 || ownInvalid) {
+          setRefused((count) => count + 1);
+          return;
+        }
+        if (!props.busy) onSubmit(draft);
       }}
       className="gap-gutter grid h-full min-h-0 grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]"
     >
@@ -146,16 +189,26 @@ export function MealForm(props: MealFormProps): React.JSX.Element {
               </ChoiceChip>
             ))}
           </div>
+          <p
+            aria-live="polite"
+            className="text-body text-text-muted empty:hidden"
+            data-testid={TID.mealTaken}
+          >
+            {taken.length > 0
+              ? t("editor.meal.taken", { titles: taken.join(", ") })
+              : null}
+          </p>
         </Field>
         <Field
           legend={t("editor.meal.dish")}
-          error={messages.icon}
+          error={dishError}
           data-testid={TID.fieldDish}
         >
           <div
             role="radiogroup"
             aria-label={t("editor.meal.dish")}
             className="flex flex-wrap gap-2"
+            data-invalid-focus=""
           >
             {DISHES.map((dish) => {
               const label = t(`editor.dish.${dish.id}`);
@@ -178,6 +231,7 @@ export function MealForm(props: MealFormProps): React.JSX.Element {
             onEmoji={(emoji) => {
               pick(emoji, null);
             }}
+            onTextChange={setOwnText}
             data-testid={TID.ownDish}
           />
         </Field>
@@ -195,6 +249,7 @@ export function MealForm(props: MealFormProps): React.JSX.Element {
       </div>
       <FormAside
         shell={props}
+        onCancel={guard.cancel}
         saveLabel={t("editor.action.save")}
         general={messages.invalid ?? messages.time ?? messages.until}
         preview={
@@ -211,6 +266,7 @@ export function MealForm(props: MealFormProps): React.JSX.Element {
       >
         {props.copyAction}
       </FormAside>
+      {guard.dialog}
     </form>
   );
 }

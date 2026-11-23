@@ -136,9 +136,7 @@ test.describe("parent editor (T-45)", () => {
       hasText: "Swimming",
     });
     await expect(swim).toBeVisible();
-    await expect(
-      swim.getByRole("img", { name: "Repeats every week" }),
-    ).toBeVisible();
+    await expect(swim.getByTestId("series-mark")).toContainText("Every week");
     await expect(
       day(page, 7).getByTestId("editor-item").filter({ hasText: "Swimming" }),
     ).toBeVisible();
@@ -234,7 +232,7 @@ test.describe("parent editor (T-45)", () => {
     await page.getByTestId("editor-delete").click();
     const confirm = page.getByRole("alertdialog");
     await expect(confirm).toContainText("Delete “Football”?");
-    await confirm.getByRole("button", { name: "Every week" }).click();
+    await confirm.getByRole("button", { name: "Delete whole series" }).click();
     await expect(page.getByTestId("editor-toast")).toContainText("Deleted");
     expect(api.editor.entries()).toHaveLength(0);
     await expect(page.getByTestId("entry-list")).not.toContainText("Football");
@@ -314,9 +312,10 @@ test.describe("parent editor (T-45)", () => {
       },
     });
     const row = page.getByTestId("templates-list");
-    // The seeded activities plus the Google piano lesson and soup.
+    // The seeded activities plus the Google piano lesson (the Google soup is a meal:
+    // the row starts events only).
     await expect(row.getByTestId("template")).toHaveCount(
-      activities.length + 2,
+      activities.length + 1,
     );
     const sizes = await row.evaluate((element) => ({
       scroll: element.scrollWidth,
@@ -551,6 +550,46 @@ test.describe("parent editor (T-45)", () => {
     });
     await expect(page.getByTestId("data-section")).toBeVisible();
     await expect(page.getByTestId("phone-feed")).toHaveCount(0);
+  });
+
+  test("a refused save shows its reason in view; Cancel asks before dropping changes", async ({
+    page,
+  }) => {
+    const api = await openEditor(page);
+    // The jump bar reaches the backup section further down and back.
+    await page
+      .getByRole("navigation", { name: "Jump to" })
+      .getByRole("button", { name: "Backup & phone" })
+      .click();
+    await expect(page.getByRole("heading", { name: "Data" })).toBeFocused();
+    await expect(page.getByRole("heading", { name: "Data" })).toBeInViewport();
+
+    await page.getByTestId("new-entry").click();
+    const form = page.getByTestId("event-form");
+    // Scroll the form down first, so the picture field is out of view.
+    await form.getByTestId("field-countdown").scrollIntoViewIfNeeded();
+    await page.getByTestId("editor-save").click();
+    const error = form
+      .getByTestId("field-what")
+      .getByText("Pick a picture or enter your own emoji.");
+    await expect(error).toBeInViewport();
+    await expect(form.getByRole("radio", { name: "Swimming" })).toBeFocused();
+
+    // An own "emoji" that is none is refused, not replaced by another picture.
+    await form.getByRole("radio", { name: "Swimming" }).check(CHIP);
+    await form.getByRole("textbox", { name: "Your own emoji" }).fill("abc");
+    await page.getByTestId("editor-save").click();
+    await expect(
+      form.getByText("The “Your own emoji” field holds no single emoji."),
+    ).toBeInViewport();
+    expect(api.editor.writes).toEqual([]);
+
+    await page.getByTestId("editor-cancel").click();
+    const ask = page.getByRole("alertdialog", { name: "Discard changes?" });
+    await expect(ask).toBeVisible();
+    await ask.getByRole("button", { name: "Discard" }).click();
+    await expect(page.getByTestId("editor-home")).toBeVisible();
+    expect(api.editor.writes).toEqual([]);
   });
 
   test("an XSS-looking title stays text", async ({ page }) => {

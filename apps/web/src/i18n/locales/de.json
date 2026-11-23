@@ -149,7 +149,7 @@
       "ownEmojiInvalid": "Bitte genau ein Emoji eingeben.",
       "ownEmojiChosen": "Dein Emoji",
       "name": "Name auf der Kachel",
-      "nameHint": "Wird aus dem Bild übernommen. Gern ändern (bis 60 Zeichen).",
+      "nameHint": "Wird aus dem Bild übernommen. Kannst du ändern (bis 60 Zeichen).",
       "when": "Wann?",
       "day": "Tag",
       "otherDay": "Anderer Tag",
@@ -181,7 +181,8 @@
       "countdownToggle": "Nächte zählen",
       "preview": "So sieht es aus",
       "previewEmpty": "Wähle ein Bild, um die Kachel zu sehen.",
-      "previewTitle": "Name"
+      "previewTitle": "Name",
+      "pastHint": "Liegt in der Vergangenheit. Speichern geht trotzdem."
     },
     "group": {
       "sport": "Sport",
@@ -189,7 +190,7 @@
       "play": "Freunde & Spielen",
       "appointments": "Termine",
       "outings": "Ausflüge",
-      "celebrations": "Feste"
+      "celebrations": "Feiern"
     },
     "activity": {
       "swimming": "Schwimmen",
@@ -306,15 +307,14 @@
       "editNamed": "{{title}} ändern",
       "template": "Als Vorlage",
       "templateNamed": "{{title}} als Vorlage nehmen",
-      "everyWeek": "Wiederholt sich jede Woche",
-      "everyOtherWeek": "Wiederholt sich alle 2 Wochen",
       "meals": "Essen",
       "unresolved": "Bitte ansehen",
       "unresolvedChild": "Ein Kind dieses Eintrags ist nicht mehr eingerichtet. Ändern oder löschen.",
       "unresolvedOther": "Dieser Eintrag passt nicht mehr zu den Einstellungen. Ändern oder löschen.",
       "fix": "Ändern",
       "fixNamed": "{{title}} ändern",
-      "deleteNamed": "{{title}} löschen"
+      "deleteNamed": "{{title}} löschen",
+      "changed": "Dieser Tag geändert"
     },
     "problem": {
       "icon": "Wähle ein Bild oder gib ein eigenes Emoji ein.",
@@ -322,15 +322,16 @@
       "time": "Das Ende muss nach dem Beginn liegen.",
       "until": "Der letzte Tag darf nicht vor dem ersten liegen.",
       "children": "Wähle Kinder, die eingerichtet sind.",
-      "invalid": "Etwas an diesem Eintrag passt nicht. Bitte prüfen."
+      "invalid": "Etwas an diesem Eintrag passt nicht. Bitte prüfen.",
+      "ownEmoji": "Im Feld „Eigenes Emoji“ steht kein einzelnes Emoji. Bitte korrigieren oder leeren."
     },
     "error": {
       "offline": "Keine Verbindung. Dein Eintrag bleibt hier – versuch es nochmal, wenn das Netz wieder da ist.",
       "timeout": "Das hat zu lange gedauert. Dein Eintrag bleibt hier – bitte nochmal versuchen.",
       "unauthorized": "Dieses Tablet braucht einen neuen Zugangslink.",
       "locked": "Zur Sicherheit hat sich der Editor gesperrt. PIN nochmal eingeben – dein Eintrag bleibt.",
-      "conflict": "Dieser Eintrag wurde inzwischen woanders geändert. Nochmal speichern behält deine Fassung, Abbrechen zeigt die aktuelle.",
-      "conflictDelete": "Dieser Eintrag wurde inzwischen woanders geändert. Sieh ihn dir in der Liste an und lösche ihn dann nochmal, wenn du willst.",
+      "conflict": "Dieser Eintrag wurde inzwischen woanders geändert. Speichern behält deine Fassung, Abbrechen zeigt die aktuelle.",
+      "conflictDelete": "Dieser Eintrag wurde inzwischen woanders geändert. Sieh ihn dir in der Liste an und lösche ihn dann erneut, wenn du willst.",
       "limitEntries": "Der Editor ist voll (1.000 Einträge). Bitte zuerst alte Einträge löschen.",
       "limitSize": "Dieser Eintrag ist zu groß. Bitte kürzen.",
       "invalid": "Bitte die markierten Felder prüfen.",
@@ -354,20 +355,22 @@
       "imported_one": "{{count}} Eintrag importiert.",
       "imported_other": "{{count}} Einträge importiert.",
       "copied_one": "{{count}} Essen kopiert.",
-      "copied_other": "{{count}} Essen kopiert."
+      "copied_other": "{{count}} Essen kopiert.",
+      "close": "Hinweis schließen"
     },
     "scope": {
       "title": "„{{title}}“ ändern",
       "text": "Dieser Eintrag wiederholt sich. Was soll sich ändern?",
       "one": "Nur am {{day}}",
-      "series": "Jede Woche",
-      "overrideText": "Dieser Tag wurde schon einzeln geändert; „Jede Woche“ übernimmt deinen Eintrag auch für ihn."
+      "series": "Ganze Reihe",
+      "overrideText": "Dieser Tag wurde schon einzeln geändert; „Ganze Reihe“ übernimmt deinen Eintrag auch für ihn."
     },
     "delete": {
       "title": "„{{title}}“ löschen?",
       "text": "Er verschwindet von der Tafel.",
-      "seriesText": "Dieser Eintrag wiederholt sich. Nur diesen Tag oder jede Woche löschen?",
-      "keep": "Behalten"
+      "seriesText": "Nur diesen Tag oder die ganze Reihe löschen?",
+      "keep": "Behalten",
+      "series": "Ganze Reihe löschen"
     },
     "meal": {
       "newTitle": "Was gibt's zu essen?",
@@ -376,12 +379,13 @@
       "slot": "Welche Mahlzeit?",
       "slots": {
         "breakfast": "Frühstück",
-        "lunch": "Mittag",
+        "lunch": "Mittagessen",
         "dinner": "Abendessen",
         "unspecified": "Irgendwann"
       },
       "dish": "Was gibt es?",
-      "previewEmpty": "Wähle ein Gericht, um den Teller zu sehen."
+      "previewEmpty": "Wähle ein Gericht, um den Teller zu sehen.",
+      "taken": "An diesem Tag steht schon: {{titles}}. Speichern trägt deins zusätzlich ein."
     },
     "copy": {
       "title": "Essen der letzten Woche wiederholen",
@@ -424,6 +428,17 @@
         "replaceText": "Alle hier gemachten Einträge werden vorher gelöscht. Einträge aus Google bleiben.",
         "replaceAction": "Alles ersetzen"
       }
+    },
+    "discard": {
+      "title": "Änderungen verwerfen?",
+      "text": "Was du hier geändert hast, wird nicht gespeichert.",
+      "action": "Verwerfen",
+      "keep": "Weiter bearbeiten"
+    },
+    "jump": {
+      "label": "Springen zu",
+      "list": "Termine",
+      "data": "Sicherung & Handy"
     }
   }
 }

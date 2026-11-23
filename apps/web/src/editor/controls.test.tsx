@@ -137,6 +137,24 @@ describe("IconPicker", () => {
     expect(own).toHaveAttribute("aria-invalid", "false");
   });
 
+  it("reports every typed text, also text that is no emoji", async () => {
+    const onOwnText = vi.fn<(text: string) => void>();
+    render(<IconPicker icon="" onPick={vi.fn()} onOwnText={onOwnText} />);
+    const own = screen.getByRole("textbox", { name: en.editor.form.ownEmoji });
+    await userEvent.type(own, "abc");
+    expect(onOwnText).toHaveBeenLastCalledWith("abc");
+    await userEvent.clear(own);
+    expect(onOwnText).toHaveBeenLastCalledWith("");
+  });
+
+  it("long labels may wrap and hyphenate inside their chip", () => {
+    applyLocale("de");
+    render(<IconPicker icon="🌲" onPick={vi.fn()} />);
+    const label = screen.getByText(de.editor.activity.forest);
+    expect(label).toHaveClass("hyphens-auto", "break-words", "line-clamp-2");
+    expect(label.closest("label")).toHaveClass("px-2");
+  });
+
   it("marks an own icon as chosen", () => {
     render(<IconPicker icon="🦖" onPick={vi.fn()} />);
     expect(screen.getByTestId("own-icon")).toHaveTextContent(
@@ -177,6 +195,32 @@ describe("WhenPicker", () => {
     );
   }
   const state = (): string | null => screen.getByTestId("state").textContent;
+
+  it("shows a gentle notice without marking the field invalid", () => {
+    const props = {
+      today: TODAY,
+      format: FORMAT,
+      date: TODAY,
+      onDate: vi.fn(),
+      allDay: false,
+      onAllDay: vi.fn(),
+      startTime: "09:00",
+      onStartTime: vi.fn(),
+      duration: 60,
+      onDuration: vi.fn(),
+    };
+    const { rerender } = render(
+      <WhenPicker {...props} notice={en.editor.form.pastHint} />,
+    );
+    const notice = screen.getByTestId("when-notice");
+    expect(notice).toHaveTextContent(en.editor.form.pastHint);
+    expect(notice).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByTestId("field-when")).not.toHaveAttribute(
+      "aria-invalid",
+    );
+    rerender(<WhenPicker {...props} />);
+    expect(notice).toBeEmptyDOMElement();
+  });
 
   it("has today and tomorrow chips and a date field", async () => {
     render(<Harness />);
@@ -491,6 +535,25 @@ describe("FailureNotice and Toast", () => {
       screen.getByRole("button", { name: en.editor.action.retry }),
     );
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("a toast can be closed at once and is not shown under a dialog", async () => {
+    const onDone = vi.fn();
+    const { rerender } = render(
+      <Toast message="Saved." onDone={onDone} hidden />,
+    );
+    const region = screen.getByRole("status");
+    expect(region).toHaveAttribute("aria-live", "polite");
+    expect(region).toBeEmptyDOMElement();
+    rerender(<Toast message="Saved." onDone={onDone} />);
+    expect(region).toHaveTextContent("Saved.");
+    // At the top of the editor, never over the list rows or the form's actions.
+    expect(region).toHaveClass("top-0");
+    expect(region).not.toHaveClass("bottom-6");
+    await userEvent.click(
+      within(region).getByRole("button", { name: en.editor.toast.close }),
+    );
+    expect(onDone).toHaveBeenCalledTimes(1);
   });
 
   it("a toast is a polite status that hides itself", () => {

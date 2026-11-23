@@ -63,7 +63,7 @@ export function BringPicker({
               toggle(icon);
             }}
             label={t("editor.form.ownBringItem", { icon })}
-            className="rounded-tile w-28 flex-col py-2"
+            className="rounded-tile w-32 flex-col px-2 py-2"
           >
             <Emoji emoji={icon} className="text-[2rem]" />
           </ChoiceChip>

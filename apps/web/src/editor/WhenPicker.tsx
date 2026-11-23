@@ -79,6 +79,7 @@ export function WhenPicker({
   duration,
   onDuration,
   error,
+  notice,
 }: {
   today: string;
   format: FormatContext;
@@ -91,6 +92,8 @@ export function WhenPicker({
   duration: number;
   onDuration: (minutes: number) => void;
   error?: string | undefined;
+  /** A gentle, non-blocking note (e.g. the start lies in the past). */
+  notice?: string | undefined;
 }): React.JSX.Element {
   const { t } = useTranslation();
   const dayName = useId();
@@ -203,6 +206,13 @@ export function WhenPicker({
           </div>
         </>
       )}
+      <p
+        aria-live="polite"
+        className="text-body text-text-muted empty:hidden"
+        data-testid={TID.whenNotice}
+      >
+        {notice}
+      </p>
     </Field>
   );
 }

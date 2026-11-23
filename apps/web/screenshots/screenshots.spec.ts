@@ -273,9 +273,9 @@ for (const theme of ["light", "night"] as const) {
     await own.first().evaluate((element) => {
       element.scrollIntoView({ block: "center" });
     });
-    await expect(
-      own.first().getByRole("img", { name: "Repeats every week" }),
-    ).toBeVisible();
+    await expect(own.first().getByTestId("series-mark")).toContainText(
+      "Every week",
+    );
     await page.mouse.move(0, 0);
     await shoot(page, `editor-list-${theme}`, size);
 

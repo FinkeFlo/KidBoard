@@ -9,6 +9,8 @@ import { describe, expect, it } from "vitest";
 import { BEN, MIA } from "../components/fixtures.test-utils";
 import { configFixture } from "../data/testing.test-utils";
 import {
+  defaultStart,
+  draftChanged,
   type EventDraft,
   eventDraftFromEntry,
   eventDraftFromGoogle,
@@ -26,6 +28,7 @@ import {
   previewEvent,
   problemsOf,
   seriesStartDate,
+  startsInPast,
   toggleWeekday,
   withDate,
 } from "./draft";
@@ -438,5 +441,123 @@ describe("live preview event", () => {
       start: TODAY,
       end: "2026-11-24",
     });
+  });
+});
+
+describe("defaultStart", () => {
+  const at = (iso: string): number => Date.parse(iso);
+  const BERLIN = "Europe/Berlin";
+
+  it.each([
+    ["2026-11-22T12:00:00+01:00", TODAY, "15:00"],
+    // 15:00 has not passed yet at 15:00 sharp.
+    ["2026-11-22T15:00:00+01:00", TODAY, "15:00"],
+    ["2026-11-22T15:01:00+01:00", TODAY, "16:00"],
+    ["2026-11-22T15:59:00+01:00", TODAY, "16:00"],
+    ["2026-11-22T16:00:00+01:00", TODAY, "17:00"],
+    ["2026-11-22T22:30:00+01:00", TODAY, "23:00"],
+    // No full hour of today is left: tomorrow at the default start.
+    ["2026-11-22T23:05:00+01:00", "2026-11-23", "15:00"],
+  ])("at %s → %s %s", (now, date, startTime) => {
+    expect(defaultStart(TODAY, at(now), BERLIN)).toEqual({ date, startTime });
+  });
+
+  it("reads the wall clock of the configured zone, not the device", () => {
+    const now = at("2026-11-22T15:30:00Z");
+    // 16:30 in Berlin, 10:30 in New York.
+    expect(defaultStart(TODAY, now, BERLIN).startTime).toBe("17:00");
+    expect(defaultStart(TODAY, now, "America/New_York").startTime).toBe(
+      "15:00",
+    );
+  });
+});
+
+describe("startsInPast", () => {
+  const NOON = Date.parse("2026-11-22T12:00:00+01:00");
+  const BERLIN = "Europe/Berlin";
+
+  it("is true for a one-off start before now in the configured zone", () => {
+    expect(
+      startsInPast(draft({ startTime: "11:00" }), TODAY, NOON, BERLIN),
+    ).toBe(true);
+    expect(
+      startsInPast(draft({ startTime: "12:00" }), TODAY, NOON, BERLIN),
+    ).toBe(false);
+    expect(
+      startsInPast(draft({ startTime: "13:00" }), TODAY, NOON, BERLIN),
+    ).toBe(false);
+    expect(
+      startsInPast(
+        draft({ date: "2026-11-21", startTime: "20:00" }),
+        TODAY,
+        NOON,
+        BERLIN,
+      ),
+    ).toBe(true);
+    // 11:00 in New York is 17:00 in Berlin: still ahead.
+    expect(
+      startsInPast(
+        draft({ startTime: "11:00" }),
+        TODAY,
+        NOON,
+        "America/New_York",
+      ),
+    ).toBe(false);
+  });
+
+  it("counts all-day entries by day and never calls a series past", () => {
+    expect(startsInPast(draft({ allDay: true }), TODAY, NOON, BERLIN)).toBe(
+      false,
+    );
+    expect(
+      startsInPast(
+        draft({ allDay: true, date: "2026-11-21" }),
+        TODAY,
+        NOON,
+        BERLIN,
+      ),
+    ).toBe(true);
+    expect(
+      startsInPast(
+        draft({ startTime: "09:00", repeat: "weekly", weekdays: [7] }),
+        TODAY,
+        NOON,
+        BERLIN,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("draftChanged", () => {
+  it("ignores the title-follows-picture flag and the key order", () => {
+    const initial = draft();
+    expect(draftChanged(initial, { ...initial })).toBe(false);
+    expect(draftChanged(initial, { ...initial, titleFromLabel: true })).toBe(
+      false,
+    );
+    const reordered = Object.fromEntries(
+      Object.entries(initial).reverse(),
+    ) as unknown as EventDraft;
+    expect(draftChanged(initial, reordered)).toBe(false);
+    // An undefined optional field is no change.
+    expect(draftChanged(initial, { ...initial, anchorDate: undefined })).toBe(
+      false,
+    );
+  });
+
+  it("sees every edited field, also inside arrays and the repeat rule", () => {
+    const initial = draft({ bring: ["🩱"] });
+    expect(draftChanged({ ...initial, title: "Swim" }, initial)).toBe(true);
+    expect(draftChanged({ ...initial, bring: ["🩱", "🥽"] }, initial)).toBe(
+      true,
+    );
+    expect(draftChanged({ ...initial, childIds: ["mia"] }, initial)).toBe(true);
+    const meal = newMealDraft(TODAY, "dinner");
+    const weekly = {
+      ...meal,
+      repeat: { weekly: { weekdays: [7], interval: 1 as const } },
+    };
+    expect(draftChanged(weekly, structuredClone(weekly))).toBe(false);
+    expect(draftChanged({ ...weekly, slot: "lunch" }, weekly)).toBe(true);
   });
 });

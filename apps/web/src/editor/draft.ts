@@ -17,6 +17,8 @@ import {
   resolveTimedRange,
 } from "@kidboard/shared";
 
+import { minuteOfDay } from "../time/clock";
+
 /*
  * The editor's form state (T-45) and its conversion to and from the shared editor model
  * (`EditorEntryInput`, T-39). Pure functions, the configured zone is always passed in.
@@ -78,7 +80,10 @@ export interface MealDraft {
   repeat: EditorEntryInput["repeat"];
 }
 
-export function newEventDraft(date: string): EventDraft {
+export function newEventDraft(
+  date: string,
+  startTime: string = DEFAULT_START_TIME,
+): EventDraft {
   return {
     childIds: [],
     icon: "",
@@ -86,7 +91,7 @@ export function newEventDraft(date: string): EventDraft {
     titleFromLabel: false,
     date,
     allDay: false,
-    startTime: DEFAULT_START_TIME,
+    startTime,
     duration: DEFAULT_DURATION,
     allDayDays: 1,
     repeat: "none",
@@ -107,6 +112,63 @@ export function newMealDraft(date: string, slot: MealSlot): MealDraft {
     titleFromLabel: false,
     repeat: "none",
   };
+}
+
+/**
+ * Day and start of a new entry made at `nowMs`: today at {@link DEFAULT_START_TIME},
+ * or, once that has passed in the configured zone, today at the next full hour (from
+ * 23:00 on, tomorrow at the default start, as no full hour of today is left).
+ */
+export function defaultStart(
+  today: string,
+  nowMs: number,
+  timeZone: string,
+): { date: string; startTime: string } {
+  const minutes = minuteOfDay(nowMs, timeZone);
+  if (minutes <= minutesOfTime(DEFAULT_START_TIME)) {
+    return { date: today, startTime: DEFAULT_START_TIME };
+  }
+  const hour = Math.floor(minutes / 60) + 1;
+  if (hour >= 24) {
+    return { date: addCalendarDays(today, 1), startTime: DEFAULT_START_TIME };
+  }
+  return { date: today, startTime: `${String(hour).padStart(2, "0")}:00` };
+}
+
+/**
+ * Whether a one-off draft starts before `nowMs` (an all-day one: before `today`), for
+ * a gentle hint; series are never "past" as their later days still come.
+ */
+export function startsInPast(
+  draft: EventDraft,
+  today: string,
+  nowMs: number,
+  timeZone: string,
+): boolean {
+  if (draft.repeat !== "none") return false;
+  if (draft.allDay) return draft.date < today;
+  const range = resolveTimedRange(
+    { date: draft.date, startTime: draft.startTime, ...timedEnd(draft) },
+    timeZone,
+  );
+  return range.startMs < nowMs;
+}
+
+/**
+ * Whether the form holds changes against what it opened with (ignoring the internal
+ * "title still follows the picture" flag), so Cancel can ask before dropping them.
+ */
+export function draftChanged<T extends EventDraft | MealDraft>(
+  draft: T,
+  initial: T,
+): boolean {
+  const a: Record<string, unknown> = { ...draft };
+  const b: Record<string, unknown> = { ...initial };
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  keys.delete("titleFromLabel");
+  return [...keys].some(
+    (key) => JSON.stringify(a[key]) !== JSON.stringify(b[key]),
+  );
 }
 
 function sortedUnique(days: readonly number[]): number[] {

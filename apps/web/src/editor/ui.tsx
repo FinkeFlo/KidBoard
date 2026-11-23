@@ -91,7 +91,7 @@ export function Field({
       aria-describedby={described}
       aria-invalid={error === undefined ? undefined : true}
       data-testid={testId}
-      className={`flex min-w-0 flex-col gap-3 ${className}`}
+      className={`flex min-w-0 scroll-mt-4 flex-col gap-3 ${className}`}
     >
       <legend className="text-title mb-3">{legend}</legend>
       {hint !== undefined && (
@@ -109,10 +109,12 @@ export function Field({
   );
 }
 
-export type ButtonTone = "primary" | "secondary" | "quiet";
+export type ButtonTone = "primary" | "secondary" | "quiet" | "danger";
 
 const BUTTON_TONES: Record<ButtonTone, string> = {
   primary: "bg-accent text-on-accent",
+  /** Destructive choices (delete a whole series, discard changes). */
+  danger: "bg-danger text-on-danger",
   secondary: "bg-surface-sunken text-text inset-ring-border inset-ring-2",
   quiet: "text-text-muted underline-offset-4 hover:underline",
 };
