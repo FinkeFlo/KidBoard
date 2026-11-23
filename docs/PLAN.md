@@ -753,7 +753,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
      tests for every control, a11y (labels, roles, focus order, AA contrast in light and
      night), XSS-looking titles render as text.
 
-- [ ] **T-46a Worker: phone feed** (risk: **high** → Opus, deps: T-41, T-42)
+- [x] **T-46a Worker: phone feed** (risk: **high** → Opus, deps: T-41, T-42)
   Acceptance: optional secret feed of the app entries: `GET /api/feed.ics?token=<KIDBOARD_FEED_TOKEN>`
   (only when that secret is set, 32–256 chars `[A-Za-z0-9_-]`, not the template; 404 on
   every miss; constant-time compare; no access token needed for exactly GET/HEAD of this
