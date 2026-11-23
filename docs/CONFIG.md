@@ -25,7 +25,7 @@ Set locally in `.dev.vars` in the repository root, next to `wrangler.jsonc` (cop
 | `CAL_<ID>_URL`            | yes, one per calendar | -     | Secret iCal address of the calendar with id `<ID>` (upper case), e.g. `CAL_KINDER_URL`. Google Calendar: Settings > calendar > "Secret address in iCal format". `https://`, `http://` or `webcal://` (fetched as `https://`). Never commit it. A missing or invalid value marks only that calendar as `error`. |
 | `KIDBOARD_ACCESS_TOKEN`   | no       | unset (no check)   | If set (non-empty), API requests must present this token as `Authorization: Bearer <token>` or `?key=<token>`, else `401`. Prefer the header: `?key=` ends up in browser history (Workers Logs drop query strings, `redact_query_string`). A value that still contains `REPLACE_ME` (the template) is refused: every protected path answers `500 server_misconfigured`. `/api/health` stays public (it only returns `{ "ok": true }`). |
 | `KIDBOARD_ALLOWED_ORIGINS`| no       | same origin only   | Comma-separated list of allowed CORS origins, e.g. `http://localhost:5173`.                                                                      |
-| `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh (integer 60-86400; other values fall back to 3600 with a log warning). With the KV cache at least `ceil(calendars × 86400 / 500)` (KV Free plan write quota; 2 calendars → 346).                                    |
+| `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh (integer 60-86400; other values fall back to 3600 with a log warning). With the KV cache at least `ceil(calendars × 86400 / 500)` (KV Free plan write quota; 2 calendars → 346; with the parent editor on, its two app sources count as calendars).                                    |
 | `KIDBOARD_CONFIG`         | yes      | -                  | The JSON document described below (single line). Missing or invalid: the API answers `500` and the log lists the validation errors.             |
 
 The root `.env.example` only lists tooling variables (e.g. `PLAYWRIGHT_CHROMIUM_EXECUTABLE`).
@@ -60,7 +60,7 @@ shared secret for this tablet: treat the link like a password.
 | `children[].color`      | CSS color or token name       | required                         | `"#E4572E"`                     | Child colour: tints the child's event tiles and rings the badge. A token name `child-1` ... `child-6` or any CSS colour (hex, `rgb()`, `hsl()`, `oklch()`, named); an unusable value falls back to neutral. Text stays readable on the tint in both themes. |
 | `children[].avatar`     | single emoji                  | required                         | `"🦊"`                          | The child's emoji (this is the field the schema calls `avatar`; there is no `emoji` key). Shown in the badge on the child's tiles and in the "who is who" legend. |
 | `calendars`             | array of calendar source      | required                         | see below                       | Configured feeds. Ids must be unique.                                                                |
-| `calendars[].id`        | string                        | required                         | `"kinder"`                      | Maps to the secret `CAL_<ID>_URL`.                                                                   |
+| `calendars[].id`        | string                        | required                         | `"kinder"`                      | Maps to the secret `CAL_<ID>_URL`. `app-events` and `app-meals` are reserved (entries made in the app). |
 | `calendars[].kind`      | `"events"` \| `"meals"`       | required                         | `"meals"`                       | Events calendar or meal plan.                                                                        |
 | `calendars[].childId`   | string (child id)             | unset (event is for everyone)    | `"mia"`                         | Marks a one-calendar-per-child feed. Must reference an existing child.                               |
 | `calendars[].label`     | string                        | unset                            | `"Kinder"`                      | Optional human-readable name.                                                                        |
@@ -77,7 +77,8 @@ shared secret for this tablet: treat the link like a password.
 Validation details (schema in `packages/shared`): unknown keys are rejected (typos are
 reported, not ignored); ids (children and calendars) match `[a-z0-9][a-z0-9_-]*` (max 32
 chars); the secret name is the upper-cased id with `-` replaced by `_` (`school-a` ->
-`CAL_SCHOOL_A_URL`), so ids that map to the same name (`a-b` and `a_b`) are rejected; child
+`CAL_SCHOOL_A_URL`), so ids that map to the same name (`a-b` and `a_b`) are rejected; the
+calendar ids `app-events` and `app-meals` are reserved for the entries made in the app; child
 names must be unique (case-insensitive); `refreshMinutes` is 1-1440; `autoReturnSeconds` is
 10-3600; bands must be strictly ascending; `nightMode.start` and `end` must differ.
 
@@ -104,7 +105,11 @@ for the window is stored once per refresh: it is fresh for `KIDBOARD_CACHE_TTL` 
 cover only part of the requested range). The store is the Workers KV namespace
 `KIDBOARD_CACHE`, which Wrangler creates automatically on the first deploy (declared
 without an id in the root `wrangler.jsonc`); without that binding the Cache API is
-used, which only works on a custom domain (not on `*.workers.dev`). All API responses
+used, which only works on a custom domain (not on `*.workers.dev`). With the parent
+editor on (ADR-0014), `sources` also lists `app-events` and `app-meals`: the entries made
+in the app, read from D1 and cached the same way; a change in the app shows on the next
+refresh, and if D1 is unavailable they are `stale` (or `error`) while the Google calendars
+are unaffected. All API responses
 carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and
 `Referrer-Policy: no-referrer`.
 
@@ -118,7 +123,9 @@ Optional: `KIDBOARD_ACCESS_TOKEN` (dann brauchen alle API-Aufrufe außer `/api/h
 Token als `Authorization: Bearer <token>` oder `?key=<token>`; besser den Header, denn `?key=`
 landet im Browserverlauf; ein Wert, der noch `REPLACE_ME` enthält, wird abgelehnt (`500`); `/api/health` bleibt öffentlich und liefert nur `{ "ok": true }`),
 `KIDBOARD_ALLOWED_ORIGINS`, `KIDBOARD_CACHE_TTL` (Sekunden, 60-86400, Standard 3600; mit
-KV-Cache mindestens `Kalender × 86400 / 500`).
+KV-Cache mindestens `Kalender × 86400 / 500`; bei eingeschaltetem Eltern-Editor zählen
+seine zwei App-Quellen mit). Die Kalender-IDs `app-events` und `app-meals` sind für die in
+der App angelegten Einträge reserviert.
 
 **Zugriffstoken: der Tablet-Link.** Ist `KIDBOARD_ACCESS_TOKEN` gesetzt, das Board auf dem
 Tablet **einmal** als `https://<dein-worker>.workers.dev/?key=<token>` öffnen (z. B. als
@@ -157,4 +164,6 @@ ohne Binding: Cache API, die nur mit eigener Domain funktioniert): frisch für
 `KIDBOARD_CACHE_TTL`, danach bis 7 Tage als letzter guter Stand. Fällt ein Kalender aus, wird
 dieser Stand mit `status: "stale"` geliefert (ein alter Stand deckt evtl. nur einen Teil des
 Zeitraums ab), ohne Stand `error`. Antwort `200`, wenn mindestens ein Kalender Daten hat, sonst
-`502`.
+`502`. Mit Eltern-Editor kommen die Quellen `app-events` und `app-meals` (Einträge aus der
+App, aus D1) hinzu; eine Änderung in der App ist beim nächsten Abruf sichtbar, fällt D1 aus,
+sind nur sie `stale` bzw. `error`.

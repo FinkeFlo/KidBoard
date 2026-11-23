@@ -11,11 +11,18 @@ import { secureHeaders } from "hono/secure-headers";
 import { validator } from "hono/validator";
 import { z } from "zod";
 
+import { APP_SOURCES, loadAppSources } from "./agenda/appSources";
 import { buildAgenda } from "./agenda/buildAgenda";
 import { type Flight, loadSource } from "./agenda/loadSource";
 import { loadConfig } from "./config/loadConfig";
-import type { AppEnv } from "./env";
-import { cacheBackend, kvBackend, SourceStore } from "./feeds/sourceStore";
+import { SchemaGate } from "./entries/schema";
+import type { AppEnv, Env } from "./env";
+import {
+  cacheBackend,
+  kvBackend,
+  SourceStore,
+  type StoreBackend,
+} from "./feeds/sourceStore";
 import { accessToken } from "./http/auth";
 import { parseCalendarDate } from "./ical/zonedTime";
 import { logError, logWarn } from "./log";
@@ -151,6 +158,13 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
   const fallbackBackend = cacheBackend(
     options.openCache ?? (() => Promise.resolve(caches.default)),
   );
+  // ADR-0006: KV when bound (works everywhere, global), else the Cache API.
+  const backendFor = (env: Env): StoreBackend =>
+    env.KIDBOARD_CACHE === undefined
+      ? fallbackBackend
+      : kvBackend(env.KIDBOARD_CACHE);
+  /** D1 schema memo of this isolate (app entries, ADR-0014). */
+  const gate = new SchemaGate();
   const inflight = new Map<string, Flight>();
   const app = new Hono<AppEnv>();
 
@@ -240,15 +254,32 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
       }
 
       const configHash = await loaded.hash;
-      // ADR-0006: KV when bound (works everywhere, global), else the Cache API.
-      const kv = c.env.KIDBOARD_CACHE;
-      const backend = kv === undefined ? fallbackBackend : kvBackend(kv);
+      const backend = backendFor(c.env);
+      // ADR-0014: app entries join the board as virtual sources while the editor is on.
+      const db = editorEnabled(c.env) ? c.env.KIDBOARD_DATA : undefined;
       const freshTtlSeconds = effectiveTtlSeconds(
         cacheTtlSeconds(c.env.KIDBOARD_CACHE_TTL),
-        config.calendars.length,
+        config.calendars.length + (db === undefined ? 0 : APP_SOURCES.length),
         backend.kind === "kv",
       );
-      const results = await Promise.all(
+      const appResults =
+        db === undefined
+          ? Promise.resolve([])
+          : loadAppSources({
+              db,
+              gate,
+              config,
+              configHash,
+              window,
+              nowMs,
+              freshTtlSeconds,
+              store,
+              backend,
+              defer: (work) => {
+                defer(c, work);
+              },
+            });
+      const feedResults = Promise.all(
         config.calendars.map((source) =>
           loadSource(source, {
             env: c.env,
@@ -272,6 +303,8 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
           }),
         ),
       );
+      const [feeds, apps] = await Promise.all([feedResults, appResults]);
+      const results = [...feeds, ...apps];
       const { body, status } = buildAgenda(
         results,
         { from, to },

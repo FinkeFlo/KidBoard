@@ -1036,7 +1036,7 @@ describe("GET /api/config", () => {
 });
 
 describe("editor flag and the board", () => {
-  it("leaves /api/agenda unchanged with or without the D1 binding and PIN", async () => {
+  it("leaves the Google data unchanged and adds only the empty app sources with the editor on", async () => {
     serveIcs(KINDER_URL, eventsIcs);
     serveIcs(ESSEN_URL, mealsIcs);
     const without = await agenda(harness(), "?days=8");
@@ -1050,10 +1050,16 @@ describe("editor flag and the board", () => {
     );
     expect(without.status).toBe(200);
     expect(without.body.events.length).toBeGreaterThan(0);
-    expect(withEditor).toEqual(without);
-    expect(withEditor.body.sources.map((s) => s.id)).toEqual([
-      "kinder",
-      "essen",
+    expect(without.body.sources.map((s) => s.id)).toEqual(["kinder", "essen"]);
+    expect(withEditor.status).toBe(200);
+    expect(withEditor.body.events).toEqual(without.body.events);
+    expect(withEditor.body.meals).toEqual(without.body.meals);
+    expect(withEditor.body.sources.slice(0, 2)).toEqual(without.body.sources);
+    expect(
+      withEditor.body.sources.slice(2).map((s) => [s.id, s.status]),
+    ).toEqual([
+      ["app-events", "ok"],
+      ["app-meals", "ok"],
     ]);
   });
 });

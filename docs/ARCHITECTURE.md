@@ -323,6 +323,33 @@ on read; a corrupt row is skipped and logged by failure type only. `/api/config`
 (`apps/worker/src/parent/pin.ts`); the key is omitted when false (older web bundles parse the config strictly) and `PublicConfigSchema` defaults it to `false` and strips
 unknown top-level keys.
 
+### App entries on the board (T-41, ADR-0014)
+
+With the editor on, `/api/agenda` appends two virtual sources, `app-events` and
+`app-meals` (reserved calendar ids, `RESERVED_CALENDAR_IDS` in `packages/shared`), after
+the configured calendars. `apps/worker/src/entries/renderCalendar.ts` renders the stored
+entries of one kind as an in-memory iCalendar with ical.js: `UID` = entry id, `SUMMARY`
+via `composeTitle`, `DESCRIPTION` via `composeDescription("")` (bring line, `#countdown`;
+meals none), `DTSTART`/`DTEND` as wall-clock times with `TZID` = config zone (no
+VTIMEZONE; the expansion uses the runtime tz database) or `VALUE=DATE`, `RRULE` from
+`buildRecurrenceRule`, one `EXDATE` per removed day and one `RECURRENCE-ID` VEVENT per
+"only this day" override, both in the master's value type. An entry the config can no
+longer express (removed child, …) is skipped, such an override hides its day; both are
+logged by code and id only. The calendar then goes through `expandCalendar` and
+`normalize` like a feed, so DST, gaps, bring lists, countdown and ids (hash of source,
+UID and recurrence id: stable per entry and occurrence) behave as for Google events.
+
+`apps/worker/src/agenda/appSources.ts` loads both sources per request: one primary-key
+read of a random D1 change stamp (`kb_meta.entries_stamp`); a cached `SourceEntry`
+(same store, keys and TTL as the feeds) is fresh only with that stamp, the current
+window and version; otherwise the entries are listed once for both kinds (`list(window)`)
+and rebuilt. `invalidateAppSources` (called by the T-43 write routes after every write)
+replaces the stamp and deletes both entries from memory and KV/Cache API; the stamp makes
+every isolate notice the write at once, which KV deletes alone would not (eventual
+consistency, per-isolate memory). D1 unavailable or a render failure → the cached entry
+as `stale`, else `error`; the configured calendars are unaffected. With KV, the TTL
+write-budget floor counts the two app sources.
+
 ## Caching & offline (summary – details in [ADR-0006](adr/0006-caching-offline.md))
 
 | Layer | What | Lifetime |

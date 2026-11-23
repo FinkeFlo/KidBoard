@@ -110,6 +110,31 @@ describe("parseConfig invalid", () => {
     expect(errors).toEqual(['calendars[1].id: Duplicate calendar id "a"']);
   });
 
+  it.each(["app-events", "app-meals"])(
+    "rejects the reserved calendar id %s",
+    (id) => {
+      const errors = errorsOf({
+        calendars: [
+          { id: "kinder", kind: "events" },
+          { id, kind: "events" },
+        ],
+      });
+      expect(errors).toEqual([
+        `calendars[1].id: Calendar id "${id}" is reserved for entries made in the app`,
+      ]);
+    },
+  );
+
+  it("accepts ids that only resemble the reserved ones", () => {
+    const result = parseConfig({
+      calendars: [
+        { id: "app-event", kind: "events" },
+        { id: "app_meals", kind: "meals" },
+      ],
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects calendar ids that collide on the secret name", () => {
     const errors = errorsOf({
       calendars: [

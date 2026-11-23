@@ -18,6 +18,20 @@ export function calendarSecretName(id: string): CalendarSecretName {
   return `CAL_${id.toUpperCase().replaceAll("-", "_")}_URL`;
 }
 
+/** Source id of the app's own events (parent editor, ADR-0014); reserved. */
+export const APP_EVENTS_SOURCE_ID = "app-events";
+/** Source id of the app's own meals (parent editor, ADR-0014); reserved. */
+export const APP_MEALS_SOURCE_ID = "app-meals";
+/**
+ * Calendar ids the worker uses for the virtual sources of app entries
+ * (`AgendaResponse.sources`, `sourceId` of events and meals); configured calendars must
+ * not use them.
+ */
+export const RESERVED_CALENDAR_IDS: readonly string[] = [
+  APP_EVENTS_SOURCE_ID,
+  APP_MEALS_SOURCE_ID,
+];
+
 function toMinutes(time: string): number {
   const [hours = "0", minutes = "0"] = time.split(":");
   return Number(hours) * 60 + Number(minutes);
@@ -114,7 +128,13 @@ function refineConfig(config: AppConfigFields, ctx: z.RefinementCtx): void {
   const calendarIds = new Set<string>();
   const secretNames = new Map<string, string>();
   config.calendars.forEach((calendar, i) => {
-    if (calendarIds.has(calendar.id)) {
+    if (RESERVED_CALENDAR_IDS.includes(calendar.id)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["calendars", i, "id"],
+        message: `Calendar id "${calendar.id}" is reserved for entries made in the app`,
+      });
+    } else if (calendarIds.has(calendar.id)) {
       ctx.addIssue({
         code: "custom",
         path: ["calendars", i, "id"],

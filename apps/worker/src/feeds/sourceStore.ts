@@ -22,6 +22,11 @@ export const SourceEntrySchema = z.object({
   /** `[from, to)` the data was expanded for, `YYYY-MM-DD` in the config zone. */
   window: z.object({ from: DateStringSchema, to: DateStringSchema }),
   truncated: z.boolean(),
+  /**
+   * Virtual sources of app entries only: the D1 change stamp the data was read at
+   * (`agenda/appSources.ts`); a different current stamp makes the entry not fresh.
+   */
+  stamp: z.string().optional(),
   events: z.array(CalendarEventSchema),
   meals: z.array(MealSchema),
 });
@@ -50,6 +55,8 @@ export interface StoreBackend {
   /** Raw JSON text under `key`, or null. */
   read(key: string): Promise<string | null>;
   write(key: string, json: string, ttlSeconds: number): Promise<void>;
+  /** Removes `key` (a missing key is not an error). */
+  delete(key: string): Promise<void>;
 }
 
 /** Workers KV (`KIDBOARD_CACHE` binding): global, survives isolates, works on workers.dev. */
@@ -60,6 +67,7 @@ export function kvBackend(namespace: KVNamespace): StoreBackend {
     write: (key, json, ttlSeconds) =>
       // KV requires expirationTtl >= 60 s.
       namespace.put(key, json, { expirationTtl: Math.max(60, ttlSeconds) }),
+    delete: (key) => namespace.delete(key),
   };
 }
 
@@ -89,6 +97,10 @@ export function cacheBackend(openCache: () => Promise<Cache>): StoreBackend {
           },
         }),
       );
+    },
+    delete: async (key) => {
+      const cache = await openCache();
+      await cache.delete(`${CACHE_KEY_ORIGIN}/${key}`);
     },
   };
 }
@@ -145,6 +157,15 @@ export class SourceStore {
   ): Promise<void> {
     this.#remember(key, entry);
     await backend.write(key, JSON.stringify(entry), LAST_GOOD_TTL_SECONDS);
+  }
+
+  /**
+   * Drops the entry under `key` from memory at once and from the backend (KV deletes
+   * may take up to a minute to reach other locations).
+   */
+  async delete(backend: StoreBackend, key: string): Promise<void> {
+    this.#memory.delete(key);
+    await backend.delete(key);
   }
 
   #remember(key: string, entry: SourceEntry): void {
