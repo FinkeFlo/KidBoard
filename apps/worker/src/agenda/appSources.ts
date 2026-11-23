@@ -52,6 +52,12 @@ export interface AppSourcesContext extends AppSourceCacheContext {
   window: { from: string; to: string };
   nowMs: number;
   freshTtlSeconds: number;
+  /**
+   * Deadline (ms) for the D1 reads of one request (stamp and, if needed, the entry
+   * list): a hanging database must never delay `/api/agenda`. Past it the request
+   * serves the last good data (`stale`) or `error`, like any other D1 failure.
+   */
+  d1TimeoutMs: number;
   /** Keeps background work (cache writes) alive after the response. */
   defer: (work: Promise<unknown>) => void;
 }
@@ -113,6 +119,26 @@ function isFresh(
   );
 }
 
+/** Rejection of {@link withTimeout}; its name is what the log shows. */
+class D1TimeoutError extends Error {
+  override name = "D1TimeoutError";
+}
+
+/** `promise`, or a {@link D1TimeoutError} after `ms` (the timer is cleared). */
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new D1TimeoutError("D1 read timed out"));
+    }, ms);
+  });
+  try {
+    return await Promise.race([promise, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function errorName(error: unknown): string {
   // Log the type only: messages may quote stored text.
   return error instanceof Error ? error.name : typeof error;
@@ -158,8 +184,9 @@ function build(
  * read of the change stamp; a cached entry with that stamp, the current window and
  * version, younger than the TTL, is served as is; otherwise the entries are listed
  * from D1 once for both, rendered as an iCalendar (`renderAppCalendar`), expanded and
- * normalized like a feed, and cached. D1 unavailable (or a render failure) → the last
- * cached entry as `stale`, else `error`; the configured calendars are not affected.
+ * normalized like a feed, and cached. D1 unavailable or slower than `d1TimeoutMs` (or a
+ * render failure) → the last cached entry as `stale`, else `error`; the configured
+ * calendars are not affected.
  * Entry text never reaches the log.
  */
 export async function loadAppSources(
@@ -182,13 +209,21 @@ export async function loadAppSources(
   let stamp: string;
   let entries: AppEntry[] | undefined;
   try {
-    stamp = await readStamp(ctx);
-    if (cached.some((entry) => entry === null || !isFresh(entry, stamp, ctx))) {
-      entries = await new EntryStore(ctx.db, {
+    const read = async (): Promise<[string, AppEntry[] | undefined]> => {
+      const current = await readStamp(ctx);
+      if (
+        cached.every((entry) => entry !== null && isFresh(entry, current, ctx))
+      ) {
+        return [current, undefined];
+      }
+      const listed = await new EntryStore(ctx.db, {
         config: ctx.config,
         gate: ctx.gate,
       }).list(ctx.window.from, ctx.window.to);
-    }
+      return [current, listed];
+    };
+    // One deadline for both reads; a late result is dropped (nothing is written).
+    [stamp, entries] = await withTimeout(read(), ctx.d1TimeoutMs);
   } catch (error) {
     logWarn(
       `app entries: D1 read failed (${errorName(error)}), ${cached.some((e) => e !== null) ? "serving last-good data" : "no last-good data"}`,

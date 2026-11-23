@@ -43,3 +43,14 @@ export async function parseJsonBody<S extends z.ZodType>(
   }
   return { ok: true, value: parsed.data };
 }
+
+/** 413 `payload_too_large` naming the limit (the `bodyLimit` error handler). */
+export function payloadTooLarge(c: Context, maxBytes: number): Response {
+  return c.json(
+    {
+      error: "payload_too_large",
+      message: `Request body must be at most ${String(maxBytes)} bytes`,
+    },
+    413,
+  );
+}

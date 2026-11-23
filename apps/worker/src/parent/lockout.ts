@@ -142,6 +142,13 @@ export class UnlockLimiter {
   /**
    * The reserved attempt was a wrong PIN: it stays counted; once the window holds
    * {@link MAX_FAILURES} attempts the lockout starts (15 min from now), here and in D1.
+   *
+   * The lock condition counts every attempt in the window, including reservations of
+   * parallel requests whose PIN is still being compared, not only settled failures.
+   * Deliberate (T-43 review follow-up): it errs on the closed side and differs only
+   * while attempts run in parallel, which one family tablet does not produce (a parent
+   * types one PIN at a time); telling pending from failed rows in D1 would need a
+   * second row type and a settle write in this security path for no practical gain.
    */
   async fail(db: D1Database, nowSeconds: number): Promise<FailureOutcome> {
     const windowStart = nowSeconds - FAILURE_WINDOW_SECONDS;

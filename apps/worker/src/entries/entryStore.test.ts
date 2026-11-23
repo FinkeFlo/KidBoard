@@ -700,7 +700,11 @@ describe("export / import", () => {
         {
           ...doc,
           entries: [
-            { ...valid, id: otherId, data: { ...valid.data, childIds: ["x"] } },
+            {
+              ...valid,
+              id: otherId,
+              data: { ...valid.data, childIds: ["Not A Slug"] },
+            },
           ],
         },
         "entries.0.data.childIds.0",
@@ -724,6 +728,47 @@ describe("export / import", () => {
       }
     }
     expect((await s.list()).map((e) => e.id)).toEqual([dentist.id]);
+  });
+
+  it("restores entries the config can no longer express (shape-checked only)", async () => {
+    const s = store();
+    const dentist = ok(await s.create(DENTIST));
+    const doc = await s.exportAll();
+    const valid = doc.entries[0];
+    if (valid === undefined) {
+      throw new Error("no entry");
+    }
+    const removedChild = {
+      ...valid,
+      id: crypto.randomUUID(),
+      data: { ...valid.data, childIds: ["removed-child"] },
+    };
+    expect(
+      ok(
+        await s.importAll(
+          { ...doc, entries: [valid, removedChild] },
+          "replace",
+        ),
+      ),
+    ).toEqual({ mode: "replace", imported: 2 });
+    const stored = await s.list();
+    expect(stored.map((e) => e.id).sort()).toEqual(
+      [dentist.id, removedChild.id].sort(),
+    );
+    const restored = stored.find((e) => e.id === removedChild.id);
+    expect(restored?.data.childIds).toEqual(["removed-child"]);
+    // New writes are still checked against the config.
+    expect(
+      await s.update(
+        removedChild.id,
+        restored?.revision ?? 0,
+        removedChild.data,
+      ),
+    ).toMatchObject({
+      ok: false,
+      error: "invalid",
+      issues: [expect.objectContaining({ code: "unknown_child" })],
+    });
   });
 
   it("refuses a merge beyond the entry limit and an oversized entry", async () => {

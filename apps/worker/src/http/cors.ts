@@ -41,7 +41,8 @@ const BOARD_CORS = {
  * CORS for the API. Listed origins (`KIDBOARD_ALLOWED_ORIGINS`) may read the board API
  * with `GET`/`HEAD` and the `Authorization` header. On `/api/parent/*` a listed origin
  * additionally gets `POST, PATCH, DELETE`, the `Content-Type` and
- * {@link PARENT_SESSION_HEADER} request headers and may read `Retry-After` (ADR-0013);
+ * {@link PARENT_SESSION_HEADER} request headers and may read `Retry-After` (ADR-0013)
+ * and `Content-Disposition` (export file name, T-43);
  * any other origin never gets more than the board set (and no allow-origin at all).
  */
 export function apiCors(): MiddlewareHandler<AppEnv> {
@@ -50,7 +51,7 @@ export function apiCors(): MiddlewareHandler<AppEnv> {
     ...BOARD_CORS,
     allowMethods: ["GET", "HEAD", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Authorization", "Content-Type", PARENT_SESSION_HEADER],
-    exposeHeaders: ["Retry-After"],
+    exposeHeaders: ["Retry-After", "Content-Disposition"],
   });
   return (c, next) =>
     isParentPath(c.req.path) && originAllowed(c)

@@ -1,4 +1,8 @@
-import { reset } from "cloudflare:test";
+import {
+  createExecutionContext,
+  reset,
+  waitOnExecutionContext,
+} from "cloudflare:test";
 import { env as testEnv } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -392,6 +396,114 @@ describe("lockout", () => {
   });
 });
 
+describe("unlock reservations on failures", () => {
+  /** A D1 binding whose every call fails like an unavailable database. */
+  function brokenDb(): D1Database {
+    // Test double: only the methods the worker calls are needed, all of them fail.
+    return {
+      prepare: () => {
+        throw new Error("D1_ERROR: unavailable");
+      },
+      batch: () => Promise.reject(new Error("D1_ERROR: unavailable")),
+      exec: () => Promise.reject(new Error("D1_ERROR: unavailable")),
+    } as unknown as D1Database;
+  }
+
+  /** The real database, except that the first `failures` reservation deletes fail. */
+  function failingReleaseDb(failures: number): D1Database {
+    const real = testEnv.KIDBOARD_DATA;
+    let left = failures;
+    // Test double around the real binding: only these three methods are used.
+    return {
+      prepare: (sql: string) => {
+        if (sql === "DELETE FROM kb_meta WHERE key = ?1" && left > 0) {
+          left -= 1;
+          return {
+            bind: () => ({
+              run: () => Promise.reject(new Error("D1_ERROR: delete failed")),
+            }),
+          };
+        }
+        return real.prepare(sql);
+      },
+      batch: (statements: D1PreparedStatement[]) => real.batch(statements),
+      exec: (sql: string) => real.exec(sql),
+    } as unknown as D1Database;
+  }
+
+  async function unlockWithContext(
+    e: Env,
+  ): Promise<{ status: number; body: Record<string, unknown> }> {
+    const app = createApp({ now: () => NOW });
+    const ctx = createExecutionContext();
+    const response = await app.fetch(
+      new Request("https://board.example.test/api/parent/unlock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: PIN }),
+      }),
+      e,
+      ctx,
+    );
+    await waitOnExecutionContext(ctx);
+    return { status: response.status, body: await json(response) };
+  }
+
+  it("drops the isolate's reservation when D1 fails before the compare", async () => {
+    const h = harness();
+    for (let i = 0; i < 6; i++) {
+      // Each one reserved locally first; a D1 error must not leave it counted.
+      expect(
+        (await h.unlock(PIN, env({ KIDBOARD_DATA: brokenDb() }))).status,
+      ).toBe(500);
+    }
+    expect((await h.unlock(PIN)).status).toBe(200);
+    for (let i = 0; i < 4; i++) {
+      expect((await h.unlock(OTHER_PIN)).status).toBe(403);
+    }
+    expect((await h.unlock(PIN)).status).toBe(200);
+  });
+
+  it("drops the isolate's reservation on a bad body and keeps counting wrong PINs", async () => {
+    const h = harness();
+    for (let i = 0; i < 6; i++) {
+      expect((await h.unlock(123456)).status).toBe(400);
+    }
+    for (let i = 0; i < 4; i++) {
+      expect((await h.unlock(OTHER_PIN)).status).toBe(403);
+    }
+    // The 5th wrong PIN locks.
+    expect((await h.unlock(OTHER_PIN)).status).toBe(429);
+  });
+
+  it("answers with a session when releasing after the right PIN fails, and retries the delete", async () => {
+    const reply = await unlockWithContext(
+      env({ KIDBOARD_DATA: failingReleaseDb(1) }),
+    );
+    expect(reply.status).toBe(200);
+    expect(typeof reply.body.token).toBe("string");
+    expect(
+      (await metaRows()).filter((r) => r.key.startsWith("parent_fail:")),
+    ).toEqual([]);
+    expect(consoleOutput.join("\n")).toContain(
+      "parent unlock: releasing the attempt failed (Error), retrying",
+    );
+  });
+
+  it("still answers with a session when the retry fails too (the row ages out)", async () => {
+    const reply = await unlockWithContext(
+      env({ KIDBOARD_DATA: failingReleaseDb(2) }),
+    );
+    expect(reply.status).toBe(200);
+    expect(
+      (await metaRows()).filter((r) => r.key.startsWith("parent_fail:")),
+    ).toHaveLength(1);
+    expect(consoleOutput.join("\n")).toContain(
+      "parent unlock: releasing the attempt failed again (Error)",
+    );
+  });
+});
+
 describe("GET /api/parent/session (requireParentSession)", () => {
   it("accepts a fresh token and returns its expiry", async () => {
     const h = harness();
@@ -471,6 +583,16 @@ describe("editor off", () => {
         ],
         ["/api/parent/session", {}],
         ["/api/parent/entries", {}],
+        ["/api/parent/templates", {}],
+        ["/api/parent/export", {}],
+        [
+          "/api/parent/import?mode=merge",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+          },
+        ],
         ["/api/parent/whatever", { method: "DELETE" }],
       ];
       for (const [path, init] of requests) {
@@ -514,7 +636,7 @@ describe("CORS on /api/parent/*", () => {
     );
   });
 
-  it("exposes Retry-After to allowed origins", async () => {
+  it("exposes Retry-After and Content-Disposition to allowed origins", async () => {
     const response = await harness().call(
       "/api/parent/session",
       { headers: { Origin: ORIGIN } },
@@ -523,7 +645,7 @@ describe("CORS on /api/parent/*", () => {
     expect(response.status).toBe(403);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe(ORIGIN);
     expect(response.headers.get("Access-Control-Expose-Headers")).toBe(
-      "Retry-After",
+      "Retry-After,Content-Disposition",
     );
   });
 

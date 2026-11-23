@@ -83,11 +83,13 @@ interface Harness {
 /** A fresh app: its own memory layer (a new isolate) and its own Cache API cache. */
 function harness(
   cacheName = `kidboard-app-${String(cacheCounter++)}`,
+  options: { d1TimeoutMs?: number } = {},
 ): Harness {
   const clock = { now: NOW };
   const app = createApp({
     now: () => clock.now,
     openCache: () => caches.open(cacheName),
+    ...options,
   });
   return {
     clock,
@@ -158,6 +160,24 @@ function appMeals(body: AgendaResponse): Meal[] {
 
 function times(events: readonly CalendarEvent[]): string[][] {
   return events.map((e) => [e.start, e.end]);
+}
+
+/** A D1 binding whose every call never settles (a hanging database). */
+function hangingDb(): D1Database {
+  const never = (): Promise<never> => new Promise<never>(() => undefined);
+  const statement = {
+    bind: () => statement,
+    first: never,
+    run: never,
+    all: never,
+    raw: never,
+  };
+  // Test double: only the methods the worker calls are needed, none of them settle.
+  return {
+    prepare: () => statement,
+    batch: never,
+    exec: never,
+  } as unknown as D1Database;
 }
 
 /** A D1 binding whose every call fails like an unavailable database. */
@@ -753,6 +773,38 @@ describe("D1 unavailable", () => {
       "stale",
     );
     expect(appEvents(body)).toHaveLength(5);
+  });
+
+  it("does not wait for a hanging D1: last good data as stale after the deadline", async () => {
+    await create(SWIM);
+    const h = harness(undefined, { d1TimeoutMs: 50 });
+    const good = await h.agenda();
+    const started = Date.now();
+    const slow = await h.agenda(FULL, env({ KIDBOARD_DATA: hangingDb() }));
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(slow.status).toBe(200);
+    expect(slow.body.sources.map((s) => [s.id, s.status])).toEqual([
+      ["kinder", "ok"],
+      ["essen", "ok"],
+      ["app-events", "stale"],
+      ["app-meals", "stale"],
+    ]);
+    expect(appEvents(slow.body)).toEqual(appEvents(good.body));
+    expect(consoleOutput.join("\n")).toContain(
+      "app entries: D1 read failed (D1TimeoutError), serving last-good data",
+    );
+
+    // Without last good data: error, the Google sources unaffected.
+    const fresh = await harness(undefined, { d1TimeoutMs: 50 }).agenda(
+      FULL,
+      env({ KIDBOARD_DATA: hangingDb() }),
+    );
+    expect(fresh.body.sources.map((s) => s.status)).toEqual([
+      "ok",
+      "ok",
+      "error",
+      "error",
+    ]);
   });
 
   it("tolerates a failing invalidation and logs only the error type", async () => {

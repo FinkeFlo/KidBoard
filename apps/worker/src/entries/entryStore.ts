@@ -197,6 +197,20 @@ function withPrefix(prefix: string, issues: EditorIssue[]): EditorIssue[] {
   }));
 }
 
+/** Shape-only validation (no config): what an import and a stored row must satisfy. */
+function validateShape(
+  input: unknown,
+): { ok: true; value: EditorEntryInput } | InvalidFailure {
+  const result = EditorEntryInputSchema.safeParse(input);
+  return result.success
+    ? { ok: true, value: result.data }
+    : invalid(
+        result.error.issues.map((i) =>
+          issue(i.path.map(String).join("."), i.message),
+        ),
+      );
+}
+
 /**
  * Parses a row read from D1. Rows are validated on read too: a corrupt row (manual
  * edit, bug, partial restore) is skipped and logged by failure type only, so it can
@@ -484,7 +498,8 @@ export class EntryStore {
 
   /**
    * Imports an {@link EntryExport} document. Every entry, exception and override is
-   * validated like an editor input first; nothing is written unless all are valid. The
+   * validated for its shape first (see `prepareImport`); nothing is written unless all
+   * are valid. The
    * write is one batch (one transaction): all or nothing. Imported entries get a
    * revision above every revision the store has handed out, so a client still holding
    * an old revision gets a conflict instead of overwriting imported data.
@@ -588,7 +603,14 @@ export class EntryStore {
     });
   }
 
-  /** Validates every entry of an import document; collects all issues. */
+  /**
+   * Validates every entry of an import document; collects all issues. Entries are
+   * checked for their shape only (`EditorEntryInputSchema`), not against the config: a
+   * backup from before a config change (a removed child, …) is restored as it was,
+   * the board skips what the config cannot express and the editor lists it as
+   * unresolved, so the parent can fix or delete it. New and changed entries
+   * (`create`, `update`, `setOverride`) are still checked against the config.
+   */
   private prepareImport(
     entries: z.output<typeof ExportedEntrySchema>[],
   ): StoreResult<ImportRow[]> {
@@ -602,7 +624,7 @@ export class EntryStore {
         issues.push(issue(`${at}.id`, "Duplicate entry id"));
       }
       seen.add(entry.id);
-      const data = this.validate(entry.data);
+      const data = validateShape(entry.data);
       if (!data.ok) {
         issues.push(...withPrefix(`${at}.data`, data.issues));
         continue;
@@ -626,7 +648,7 @@ export class EntryStore {
           issues.push({ ...problem, path });
           continue;
         }
-        const override = this.validate(raw);
+        const override = validateShape(raw);
         if (!override.ok) {
           issues.push(...withPrefix(path, override.issues));
         } else if (override.value.repeat !== "none") {

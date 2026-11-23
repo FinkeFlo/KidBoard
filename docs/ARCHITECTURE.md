@@ -313,7 +313,7 @@ requests are safe; a `SchemaGate` remembers success per isolate. `EntryStore`
 move), `exportAll()` / `importAll(doc, "replace" | "merge")`. One row per entry: `id`
 (`crypto.randomUUID()`), `revision` (optimistic concurrency, `UPDATE … WHERE revision = ?`
 → `conflict`), `kind`, `data` (`EditorEntryInput` JSON), `exdates`, `overrides` (keyed by
-the original occurrence date), timestamps. Inputs go through `parseEditorEntryInput`;
+the original occurrence date), timestamps. Inputs go through `parseEditorEntryInput` (imports: shape only, see Editor API);
 exception/override days must be occurrences of the series (weekday, `INTERVAL=2` week
 parity, `until`); a series edit keeps only those that still are. Limits: 1 000 entries
 (count check inside the `INSERT`; imports end with a guard insert into `kb_guard` whose
@@ -347,8 +347,10 @@ and rebuilt. `invalidateAppSources` (called by the T-43 write routes after every
 replaces the stamp and deletes both entries from memory and KV/Cache API; the stamp makes
 every isolate notice the write at once, which KV deletes alone would not (eventual
 consistency, per-isolate memory). D1 unavailable or a render failure → the cached entry
-as `stale`, else `error`; the configured calendars are unaffected. With KV, the TTL
-write-budget floor counts the two app sources.
+as `stale`, else `error`; the configured calendars are unaffected. The D1 reads of one
+request (stamp and entry list) share a deadline of 2.5 s (`APP_SOURCES_D1_TIMEOUT_MS`);
+a hanging database counts as unavailable, so it never delays `/api/agenda`. With KV, the
+TTL write-budget floor counts the two app sources.
 
 ### Parent lock (T-42, ADR-0013)
 
@@ -367,12 +369,73 @@ conditional insert of a `kb_meta` row `parent_fail:<uuid>` → epoch s succeeds 
 without an active `parent_lock_until` and with fewer than 5 rows in the last 15 min (older
 rows are dropped); not reserved → `429 parent_lockout` with `Retry-After`, no compare. A
 wrong PIN keeps the row and, as the 5th in 15 min, writes `parent_lock_until` (now + 15
-min, also answered with 429); a right PIN deletes its row.
+min, also answered with 429); a right PIN deletes its row. Any other way out of `/unlock` (bad
+body, refused by D1, a D1 error) drops the isolate's reservation (`try`/`finally`). If
+deleting the row of a right PIN fails, the session is still issued and the delete is
+retried once past the response (`waitUntil`); a row left behind ages out with the window.
+The lock condition counts all attempts in the window, including parallel ones still being
+compared, not only settled failures: deliberately conservative, it differs only for
+parallel attempts (one tablet does not produce them), and separating pending from failed
+rows in D1 would add a second row type and a settle write to this path.
 `requireParentSession` (`parent/session.ts`) guards editor routes: it verifies
 `X-KidBoard-Parent` (canonical base64url, `crypto.subtle.verify`, `now < exp ≤ now +
 15 min`) or answers `403 parent_locked`; `GET /api/parent/session` → `{ expiresAt }`. CORS (`http/cors.ts`):
 only on `/api/parent/*` and only for listed origins are `POST, PATCH, DELETE`,
 `Content-Type`, `X-KidBoard-Parent` allowed and `Retry-After` exposed.
+
+### Editor API (T-43, ADR-0014)
+
+`apps/worker/src/parent/editorRoutes.ts` adds the editor routes to the parent sub-app, so
+the editor-off `404`, the 16 KB body limit and `requireParentSession` (`403
+parent_locked`) apply; the response bodies are zod schemas in
+`packages/shared/src/editor/api.ts` (`EditorListResponseSchema`,
+`EditorWriteResponseSchema`, `EditorTemplatesResponseSchema`,
+`EditorImportResponseSchema`, `EditorErrorResponseSchema`) for the web client. The routes
+share the board's per-isolate sources (`agenda/board.ts`: memory layer, single flight,
+schema gate) with `/api/agenda`.
+
+* `GET /entries?from&days` (window rules of `/api/agenda`) → `{ timeZone, range,
+  sources, items }`. App items come from D1 through the board's own path
+  (`renderAppCalendar` + `expandCalendar`), one per occurrence: `entryId`, `revision`,
+  the stored `entry`, `occurrenceDate` (series; the `date` of `scope=one` writes) and
+  the `override` shown on that day. Google items reuse the cached, normalized feed data
+  (`loadSource`, never a second fetch) and are built field by field (`origin: "google"`,
+  title, icon, children, time, bring icons; never a description); a Google meal is a
+  whole day in its slot. `sources` = status of the Google calendars. Order: day, all-day
+  first, time, events before meals, slot, title.
+  Stored entries the current config can no longer express (`parseEditorEntryInput`
+  fails, e.g. a removed child) are not in `items` but in `unresolved` (`entryId`,
+  `revision`, `entry`, `issues`), so a parent can change or delete them with their
+  revision; entries whose date range does not touch the requested days are not checked.
+  D1 unavailable → the Google items with `storageUnavailable: true` (no 503).
+* `POST /entries` (body: `EditorEntryInput`) → `201`; `PATCH /entries/:id?scope=one|series&date=`
+  (body `{ revision, entry }`; `scope` defaults to `series`; `one` writes an "only this
+  day" override) and `DELETE /entries/:id?scope=one|series&date=&revision=` (`one`
+  writes an exception) → `{ entry, boardRefresh: "now" }` (`entry: null` after a full
+  delete). Series edits keep the exceptions and overrides whose dates still exist
+  (`EntryStore.update`). Errors: `400 bad_request` (JSON, query), `404 not_found`,
+  `409 conflict` (+ current `revision`), `422 invalid_entry` (+ `issues` with the
+  `parseEditorEntryInput` codes and field paths, at most 50), `422 limit_reached`
+  (+ `limit`: `entries`/`size`), `503 storage_unavailable` (D1 error, type logged only).
+* `GET /templates` → up to 12 suggestions grouped by kind, icon (VS16 ignored), title
+  and children; most occurrences first, then nearest to now. App entries count from
+  today − 56 to today + 28; Google entries only within the cached window (today − 1 to
+  today + 28),
+  because looking further back would mean another fetch and expansion outside the CPU
+  budget (ADR-0003); weekly Google series still count through their next four weeks.
+  Titles or icons an app entry cannot hold are left out; times, slot, bring icons and
+  countdown come from the occurrence nearest to now.
+* `GET /export` → the `EntryStore.exportAll` document with `Content-Disposition:
+  attachment; filename="kidboard-entries-<today>.json"` (exposed to listed CORS origins).
+  `POST /import?mode=merge|replace` (mode required) → `{ mode, imported, boardRefresh }`.
+  Imported entries are checked for their shape only, not against the config, so a
+  backup from before a config change is restored and its leftovers surface as
+  `unresolved` (`create`/`update`/`setOverride` still check the config);
+  its body limit is `MAX_IMPORT_BODY_BYTES` (1 000 × (8 KB + 512 B) + 4 KB ≈ 8.3 MiB,
+  enough for any export) instead of 16 KB and is checked after the session guard, so
+  only an unlocked parent can make the worker read that much.
+* Every successful write calls `invalidateAppSources` before answering, so the agenda
+  refetch the client starts at once shows the change.
 
 ## Caching & offline (summary – details in [ADR-0006](adr/0006-caching-offline.md))
 

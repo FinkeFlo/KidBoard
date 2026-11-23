@@ -1,10 +1,14 @@
 import { type Context, Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { except } from "hono/combine";
 import { z } from "zod";
 
+import { type Board, defer } from "../agenda/board";
 import type { AppEnv } from "../env";
 import { tokensEqual } from "../http/auth";
-import { parseJsonBody } from "../http/jsonBody";
+import { parseJsonBody, payloadTooLarge } from "../http/jsonBody";
+import { logWarn } from "../log";
+import { IMPORT_ROUTE, registerEditorRoutes } from "./editorRoutes";
 import { UnlockLimiter } from "./lockout";
 import { editorEnabled } from "./pin";
 import {
@@ -15,7 +19,13 @@ import {
   signSession,
 } from "./session";
 
-/** ADR-0013: request bodies of `/api/parent/*` are at most 16 KB. */
+/** Where {@link parentRoutes} is mounted. */
+export const PARENT_BASE_PATH = "/api/parent";
+
+/**
+ * ADR-0013: request bodies of `/api/parent/*` are at most 16 KB (the import route has
+ * its own limit, `MAX_IMPORT_BODY_BYTES`).
+ */
 export const MAX_PARENT_BODY_BYTES = 16 * 1024;
 
 /** Body of `POST /api/parent/unlock`. Any string is a guess; only the length is capped. */
@@ -24,12 +34,14 @@ const UnlockBodySchema = z.strictObject({ pin: z.string().max(64) });
 export interface ParentRoutesOptions {
   /** Clock, epoch ms. */
   now: () => number;
+  /** Board sources of the isolate (feeds for the editor list, app cache invalidation). */
+  board: Board;
 }
 
 export interface ParentRoutes {
   /** Mount at `/api/parent` (after the access token middleware). */
   app: Hono<AppEnv>;
-  /** Guard for editor routes added later (T-43), sharing this instance's key cache. */
+  /** Guard of the editor routes, sharing this instance's key cache. */
   requireSession: MiddlewareHandler<ParentEnv>;
 }
 
@@ -46,7 +58,8 @@ function isoSeconds(epochSeconds: number): string {
  *   `wrong_pin` with `attemptsLeft`; the 5th wrong PIN within 15 min and every request
  *   during the following 15 min → 429 `parent_lockout` with `Retry-After`. Each attempt
  *   is reserved against the limit before the PIN is compared (see `UnlockLimiter`);
- * * `GET /session` (needs {@link requireParentSession}) → `{ expiresAt }`.
+ * * `GET /session` (needs {@link requireParentSession}) → `{ expiresAt }`;
+ * * the editor API (`./editorRoutes.ts`, T-43), behind the same session guard.
  *
  * State (key cache, per-isolate failure counter) lives in the returned instance.
  */
@@ -62,19 +75,17 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
     }
     await next();
   });
+  // The import route checks the session first and then applies its own, larger limit
+  // (`except` matches the full request path).
   app.use(
     "*",
-    bodyLimit({
-      maxSize: MAX_PARENT_BODY_BYTES,
-      onError: (c) =>
-        c.json(
-          {
-            error: "payload_too_large",
-            message: `Request body must be at most ${String(MAX_PARENT_BODY_BYTES)} bytes`,
-          },
-          413,
-        ),
-    }),
+    except(
+      `${PARENT_BASE_PATH}${IMPORT_ROUTE}`,
+      bodyLimit({
+        maxSize: MAX_PARENT_BODY_BYTES,
+        onError: (c) => payloadTooLarge(c, MAX_PARENT_BODY_BYTES),
+      }),
+    ),
   );
 
   app.post("/unlock", async (c) => {
@@ -91,43 +102,81 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
     if (!local.ok) {
       return lockout(c, local.retryAfterSeconds);
     }
-    const body = await parseJsonBody(c, UnlockBodySchema);
-    if (!body.ok) {
-      limiter.releaseLocal(local);
-      return body.response;
-    }
-    await keys.ensureSchema(db);
-    const reserved = await limiter.reserveRemote(db, local, nowSeconds);
-    if (!reserved.ok) {
-      limiter.releaseLocal(local);
-      return lockout(c, reserved.retryAfterSeconds);
-    }
-    if (!(await tokensEqual(body.value.pin, expected))) {
-      const outcome = await limiter.fail(db, nowSeconds);
-      if (outcome.locked) {
-        return lockout(c, outcome.retryAfterSeconds);
+    // Settled = counted as a wrong PIN (kept) or released after the right one; any
+    // other way out (bad body, refused by D1, a D1 error) drops the local reservation.
+    let settled = false;
+    try {
+      const body = await parseJsonBody(c, UnlockBodySchema);
+      if (!body.ok) {
+        return body.response;
       }
-      // 403, not 401: 401 means "access token invalid" to the board client.
-      return c.json(
-        {
-          error: "wrong_pin",
-          message: "Wrong PIN",
-          attemptsLeft: outcome.attemptsLeft,
-        },
-        403,
-      );
+      await keys.ensureSchema(db);
+      const reserved = await limiter.reserveRemote(db, local, nowSeconds);
+      if (!reserved.ok) {
+        return lockout(c, reserved.retryAfterSeconds);
+      }
+      if (!(await tokensEqual(body.value.pin, expected))) {
+        settled = true;
+        const outcome = await limiter.fail(db, nowSeconds);
+        if (outcome.locked) {
+          return lockout(c, outcome.retryAfterSeconds);
+        }
+        // 403, not 401: 401 means "access token invalid" to the board client.
+        return c.json(
+          {
+            error: "wrong_pin",
+            message: "Wrong PIN",
+            attemptsLeft: outcome.attemptsLeft,
+          },
+          403,
+        );
+      }
+      settled = true;
+      try {
+        await limiter.release(db, reserved);
+      } catch (error) {
+        // The PIN was right: go on with the session and retry the delete past the
+        // response, so the attempt does not stay counted against the lockout (the
+        // local copy is already gone). If the retry fails too, the row ages out with
+        // the 15-minute window.
+        logWarn(
+          `parent unlock: releasing the attempt failed (${errorName(error)}), retrying`,
+        );
+        defer(
+          c,
+          limiter.release(db, reserved).catch((retryError: unknown) => {
+            logWarn(
+              `parent unlock: releasing the attempt failed again (${errorName(retryError)})`,
+            );
+          }),
+        );
+      }
+      const expiresAt = nowSeconds + SESSION_TTL_SECONDS;
+      const token = await signSession(await keys.key(db, expected), expiresAt);
+      return c.json({ token, expiresAt: isoSeconds(expiresAt) });
+    } finally {
+      if (!settled) {
+        limiter.releaseLocal(local);
+      }
     }
-    await limiter.release(db, reserved);
-    const expiresAt = nowSeconds + SESSION_TTL_SECONDS;
-    const token = await signSession(await keys.key(db, expected), expiresAt);
-    return c.json({ token, expiresAt: isoSeconds(expiresAt) });
   });
 
   app.get("/session", requireSession, (c) =>
     c.json({ expiresAt: isoSeconds(c.var.parentSessionExpiresAt) }),
   );
 
+  registerEditorRoutes(app, {
+    now: options.now,
+    board: options.board,
+    requireSession,
+  });
+
   return { app, requireSession };
+}
+
+function errorName(error: unknown): string {
+  // Type only: D1 messages may quote statements.
+  return error instanceof Error ? error.name : typeof error;
 }
 
 function lockout(c: Context<AppEnv>, retryAfterSeconds: number): Response {
