@@ -21,6 +21,8 @@ export interface BoardFrameProps {
   onViewChange: (view: BoardView) => void;
   /** When the shown agenda was fetched (epoch ms; 0: unknown), for "Stand HH:MM". */
   updatedAt: number;
+  /** Show the hidden parent entry in the rail (`config.editor`, ADR-0013). */
+  editor?: boolean;
   /** The "How many sleeps?" countdown for the header (T-19), if there is one. */
   countdown?: React.ReactNode;
   children: React.ReactNode;
@@ -38,6 +40,7 @@ export function BoardFrame({
   view,
   onViewChange,
   updatedAt,
+  editor = false,
   countdown,
   children,
 }: BoardFrameProps): React.JSX.Element {
@@ -83,6 +86,7 @@ export function BoardFrame({
           onViewChange={onViewChange}
           updatedAt={updatedAt}
           format={format}
+          editor={editor}
         />
       </div>
       {/* The banner has a fixed slot of its own in the reserved bottom strip, left of the

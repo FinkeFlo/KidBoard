@@ -13,6 +13,7 @@ import { buildOverviewModel } from "../day/buildOverviewModel";
 import { DayError, type DayErrorKind, DayLoading } from "../day/DayStates";
 import { OverviewBoard } from "../day/OverviewBoard";
 import { formatTime, useFormatContext } from "../i18n/format";
+import { useLockWhenEditorOff, useParentGateOpen } from "../parent";
 import { useNightTheme } from "../theme";
 import { useNow } from "../time";
 import { buildWeekModel } from "../week/buildWeekModel";
@@ -60,8 +61,11 @@ export function Board(): React.JSX.Element {
   const backToDay = useCallback(() => {
     setView("day");
   }, []);
+  // ADR-0013: no auto-return while the PIN pad or the editor is open.
+  const parentOpen = useParentGateOpen();
+  useLockWhenEditorOff(config?.editor === true);
   useAutoReturn(
-    view === "week",
+    view === "week" && !parentOpen,
     config?.autoReturnSeconds ?? DEFAULT_AUTO_RETURN_SECONDS,
     backToDay,
   );
@@ -96,6 +100,7 @@ export function Board(): React.JSX.Element {
       view={view}
       onViewChange={setView}
       updatedAt={agenda.dataUpdatedAt}
+      editor={config.editor}
       countdown={
         models.countdown === undefined ? undefined : (
           <CountdownBadge

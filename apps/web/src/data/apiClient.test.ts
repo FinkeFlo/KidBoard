@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   createApiClient,
+  DEFAULT_LOCKOUT_SECONDS,
+  PARENT_SESSION_HEADER,
   REQUEST_TIMEOUT_MS,
   WORKER_UPSTREAM_BUDGET_MS,
 } from "./apiClient";
@@ -255,5 +257,141 @@ describe("createApiClient", () => {
 
     expect(error).not.toBeInstanceOf(ApiError);
     expect(fake.calls[0]?.init?.signal?.aborted).toBe(true);
+  });
+});
+
+describe("parent lock calls (ADR-0013)", () => {
+  /** Synthetic session token (not a real signature). */
+  const SESSION = "v1.1795000000.TESTONLY-not-a-signature";
+  const EXPIRES = "2026-11-22T11:15:00.000Z";
+
+  it("posts the PIN as JSON with the access token and returns the session", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/parent/unlock", {
+      status: 200,
+      body: { token: SESSION, expiresAt: EXPIRES },
+    });
+    const api = createApiClient({ fetch: fake.fetch, token: TEST_TOKEN });
+
+    await expect(api.unlockParent("123456")).resolves.toEqual({
+      kind: "unlocked",
+      token: SESSION,
+      expiresAt: Date.parse(EXPIRES),
+    });
+    const call = fake.calls[0];
+    expect(call?.init?.method).toBe("POST");
+    expect(call?.init?.body).toBe(JSON.stringify({ pin: "123456" }));
+    expect(call?.url).not.toContain("123456");
+    const headers = new Headers(call?.init?.headers);
+    expect(headers.get("Authorization")).toBe(`Bearer ${TEST_TOKEN}`);
+    expect(headers.get("Content-Type")).toBe("application/json");
+  });
+
+  it("maps 403 wrong_pin to the attempts left", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/parent/unlock", {
+      status: 403,
+      body: { error: "wrong_pin", message: "Wrong PIN", attemptsLeft: 3 },
+    });
+    await expect(
+      createApiClient({ fetch: fake.fetch }).unlockParent("000000"),
+    ).resolves.toEqual({ kind: "wrong-pin", attemptsLeft: 3 });
+  });
+
+  it("reads the lockout length from Retry-After first, then the body, then 15 min", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies(
+      "/api/parent/unlock",
+      {
+        status: 429,
+        body: { error: "parent_lockout", retryAfterSeconds: 60 },
+        headers: { "Retry-After": "840" },
+      },
+      {
+        status: 429,
+        body: { error: "parent_lockout", retryAfterSeconds: 61 },
+        headers: { "Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT" },
+      },
+      { raw: "busy", status: 429 },
+    );
+    const api = createApiClient({ fetch: fake.fetch });
+    await expect(api.unlockParent("000000")).resolves.toEqual({
+      kind: "lockout",
+      retryAfterSeconds: 840,
+    });
+    await expect(api.unlockParent("000000")).resolves.toEqual({
+      kind: "lockout",
+      retryAfterSeconds: 61,
+    });
+    await expect(api.unlockParent("000000")).resolves.toEqual({
+      kind: "lockout",
+      retryAfterSeconds: DEFAULT_LOCKOUT_SECONDS,
+    });
+  });
+
+  it.each([
+    [401, "unauthorized"],
+    [404, "http"],
+    [500, "server"],
+  ] as const)("throws HTTP %i as ApiError %s", async (status, kind) => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/parent/unlock", { status, body: { error: "x" } });
+    const error = await rejection(
+      createApiClient({ fetch: fake.fetch }).unlockParent("123456"),
+    );
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ kind, status });
+    // Never the PIN in the message.
+    expect((error as Error).message).not.toContain("123456");
+  });
+
+  it("rejects malformed success and wrong-PIN bodies", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies(
+      "/api/parent/unlock",
+      { status: 200, body: { token: "", expiresAt: EXPIRES } },
+      { status: 403, body: { error: "parent_locked" } },
+    );
+    const api = createApiClient({ fetch: fake.fetch });
+    expect(await rejection(api.unlockParent("123456"))).toMatchObject({
+      kind: "invalid-response",
+      status: 200,
+    });
+    expect(await rejection(api.unlockParent("123456"))).toMatchObject({
+      kind: "invalid-response",
+      status: 403,
+    });
+  });
+
+  it("checks a session with the parent header; 403 means locked", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies(
+      "/api/parent/session",
+      { status: 200, body: { expiresAt: EXPIRES } },
+      { status: 403, body: { error: "parent_locked" } },
+      { status: 401, body: { error: "unauthorized" } },
+    );
+    const api = createApiClient({ fetch: fake.fetch, token: TEST_TOKEN });
+    await expect(api.getParentSession(SESSION)).resolves.toEqual({
+      expiresAt: Date.parse(EXPIRES),
+    });
+    const headers = new Headers(fake.calls[0]?.init?.headers);
+    expect(headers.get(PARENT_SESSION_HEADER)).toBe(SESSION);
+    expect(headers.get("Authorization")).toBe(`Bearer ${TEST_TOKEN}`);
+    expect(fake.calls[0]?.init?.method).toBeUndefined();
+    await expect(api.getParentSession(SESSION)).resolves.toBeNull();
+    expect(await rejection(api.getParentSession(SESSION))).toMatchObject({
+      kind: "unauthorized",
+    });
+  });
+
+  it("reports a network failure of the unlock as ApiError network", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/parent/unlock", "network-error");
+    expect(
+      await rejection(
+        createApiClient({ fetch: fake.fetch }).unlockParent("123456"),
+      ),
+    ).toMatchObject({ kind: "network", path: "/api/parent/unlock" });
   });
 });

@@ -15,6 +15,23 @@
   }
 }
 
+/* Wrong-PIN shake (PinPad): only applied with `motion-safe:`; the message carries the
+   meaning, so reduced motion loses nothing. */
+@keyframes kb-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-0.5rem);
+  }
+  40%,
+  80% {
+    transform: translateX(0.5rem);
+  }
+}
+
 @layer base {
   /*
    * Fluid root size: 16px at 1280x800 up to 24px at 2000x1200 (2vh / 1.25vw, whichever is

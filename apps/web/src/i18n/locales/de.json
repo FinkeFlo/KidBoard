@@ -102,5 +102,32 @@
     "everyone": "Alle",
     "cueTomorrow": "Morgen",
     "cueToday": "Heute"
+  },
+  "parent": {
+    "entry": "Eltern-Bereich (2 Sekunden gedrückt halten)",
+    "pin": {
+      "title": "Eltern-Bereich",
+      "prompt": "PIN eingeben",
+      "checking": "Wird geprüft …",
+      "entered_one": "{{count}} Ziffer eingegeben",
+      "entered_other": "{{count}} Ziffern eingegeben",
+      "erase": "Letzte Ziffer löschen",
+      "submit": "OK",
+      "cancel": "Abbrechen",
+      "wrong_one": "Falsche PIN. Noch {{count}} Versuch.",
+      "wrong_other": "Falsche PIN. Noch {{count}} Versuche.",
+      "lockout_one": "Zu viele falsche PINs. In {{count}} Minute wieder versuchen.",
+      "lockout_other": "Zu viele falsche PINs. In {{count}} Minuten wieder versuchen.",
+      "error": {
+        "unauthorized": "Dieses Tablet braucht einen neuen Zugangslink.",
+        "unavailable": "Der Editor ist ausgeschaltet.",
+        "failed": "Die PIN konnte nicht geprüft werden. Bitte noch einmal versuchen."
+      }
+    },
+    "editor": {
+      "title": "Editor",
+      "done": "Fertig",
+      "placeholder": "Hier lassen sich bald Termine anlegen und ändern."
+    }
   }
 }

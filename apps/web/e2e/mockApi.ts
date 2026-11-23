@@ -243,6 +243,8 @@ export interface MockApi {
   agendaStatus: number;
   /** Paths of every API request seen, in order (`/api/config`, `/api/agenda`, …). */
   requests: string[];
+  /** The parent lock (`/api/parent/*`); answered only when `config.editor` is true. */
+  parent: MockParent;
 }
 
 export interface MockBoardOptions {
@@ -271,6 +273,12 @@ export async function mockBoard(
     agenda: options.agenda ?? agenda([], []),
     agendaStatus: options.agendaStatus ?? 200,
     requests: [],
+    parent: {
+      pin: MOCK_PARENT_PIN,
+      failures: 0,
+      lockedUntil: null,
+      unlocks: [],
+    },
   };
   await fixClock(page, options.now);
   const target: Page | BrowserContext =
@@ -284,9 +292,108 @@ export async function mockBoard(
     if (path === "/api/agenda") {
       return route.fulfill({ status: api.agendaStatus, json: api.agenda });
     }
+    if (path.startsWith("/api/parent/")) {
+      return route.fulfill(answerParent(api, path, route.request()));
+    }
     return route.fulfill({ status: 404, json: { error: "not_found" } });
   });
   return api;
+}
+
+/** Synthetic parent PIN of the mock (ADR-0013: 6-12 digits). */
+export const MOCK_PARENT_PIN = "246810";
+/** Synthetic session token the mock hands out (low entropy, not a real signature). */
+export const MOCK_PARENT_SESSION = "v1.0.TESTONLY-not-a-signature";
+/** ADR-0013: 5 wrong PINs within 15 minutes lock the unlock route for 15 minutes. */
+const MOCK_MAX_FAILURES = 5;
+const MOCK_LOCKOUT_SECONDS = 15 * 60;
+
+/** State of the mocked parent lock (`/api/parent/*`), mutable during a test. */
+export interface MockParent {
+  pin: string;
+  /** Wrong PINs since the last lockout or success. */
+  failures: number;
+  /** Lockout end (epoch ms, test runner clock) or `null`. */
+  lockedUntil: number | null;
+  /** Every unlock request: the PIN sent and the access token header seen. */
+  unlocks: { pin: unknown; authorization: string | null }[];
+}
+
+interface ParentRequest {
+  method(): string;
+  postData(): string | null;
+  headers(): Record<string, string>;
+}
+
+/**
+ * Mirrors the worker's parent routes (docs/ARCHITECTURE.md "Parent lock"): editor off
+ * (config without `editor: true`) → 404; `POST /unlock` → 200 `{ token, expiresAt }`,
+ * 403 `wrong_pin` with `attemptsLeft`, or 429 `parent_lockout` with `Retry-After`;
+ * `GET /session` with `X-KidBoard-Parent` → `{ expiresAt }` or 403 `parent_locked`.
+ */
+function answerParent(
+  api: MockApi,
+  path: string,
+  request: ParentRequest,
+): { status: number; json: unknown; headers?: Record<string, string> } {
+  const enabled =
+    typeof api.config === "object" &&
+    api.config !== null &&
+    (api.config as { editor?: unknown }).editor === true;
+  if (!enabled) return { status: 404, json: { error: "not_found" } };
+  const parent = api.parent;
+  const now = Date.now();
+  const expiresAt = new Date(now + 15 * 60_000).toISOString();
+  if (path === "/api/parent/unlock" && request.method() === "POST") {
+    const body = JSON.parse(request.postData() ?? "null") as {
+      pin?: unknown;
+    } | null;
+    parent.unlocks.push({
+      pin: body?.pin,
+      authorization: request.headers()["authorization"] ?? null,
+    });
+    const lockout = (): {
+      status: number;
+      json: unknown;
+      headers: Record<string, string>;
+    } => {
+      const seconds = Math.max(
+        1,
+        Math.ceil(((parent.lockedUntil ?? now) - now) / 1000),
+      );
+      return {
+        status: 429,
+        json: { error: "parent_lockout", retryAfterSeconds: seconds },
+        headers: { "Retry-After": String(seconds) },
+      };
+    };
+    if (parent.lockedUntil !== null && parent.lockedUntil > now) {
+      return lockout();
+    }
+    if (body?.pin === parent.pin) {
+      parent.failures = 0;
+      return { status: 200, json: { token: MOCK_PARENT_SESSION, expiresAt } };
+    }
+    parent.failures += 1;
+    if (parent.failures >= MOCK_MAX_FAILURES) {
+      parent.failures = 0;
+      parent.lockedUntil = now + MOCK_LOCKOUT_SECONDS * 1000;
+      return lockout();
+    }
+    return {
+      status: 403,
+      json: {
+        error: "wrong_pin",
+        attemptsLeft: MOCK_MAX_FAILURES - parent.failures,
+      },
+    };
+  }
+  if (path === "/api/parent/session" && request.method() === "GET") {
+    return request.headers()["x-kidboard-parent"] === MOCK_PARENT_SESSION
+      ? { status: 200, json: { expiresAt } }
+      : { status: 403, json: { error: "parent_locked" } };
+  }
+  return { status: 404, json: { error: "not_found" } };
 }
 
 /** localStorage key of the persisted query cache (`PERSIST_STORAGE_KEY`). */

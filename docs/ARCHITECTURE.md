@@ -437,6 +437,17 @@ schema gate) with `/api/agenda`.
 * Every successful write calls `invalidateAppSources` before answering, so the agenda
   refetch the client starts at once shows the change.
 
+**Web gate (T-44).** `apps/web/src/parent/`: with `config.editor` the nav rail shows a
+quiet pencil (`ParentEntry`, 64 px) that opens the PIN pad only after a 2 s pointer or
+Enter hold (ring after 0.3 s, so short taps show nothing). `ParentGateProvider` holds
+`closed → pin → editor` and the session token in React state only; `unlock` uses
+`ApiClient.unlockParent` (same access token as the board, but no TanStack query, so a
+403/429/401 never runs the board's 401 wipe). It locks on "Done"/cancel, when the tab is
+hidden, after 3 min without input and at the session end (a 1 s tick compares
+`Date.now()`, so sleeping timers cannot delay it); a late unlock answer is discarded.
+A lockout (`Retry-After`) is remembered in memory and shown as minutes left. While open
+the board is `inert` and its auto-return is paused. `EditorScreen` is the shell T-45 fills.
+
 ## Caching & offline (summary – details in [ADR-0006](adr/0006-caching-offline.md))
 
 | Layer | What | Lifetime |

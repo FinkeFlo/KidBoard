@@ -69,7 +69,7 @@ export function allFailedAgenda(): AgendaResponse {
 }
 
 export type Reply =
-  | { status: number; body: unknown }
+  | { status: number; body: unknown; headers?: Record<string, string> }
   | { raw: string; status?: number }
   | "network-error"
   | "hang";
@@ -78,7 +78,10 @@ export type Reply =
 export interface FakeFetch {
   fetch: typeof fetch;
   calls: { url: string; init: RequestInit | undefined }[];
-  setReplies(path: "/api/config" | "/api/agenda", ...replies: Reply[]): void;
+  setReplies(
+    path: "/api/config" | "/api/agenda" | `/api/parent/${string}`,
+    ...replies: Reply[]
+  ): void;
   count(path: string): number;
 }
 
@@ -128,7 +131,7 @@ export function createFakeFetch(): FakeFetch {
     return Promise.resolve(
       new Response(JSON.stringify(reply.body), {
         status: reply.status,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...reply.headers },
       }),
     );
   };

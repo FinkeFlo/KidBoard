@@ -102,5 +102,32 @@
     "everyone": "Everyone",
     "cueTomorrow": "Tomorrow",
     "cueToday": "Today"
+  },
+  "parent": {
+    "entry": "Parent area (press and hold for 2 seconds)",
+    "pin": {
+      "title": "Parent area",
+      "prompt": "Enter PIN",
+      "checking": "Checking …",
+      "entered_one": "{{count}} digit entered",
+      "entered_other": "{{count}} digits entered",
+      "erase": "Delete last digit",
+      "submit": "OK",
+      "cancel": "Cancel",
+      "wrong_one": "Wrong PIN. {{count}} more try.",
+      "wrong_other": "Wrong PIN. {{count}} more tries.",
+      "lockout_one": "Too many wrong PINs. Try again in {{count}} minute.",
+      "lockout_other": "Too many wrong PINs. Try again in {{count}} minutes.",
+      "error": {
+        "unauthorized": "This tablet needs a new access link.",
+        "unavailable": "The editor is switched off.",
+        "failed": "The PIN could not be checked. Please try again."
+      }
+    },
+    "editor": {
+      "title": "Editor",
+      "done": "Done",
+      "placeholder": "Entries can be added and changed here soon."
+    }
   }
 }
