@@ -483,6 +483,21 @@ not address. These rules apply to every M5b task:
 
 ## M7+ – Later (not in MVP)
 
+* **M10 School** (first milestone after v1.0.0, before M7) – support school children without a
+  new calendar kind or config: school subjects stay normal recurring events in the events
+  calendar (e.g. `Mia: 🏊 Schwimmen`, weekly; holidays by deleting single occurrences, EXDATE
+  already works).
+  1. *Bring list:* a description line `Mitbringen:` / `Bring:` followed by emoji (e.g.
+     `Mitbringen: 👟 🩱 🧴`) is parsed server-side (like `#countdown`) into a list of icons on
+     the event DTO and shown as small emoji chips on the tile (icons only, readable without text).
+  2. *Pack the bag the evening before:* from `bands.eveningStart` the today view shows a 🎒
+     "tomorrow bring" area with all bring-list icons of the next day, grouped per child; it stays
+     visible the next morning until the event starts.
+  3. Fallback icons for more subjects (e.g. art 🎨, PE 👟); avoid emoji newer than the tablet
+     baseline (ADR-0009), e.g. 🪈.
+  4. Later, if wanted: optional school-holiday feed (public iCal per region) that hides events
+     marked `#schule` during holidays; a full timetable as a separate per-child view (all
+     subjects would crowd the board).
 * **M7 Routines** – routine checklist (e.g. brush teeth, get dressed) with reward stars,
   stored locally on the tablet; optional emoji asset set (ADR-0009).
 * **M8 Parent mode** – PIN-protected settings overlay (refresh, night mode override, locale).
@@ -496,6 +511,7 @@ not address. These rules apply to every M5b task:
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-23 | New milestone M10 School (bring list from event description, evening-before 🎒 reminder, later holidays/timetable), scheduled right after v1.0.0 | Maintainer request: school subjects where children must bring something |
 | 2026-11-23 | T-27a outcome: tile size ladder extended with space-based steps (`medium`, dense 2.75rem emoji, `slim` 2rem emoji row tiles; week `week-small`/`week-slim` with 16–18px time-of-day badge on the emoji corner) so "+N" only appears when another tile cannot fit; remaining week polish tracked as issue #5 | UI/UX dummy test loop (4 rounds): showing every event beats a larger emoji on dense days |
 | 2026-11-22 | M5b review: dense overview tiles may use ~3rem emoji (large tiles stay ≥ 3.5rem, T-30b criterion met); English title truncation, week past-event ranking, 🌞/☀️ pair, skeleton header jump become explicit T-27a checks; T-27 docs scope extended (overview, rail, states, `KB-*` codes, CONFIG `bands` wording) | M5b milestone review by reviewer-opus: 3.5rem emoji in a 4rem dense tile tucked under the child edge |
 | 2026-11-22 | release-please switched to manual dispatch; early 1.0.0 release PR closed by the maintainer, who cuts the release himself | The automatic release PR proposed 1.0.0 too early |
