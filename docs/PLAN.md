@@ -825,12 +825,16 @@ often, never force-push.
      `rain` (bool), `snow` (bool), `uvMax`), up to 7 days; temperatures rounded to whole
      degrees; old clients ignore unknown keys.
   4. `weatherIcon(code)` maps every WMO code of the Open-Meteo docs to one emoji (☀️ 🌤️ ⛅
-     ☁️ 🌫️ 🌦️ 🌧️ 🌨️ ❄️ ⛈️), unknown codes → ☁️; never 🌙 (rule 1: 🌙 counts sleeps).
-  5. `clothingFor(day)` returns at most 5 emoji from a documented threshold table (feels-like
-     in °C, converted for °F): 🧥 jacket below 12°, 🧣 below 5°, 🧤 below 0° or snow; 👕
-     from 22°, 🩳 from 24° (`feelsMax`); ☔ + 👢 for rain; 🧤 + 👢 for snow; 🧢 when sunny
-     (code ≤ 2) with UV ≥ 3 and `feelsMax` ≥ 15°, 🧴 from UV ≥ 5; fixed order, no
-     duplicates, priority to protection when capped. Table tests at every threshold (below
+     ☁️ 🌫️ 🌦️ 🌧️ ❄️ ⛈️; snow ❄️ so it differs from rain at small sizes), unknown codes →
+     ☁️; never 🌙 (rule 1: 🌙 counts sleeps).
+  5. `clothingFor(day)` returns at most 5 items (keys; emoji, or one of two drawn pictograms
+     for a warm hat and a sweater, ADR-0015) from a documented threshold table (feels-like in
+     °C, converted for °F): 🧥 jacket below 14°, warm hat below 8°, 🧣 below 5°, 🧤 below 3°
+     or snow, sweater from 14° to below 18° (`feelsMin`); 👕 from 22°, 🩳 from 24°
+     (`feelsMax`); rain → 🌂, plus 👢 rain boots only when `feelsMax` < 20°; snow → 🥾 + 🧤;
+     🧢 when sunny (code ≤ 2) with UV ≥ 3 and `feelsMax` ≥ 15°, 🧴 when sunny with UV ≥ 4;
+     priority when capped: umbrella, boots, jacket, hat, gloves, scarf, sweater, T-shirt,
+     shorts, cap, sunscreen; no duplicates. Table tests at every threshold (below
      / exact), °F input, a cool morning + hot afternoon day (jacket and T-shirt).
   6. Every new emoji is in the ADR-0011 baseline (Emoji ≤ 13.0, test).
 
@@ -862,13 +866,17 @@ often, never force-push.
      for offline like the agenda; a forecast older than 24 h or for a past date is not
      shown; any weather error hides the weather silently (the board never shows an error
      for it).
-  2. Overview: every day column shows a weather chip in its header (icon + temperature; today:
-     current temperature, other days: daily high); today's column shows the clothing row
-     (`clothingFor`) for today until `bands.eveningStart`, from then for tomorrow with the
-     🎒 day cue (arrow + short weekday); whole icons only; heights measured so the event
+  2. Overview: every day column shows a weather chip in its header (icon + temperature;
+     today: current temperature, other days: daily high, with a short date so nothing
+     truncates); today's column shows the clothing row (`clothingFor`) in its heading row:
+     for today until `bands.eveningStart`, from then for tomorrow, led by an arrow +
+     tomorrow's weather icon + high (no sun after dark: today's chip becomes 🌡️ + current
+     temperature); the row never wraps (icons 2rem → 1.75rem → the evening 🌡️ chip is
+     dropped → 1.5rem; the heading is never covered); whole icons only; heights measured so the event
      list shrinks through the existing steps and nothing scrolls (density e2e re-run with
      weather at 1280×800 and 2000×1200, incl. burn-in corners).
-  3. Week view: icon + daily high in the day headers for days inside the forecast.
+  3. Week view: icon + daily high in a row above the weekday for days inside the forecast
+     (apart from the countdown 🌙 on the date line).
   4. A11y and i18n (DE + EN): each chip is one image with a full name ("Sunny, 12 degrees"
      / "Sonnig, 12 Grad"), the clothing row a labelled list ("Today wear: jacket, scarf" /
      "Morgen anziehen: Jacke, Schal"); °C/°F from the config; night tokens and dimmed
@@ -945,6 +953,7 @@ and re-checked by Sonnet until no blocking findings; CI green.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-23 | M9 after the milestone review and the UI/UX click test: T-47.4 snow ❄️; T-47.5 new clothing thresholds, rain/snow boots, two drawn pictograms (warm hat, sweater), priority order; T-49.2 evening lead with tomorrow's weather, 🌡️ chip, one-line fit, short dates; T-49.3 week weather row above the weekday; forecast via `timeformat=unixtime` (ADR-0015) | Click test (Haiku/Sonnet/Opus): tomorrow's rain clothes next to today's sun, no hat/sweater, boots and sunscreen in summer storms; review: Open-Meteo ignores DST inside the range |
 | 2026-11-23 | New milestone M9 Weather and what to wear (T-47–T-49) before v1.0.0, pulled forward from "Later"; ADR-0015; T-28 also depends on M9 | Maintainer request: weather with temperature and child-friendly clothing pictures for today and tomorrow |
 | 2026-11-23 | T-46: user docs for the editor (README, DEPLOY, CONFIG EN + DE) deferred | Maintainer: the feature is not final yet, docs would change too much |
 | 2026-11-23 | T-46b added: Google calendars optional, deploy form asks only for access token, PIN and config | Maintainer testing the deploy button: too many fields; with the editor storing entries in D1 the iCal feeds are no longer required |
