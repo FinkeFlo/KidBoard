@@ -73,6 +73,10 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-22 | M1 | Opus 5.5 (reviewer-opus) | PASS | Fresh clone + wrangler dev sanity green; CI green after gitleaks false-positive fix (missed for 3 commits → orchestrator now checks CI after each push). |
 | 2026-11-22 | M0 | Opus 5.5 (reviewer-opus) | PASS | Fresh clone green, CI run 45013616341 green. Follow-ups folded into T-06/T-08/T-10/T-11. |
 
+## Paused state (2026-11-23)
+
+Paused at the maintainer's request after T-35. M10 next steps: T-36 (evening-before 🎒 area; partial, unreviewed work on branch `wip/t-36-bring-area`, resume from there or restart), then T-37, T-38 and the M10 exit review. T-28 (release) stays with the maintainer.
+
 ## Open questions for the maintainer
 
 1. ~~Repo setting for release-please~~ done by the maintainer (2026-11-22); release-please runs on manual dispatch until v1.0.0.
