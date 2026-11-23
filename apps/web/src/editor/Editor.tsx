@@ -592,7 +592,13 @@ function EditorBody({
     setDataFailure(null);
     try {
       const result = await api.importEntries(token, mode, backup.text);
-      setToast(t("editor.toast.imported", { count: result.imported }));
+      setToast(
+        t("editor.toast.imported", {
+          count: result.imported,
+          created: result.created,
+          updated: result.updated,
+        }),
+      );
       refreshBoard();
       return true;
     } catch (error) {

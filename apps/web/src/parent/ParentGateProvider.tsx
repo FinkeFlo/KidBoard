@@ -11,6 +11,7 @@ import { ApiError } from "../data";
 import { useApiClient } from "../data/apiContext";
 import {
   PARENT_IDLE_LOCK_MS,
+  PARENT_IDLE_WARNING_MS,
   PARENT_LOCK_CHECK_MS,
   type ParentGate,
   ParentGateContext,
@@ -37,27 +38,35 @@ type GateState =
  * pointer, touch or key input, at the session's `lockAt`, and as soon as the tab is
  * hidden. Idle time and expiry are compared with `Date.now()` on a short tick instead of
  * one long timer, so a tablet whose timers were suspended (screen off) still locks at
- * once when it wakes up.
+ * once when it wakes up. From {@link PARENT_IDLE_WARNING_MS} before the idle lock,
+ * `warn(true)` shows the "locking soon" warning; any input (or `stayActive`) hides it.
  */
 function useAutoLock(
   open: boolean,
   lockAt: number | undefined,
   lock: () => void,
-): void {
+  warn: (show: boolean) => void,
+): { stayActive: () => void } {
+  const lastActivity = useRef(0);
+  const stayActive = useCallback(() => {
+    lastActivity.current = Date.now();
+    warn(false);
+  }, [warn]);
   useEffect(() => {
     if (!open) return undefined;
-    let lastActivity = Date.now();
-    const touch = (): void => {
-      lastActivity = Date.now();
-    };
+    lastActivity.current = Date.now();
+    const touch = stayActive;
     const check = (): void => {
       const now = Date.now();
+      const idle = now - lastActivity.current;
       if (
-        now - lastActivity >= PARENT_IDLE_LOCK_MS ||
+        idle >= PARENT_IDLE_LOCK_MS ||
         (lockAt !== undefined && now >= lockAt)
       ) {
         lock();
+        return;
       }
+      warn(idle >= PARENT_IDLE_LOCK_MS - PARENT_IDLE_WARNING_MS);
     };
     const onVisibility = (): void => {
       if (document.visibilityState === "hidden") {
@@ -78,7 +87,8 @@ function useAutoLock(
         document.removeEventListener(name, touch, { capture: true });
       }
     };
-  }, [open, lockAt, lock]);
+  }, [open, lockAt, lock, warn, stayActive]);
+  return { stayActive };
 }
 
 /**
@@ -95,6 +105,14 @@ export function ParentGateProvider({
   const api = useApiClient();
   const [state, setState] = useState<GateState>({ stage: "closed" });
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [idleWarning, setIdleWarning] = useState(false);
+  // Mirrors `idleWarning`, so frequent input (pointermove) re-renders nothing.
+  const idleWarningShown = useRef(false);
+  const warn = useCallback((show: boolean) => {
+    if (idleWarningShown.current === show) return;
+    idleWarningShown.current = show;
+    setIdleWarning(show);
+  }, []);
   // Bumped on every lock: an unlock answer that arrives later is discarded.
   const generation = useRef(0);
   const inFlight = useRef<AbortController | null>(null);
@@ -103,8 +121,9 @@ export function ParentGateProvider({
     generation.current += 1;
     inFlight.current?.abort();
     inFlight.current = null;
+    warn(false);
     setState({ stage: "closed" });
-  }, []);
+  }, [warn]);
 
   const entryRef = useRef<HTMLButtonElement | null>(null);
   // Set by `close`: move focus to the entry after the board is no longer inert.
@@ -186,20 +205,37 @@ export function ParentGateProvider({
   );
 
   const session = state.stage === "editor" ? state.session : null;
-  useAutoLock(state.stage !== "closed", session?.lockAt, lock);
+  const { stayActive } = useAutoLock(
+    state.stage !== "closed",
+    session?.lockAt,
+    lock,
+    warn,
+  );
 
   const value = useMemo<ParentGate>(
     () => ({
       stage: state.stage,
       session,
       lockoutUntil,
+      idleWarning: state.stage !== "closed" && idleWarning,
+      stayActive,
       openPin,
       unlock,
       lock,
       close,
       entryRef,
     }),
-    [state.stage, session, lockoutUntil, openPin, unlock, lock, close],
+    [
+      state.stage,
+      session,
+      lockoutUntil,
+      idleWarning,
+      stayActive,
+      openPin,
+      unlock,
+      lock,
+      close,
+    ],
   );
   return <ParentGateContext value={value}>{children}</ParentGateContext>;
 }

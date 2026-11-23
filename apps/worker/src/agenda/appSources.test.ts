@@ -25,7 +25,6 @@ import {
   EntryStore,
   type StoreResult,
 } from "../entries/entryStore";
-import { SchemaGate } from "../entries/schema";
 import type { Env } from "../env";
 import { cacheBackend, kvBackend, SourceStore } from "../feeds/sourceStore";
 import { invalidateAppSources } from "./appSources";
@@ -36,6 +35,7 @@ const KINDER_URL =
 const ESSEN_URL =
   "https://feeds.kidboard.invalid/calendar/ical/private-TESTONLY-essen-c3d4/basic.ics";
 const PIN = "246813";
+const ACCESS = "TESTONLY-access-not-a-secret";
 const db = testEnv.KIDBOARD_DATA;
 
 const CONFIG_INPUT: AppConfigInput = {
@@ -67,6 +67,8 @@ function env(overrides: Partial<Env> = {}): Env {
     CAL_ESSEN_URL: ESSEN_URL,
     KIDBOARD_DATA: db,
     KIDBOARD_PARENT_PIN: PIN,
+    // The editor (and with it the app sources) needs an access token (ADR-0013).
+    KIDBOARD_ACCESS_TOKEN: ACCESS,
     ...overrides,
   };
 }
@@ -97,7 +99,9 @@ function harness(
     agenda: async (query = FULL, environment = env()) => {
       const ctx = createExecutionContext();
       const response = await app.fetch(
-        new Request(`https://board.example.test/api/agenda${query}`),
+        new Request(`https://board.example.test/api/agenda${query}`, {
+          headers: { Authorization: `Bearer ${ACCESS}` },
+        }),
         environment,
         ctx,
       );
@@ -129,11 +133,9 @@ async function create(
   return ok(await store(config).create(input));
 }
 
-/** What T-43's write routes do after a write, from another isolate's point of view. */
+/** What T-43's write routes do after a write (drop cached copies), seen from another isolate. */
 async function invalidate(cacheName: string, kv = false): Promise<void> {
   await invalidateAppSources({
-    db,
-    gate: new SchemaGate(),
     configHash: await configHash(),
     store: new SourceStore(),
     backend: kv
@@ -252,10 +254,14 @@ describe("virtual sources on the board", () => {
     delete noPin.KIDBOARD_PARENT_PIN;
     const noDb = env();
     delete noDb.KIDBOARD_DATA;
+    const noToken = env();
+    delete noToken.KIDBOARD_ACCESS_TOKEN;
     for (const off of [
       noPin,
       env({ KIDBOARD_PARENT_PIN: "REPLACE_ME" }),
       noDb,
+      noToken,
+      env({ KIDBOARD_ACCESS_TOKEN: "" }),
     ]) {
       const { body } = await harness().agenda(FULL, off);
       expect(body.sources.map((s) => s.id)).toEqual(["kinder", "essen"]);
@@ -660,11 +666,17 @@ describe("cache and invalidation", () => {
     const before = await h.agenda();
     expect(appEvents(before.body)).toHaveLength(5);
 
-    // A direct store change without invalidation is not visible yet (fresh cache).
-    ok(await store().addException(swim.id, 1, "2026-03-16"));
+    // Without a write the fresh cache is served: no entry list is read from D1.
+    const prepare = vi.spyOn(db, "prepare");
     expect(appEvents((await h.agenda()).body)).toHaveLength(5);
+    expect(
+      prepare.mock.calls.some(([sql]) => sql.includes("FROM app_entries")),
+    ).toBe(false);
+    prepare.mockRestore();
 
-    await invalidate(h.cacheName);
+    // A write changes the D1 stamp in its own batch: visible at once, even without
+    // dropping this isolate's cache.
+    ok(await store().addException(swim.id, 1, "2026-03-16"));
     const after = await h.agenda();
     expect(appEvents(after.body).map((e) => e.start.slice(0, 10))).toEqual([
       "2026-03-09",
@@ -684,9 +696,8 @@ describe("cache and invalidation", () => {
     await a.agenda();
     await b.agenda();
     ok(await store().remove(swim.id, 1));
-    // Invalidated through a third isolate: a's and b's memory layers still hold the
-    // old entry, but its stamp no longer matches.
-    await invalidate("kidboard-other-isolate");
+    // Nothing dropped any cache: a's and b's memory layers still hold the old entry,
+    // but the stamp the write replaced in its batch no longer matches.
     expect(appEvents((await a.agenda()).body)).toEqual([]);
     expect(appEvents((await b.agenda()).body)).toEqual([]);
   });
@@ -807,18 +818,18 @@ describe("D1 unavailable", () => {
     ]);
   });
 
-  it("tolerates a failing invalidation and logs only the error type", async () => {
+  it("tolerates a failing invalidation and logs only the backend kind", async () => {
     await expect(
       invalidateAppSources({
-        db: brokenDb(),
-        gate: new SchemaGate(),
         configHash: await configHash(),
         store: new SourceStore(),
-        backend: cacheBackend(() => caches.open("kidboard-broken")),
+        backend: cacheBackend(() =>
+          Promise.reject(new Error("TESTONLY-not-a-secret cache down")),
+        ),
       }),
     ).resolves.toBeUndefined();
     expect(consoleOutput.join("\n")).toContain(
-      "app entries: change stamp write failed (Error)",
+      "app entries: cache cache delete failed",
     );
     expect(consoleOutput.join("\n")).not.toContain("TESTONLY-not-a-secret");
   });

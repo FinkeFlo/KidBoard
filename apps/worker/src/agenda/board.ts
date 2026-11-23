@@ -230,7 +230,10 @@ export interface Board {
   feeds(c: BoardRequest, board: BoardContext): Promise<SourceResult[]>;
   /** The virtual app sources (`[]` while the editor is off). */
   apps(c: BoardRequest, board: BoardContext): Promise<SourceResult[]>;
-  /** After a write: the next `/api/agenda` rebuilds the app sources. Never rejects. */
+  /**
+   * After a write: drops the cached app sources (the write's batch already replaced the
+   * D1 change stamp, which makes every isolate rebuild them). Never rejects.
+   */
   invalidateApps(board: BoardContext): Promise<void>;
 }
 
@@ -331,8 +334,6 @@ export function createBoard(options: BoardOptions): Board {
         return;
       }
       await invalidateAppSources({
-        db: board.db,
-        gate,
         configHash: board.configHash,
         store,
         backend: board.backend,

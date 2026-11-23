@@ -6,13 +6,18 @@ export const FAILURE_WINDOW_SECONDS = 15 * 60;
 export const LOCKOUT_SECONDS = 15 * 60;
 
 /**
- * `kb_meta` keys: one row per attempt (`parent_fail:<uuid>` → epoch seconds), reserved
- * before the PIN is compared and deleted again if it was right, and the end of an
- * active lockout (`parent_lock_until` → epoch seconds). Attempt keys lie in the key
- * range `(FAIL_PREFIX, FAIL_END)` so the primary key index serves the scans.
+ * `kb_meta` keys: one row per attempt (→ epoch seconds of the attempt), reserved as
+ * `parent_fail:<uuid>` before the PIN is compared; a wrong PIN renames it to
+ * `parent_fail:s:<uuid>` (settled failure), a right PIN deletes it together with every
+ * settled failure. Plus the end of an active lockout (`parent_lock_until` → epoch
+ * seconds). All attempt keys lie in the key range `(FAIL_PREFIX, FAIL_END)` and the
+ * settled ones in `(SETTLED_PREFIX, SETTLED_END)` (a UUID never starts with `s`), so
+ * the primary key index serves the scans.
  */
 const FAIL_PREFIX = "parent_fail:";
 const FAIL_END = "parent_fail;";
+const SETTLED_PREFIX = "parent_fail:s:";
+const SETTLED_END = "parent_fail:s;";
 const LOCK_KEY = "parent_lock_until";
 /** Attempt rows inside the window; binds ?1 = FAIL_PREFIX, ?2 = FAIL_END, ?3 = window start. */
 const IN_WINDOW = "key > ?1 AND key < ?2 AND value > ?3";
@@ -39,6 +44,8 @@ function asNumber(value: unknown): number | null {
 interface LocalAttempt {
   id: string;
   at: number;
+  /** A wrong PIN (settled); `false` while the PIN is still being compared. */
+  failed: boolean;
 }
 
 /**
@@ -47,8 +54,13 @@ interface LocalAttempt {
  * {@link MAX_FAILURES} PINs per window: first in this isolate (synchronous check and
  * insert, no await in between), then in D1 (one batch whose conditional insert is the
  * check; strongly consistent across isolates). A wrong PIN keeps the reservation as a
- * failure and starts the lockout once the window holds {@link MAX_FAILURES}; a right
- * PIN deletes it again. The isolate copy keeps a lockout even if a D1 write is lost.
+ * settled failure and starts the lockout once the window holds {@link MAX_FAILURES}; a
+ * right PIN deletes it and clears the settled failures of the window (the parent typed
+ * the PIN; earlier typos no longer count). Reservations of attempts still being
+ * compared stay counted, so even next to a right PIN no more than
+ * {@link MAX_FAILURES} PINs are being compared at once, and without the right PIN no
+ * more than {@link MAX_FAILURES} per window. The isolate copy keeps a lockout even if
+ * a D1 write is lost.
  */
 export class UnlockLimiter {
   private attempts: LocalAttempt[] = [];
@@ -76,7 +88,7 @@ export class UnlockLimiter {
       };
     }
     const id = crypto.randomUUID();
-    this.attempts.push({ id, at: nowSeconds });
+    this.attempts.push({ id, at: nowSeconds, failed: false });
     return { ok: true, id };
   }
 
@@ -147,11 +159,20 @@ export class UnlockLimiter {
    * parallel requests whose PIN is still being compared, not only settled failures.
    * Deliberate (T-43 review follow-up): it errs on the closed side and differs only
    * while attempts run in parallel, which one family tablet does not produce (a parent
-   * types one PIN at a time); telling pending from failed rows in D1 would need a
-   * second row type and a settle write in this security path for no practical gain.
+   * types one PIN at a time). The settle write (rename to the settled key range) only
+   * decides what a later right PIN clears.
    */
-  async fail(db: D1Database, nowSeconds: number): Promise<FailureOutcome> {
+  async fail(
+    db: D1Database,
+    reservation: Reservation,
+    nowSeconds: number,
+  ): Promise<FailureOutcome> {
     const windowStart = nowSeconds - FAILURE_WINDOW_SECONDS;
+    for (const attempt of this.attempts) {
+      if (attempt.id === reservation.id) {
+        attempt.failed = true;
+      }
+    }
     if (this.attempts.length >= MAX_FAILURES) {
       this.lockedUntil = Math.max(
         this.lockedUntil,
@@ -159,6 +180,10 @@ export class UnlockLimiter {
       );
     }
     const results = await db.batch<{ value: unknown }>([
+      // Settle the reservation: it stays counted, now as a failure a right PIN clears.
+      db
+        .prepare("UPDATE kb_meta SET key = ?1 WHERE key = ?2")
+        .bind(SETTLED_PREFIX + reservation.id, FAIL_PREFIX + reservation.id),
       db
         .prepare(
           `INSERT INTO kb_meta (key, value)
@@ -180,11 +205,11 @@ export class UnlockLimiter {
       db.prepare("SELECT value FROM kb_meta WHERE key = ?1").bind(LOCK_KEY),
     ]);
     const count = Math.max(
-      asNumber(results[1]?.results[0]?.value) ?? 0,
+      asNumber(results[2]?.results[0]?.value) ?? 0,
       this.attempts.length,
     );
     const lockedUntil = Math.max(
-      asNumber(results[2]?.results[0]?.value) ?? 0,
+      asNumber(results[3]?.results[0]?.value) ?? 0,
       this.lockedUntil,
     );
     if (lockedUntil > nowSeconds) {
@@ -194,12 +219,19 @@ export class UnlockLimiter {
     return { locked: false, attemptsLeft: Math.max(0, MAX_FAILURES - count) };
   }
 
-  /** The reserved attempt was the right PIN: forget it here and in D1 (one delete). */
+  /**
+   * The reserved attempt was the right PIN: forget it and every settled failure, here
+   * and in D1 (one delete). Reservations of parallel attempts whose PIN is still being
+   * compared stay counted (they settle on their own). An active lockout is untouched:
+   * while it runs no PIN is compared at all.
+   */
   async release(db: D1Database, reservation: Reservation): Promise<void> {
-    this.releaseLocal(reservation);
+    this.attempts = this.attempts.filter(
+      (a) => a.id !== reservation.id && !a.failed,
+    );
     await db
-      .prepare("DELETE FROM kb_meta WHERE key = ?1")
-      .bind(FAIL_PREFIX + reservation.id)
+      .prepare("DELETE FROM kb_meta WHERE key = ?1 OR (key > ?2 AND key < ?3)")
+      .bind(FAIL_PREFIX + reservation.id, SETTLED_PREFIX, SETTLED_END)
       .run();
   }
 }

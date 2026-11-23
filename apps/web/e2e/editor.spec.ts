@@ -435,8 +435,9 @@ test.describe("parent editor (T-45)", () => {
     const confirm = page.getByRole("alertdialog");
     await expect(confirm).toContainText("Replace everything with 1 entry?");
     await confirm.getByRole("button", { name: "Replace all" }).click();
+    // The message says what happened (the backup's id was not stored yet).
     await expect(page.getByTestId("editor-toast")).toContainText(
-      "1 entry imported",
+      "1 entry imported. 0 updated, 1 new.",
     );
     expect(api.editor.entries().map((entry) => entry.data.title)).toEqual([
       "Circus",

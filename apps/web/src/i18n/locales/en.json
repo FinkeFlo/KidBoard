@@ -125,6 +125,12 @@
       },
       "demo": "Demo: the PIN is {{pin}}"
     },
+    "idle": {
+      "title": "Locking soon",
+      "text_one": "Without input the parent area locks in {{count}} second.",
+      "text_other": "Without input the parent area locks in {{count}} seconds.",
+      "stay": "Keep editing"
+    },
     "editor": {
       "title": "Editor",
       "done": "Done",
@@ -352,8 +358,8 @@
       "saved": "Saved – the board shows it now.",
       "deleted": "Deleted.",
       "exported": "Backup downloaded.",
-      "imported_one": "{{count}} entry imported.",
-      "imported_other": "{{count}} entries imported.",
+      "imported_one": "{{count}} entry imported. {{updated}} updated, {{created}} new.",
+      "imported_other": "{{count}} entries imported. {{updated}} updated, {{created}} new.",
       "copied_one": "{{count}} meal copied.",
       "copied_other": "{{count}} meals copied.",
       "close": "Close message"

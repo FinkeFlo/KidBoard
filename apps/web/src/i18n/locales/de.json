@@ -125,6 +125,12 @@
       },
       "demo": "Demo: Die PIN ist {{pin}}"
     },
+    "idle": {
+      "title": "Gleich wird gesperrt",
+      "text_one": "Ohne Eingabe sperrt sich der Eltern-Bereich in {{count}} Sekunde.",
+      "text_other": "Ohne Eingabe sperrt sich der Eltern-Bereich in {{count}} Sekunden.",
+      "stay": "Weiter bearbeiten"
+    },
     "editor": {
       "title": "Editor",
       "done": "Fertig",
@@ -352,8 +358,8 @@
       "saved": "Gespeichert – die Tafel zeigt es jetzt.",
       "deleted": "Gelöscht.",
       "exported": "Sicherung heruntergeladen.",
-      "imported_one": "{{count}} Eintrag importiert.",
-      "imported_other": "{{count}} Einträge importiert.",
+      "imported_one": "{{count}} Eintrag übernommen. {{updated}} aktualisiert, {{created}} neu.",
+      "imported_other": "{{count}} Einträge übernommen. {{updated}} aktualisiert, {{created}} neu.",
       "copied_one": "{{count}} Essen kopiert.",
       "copied_other": "{{count}} Essen kopiert.",
       "close": "Hinweis schließen"

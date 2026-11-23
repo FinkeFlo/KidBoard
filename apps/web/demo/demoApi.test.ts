@@ -124,6 +124,70 @@ describe("demo API", () => {
     );
   });
 
+  describe("unlock limiter (worker behaviour, ADR-0013)", () => {
+    const unlock = (
+      api: ReturnType<typeof createDemoApi>,
+      pin: string,
+    ): FakeResponse =>
+      answer(
+        api.handle(
+          request({
+            method: "POST",
+            path: "/api/parent/unlock",
+            body: JSON.stringify({ pin }),
+          }),
+        ),
+      );
+
+    it("counts the tries down and locks after the 5th wrong PIN for 15 minutes", () => {
+      let now = NOW;
+      const api = createDemoApi(() => now);
+      const left: unknown[] = [];
+      for (let i = 0; i < 4; i++) {
+        const wrong = unlock(api, "000000");
+        expect(wrong.status).toBe(403);
+        left.push((wrong.json as { attemptsLeft: number }).attemptsLeft);
+        now += 60_000;
+      }
+      expect(left).toEqual([4, 3, 2, 1]);
+      const fifth = unlock(api, "000000");
+      expect(fifth.status).toBe(429);
+      expect(fifth.headers).toEqual({ "Retry-After": "900" });
+      expect(fifth.json).toMatchObject({
+        error: "parent_lockout",
+        retryAfterSeconds: 900,
+      });
+
+      // Even the right PIN waits; Retry-After counts down.
+      now += 5 * 60_000;
+      const locked = unlock(api, DEMO_PARENT_PIN);
+      expect(locked.status).toBe(429);
+      expect(locked.headers).toEqual({ "Retry-After": "600" });
+
+      // After the lockout: a fresh count, and the right PIN opens.
+      now += 10 * 60_000;
+      expect(
+        (unlock(api, "000000").json as { attemptsLeft: number }).attemptsLeft,
+      ).toBe(4);
+      expect(unlock(api, DEMO_PARENT_PIN).status).toBe(200);
+    });
+
+    it("forgets wrong PINs older than 15 minutes and clears them on the right PIN", () => {
+      let now = NOW;
+      const api = createDemoApi(() => now);
+      unlock(api, "000000");
+      now += 16 * 60_000;
+      expect(
+        (unlock(api, "000000").json as { attemptsLeft: number }).attemptsLeft,
+      ).toBe(4);
+      unlock(api, "000000");
+      expect(unlock(api, DEMO_PARENT_PIN).status).toBe(200);
+      expect(
+        (unlock(api, "000000").json as { attemptsLeft: number }).attemptsLeft,
+      ).toBe(4);
+    });
+  });
+
   it("does not serve unknown paths", () => {
     const api = createDemoApi(() => NOW);
     expect(api.handle(request({ path: "/api/other" }))).toBeNull();

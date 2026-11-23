@@ -992,18 +992,24 @@ describe("GET /api/config", () => {
   });
 
   const PIN = "246813";
+  const ACCESS = { KIDBOARD_ACCESS_TOKEN: TOKEN };
 
   it.each<[string, Partial<Env>, boolean]>([
-    ["no D1 binding and no PIN", {}, false],
-    ["a valid PIN but no D1 binding", { KIDBOARD_PARENT_PIN: PIN }, false],
+    ["no D1 binding and no PIN", ACCESS, false],
+    [
+      "a valid PIN but no D1 binding",
+      { ...ACCESS, KIDBOARD_PARENT_PIN: PIN },
+      false,
+    ],
     [
       "the D1 binding but no PIN",
-      { KIDBOARD_DATA: testEnv.KIDBOARD_DATA },
+      { ...ACCESS, KIDBOARD_DATA: testEnv.KIDBOARD_DATA },
       false,
     ],
     [
       "the D1 binding and the template PIN",
       {
+        ...ACCESS,
         KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
         KIDBOARD_PARENT_PIN: "REPLACE_ME",
       },
@@ -1011,17 +1017,43 @@ describe("GET /api/config", () => {
     ],
     [
       "the D1 binding and a 5-digit PIN",
-      { KIDBOARD_DATA: testEnv.KIDBOARD_DATA, KIDBOARD_PARENT_PIN: "13579" },
+      {
+        ...ACCESS,
+        KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
+        KIDBOARD_PARENT_PIN: "13579",
+      },
       false,
     ],
     [
-      "the D1 binding and a valid PIN",
+      "the D1 binding and a valid PIN but no access token (fail closed)",
       { KIDBOARD_DATA: testEnv.KIDBOARD_DATA, KIDBOARD_PARENT_PIN: PIN },
+      false,
+    ],
+    [
+      "the D1 binding, a valid PIN and an empty access token (fail closed)",
+      {
+        KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
+        KIDBOARD_PARENT_PIN: PIN,
+        KIDBOARD_ACCESS_TOKEN: "",
+      },
+      false,
+    ],
+    [
+      "the D1 binding, a valid PIN and an access token",
+      {
+        ...ACCESS,
+        KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
+        KIDBOARD_PARENT_PIN: PIN,
+      },
       true,
     ],
   ])("reports editor with %s → %s", async (_, overrides, expected) => {
     const h = harness();
-    const response = await h.call("/api/config", undefined, baseEnv(overrides));
+    const response = await h.call(
+      "/api/config",
+      { headers: { Authorization: `Bearer ${TOKEN}` } },
+      baseEnv(overrides),
+    );
     expect(response.status).toBe(200);
     const body = await response.json<Record<string, unknown>>();
     if (expected) {
@@ -1042,10 +1074,11 @@ describe("editor flag and the board", () => {
     const without = await agenda(harness(), "?days=8");
     const withEditor = await agenda(
       harness(),
-      "?days=8",
+      `?days=8&key=${TOKEN}`,
       baseEnv({
         KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
         KIDBOARD_PARENT_PIN: "246813",
+        KIDBOARD_ACCESS_TOKEN: TOKEN,
       }),
     );
     expect(without.status).toBe(200);

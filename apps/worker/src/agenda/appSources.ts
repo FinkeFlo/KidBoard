@@ -10,6 +10,7 @@ import { sha256Hex } from "../config/loadConfig";
 import { type AppEntry, EntryStore } from "../entries/entryStore";
 import { renderAppCalendar } from "../entries/renderCalendar";
 import type { SchemaGate } from "../entries/schema";
+import { STAMP_KEY } from "../entries/stamp";
 import {
   SOURCE_ENTRY_VERSION,
   type SourceEntry,
@@ -32,9 +33,6 @@ export const APP_SOURCES: readonly (CalendarSource & {
   { id: APP_EVENTS_SOURCE_ID, kind: "events", entryKind: "event" },
   { id: APP_MEALS_SOURCE_ID, kind: "meals", entryKind: "meal" },
 ];
-
-/** `kb_meta` key of the change stamp (a constant, not user input). */
-const STAMP_KEY = "entries_stamp";
 
 /** What both the board read and the invalidation need. */
 export interface AppSourceCacheContext {
@@ -90,10 +88,10 @@ async function withSchema<T>(
 
 /**
  * The current change stamp of the app entries ("" before the first write). It is a
- * random value replaced by {@link invalidateAppSources} after every write, so every
- * isolate notices a write with one primary-key read, whatever its memory layer holds
- * (D1 is strongly consistent; KV deletes are not). Random rather than a counter: a
- * database restored to an earlier point can never repeat a stamp with other data.
+ * random value the entry store replaces in the same D1 batch as every write
+ * (`../entries/stamp.ts`), so every isolate notices a committed write with one
+ * primary-key read, whatever its memory layer holds (D1 is strongly consistent; KV
+ * deletes are not).
  */
 async function readStamp(ctx: AppSourceCacheContext): Promise<string> {
   return withSchema(ctx, async () => {
@@ -260,36 +258,21 @@ export async function loadAppSources(
 }
 
 /**
- * Makes the next `/api/agenda` reflect a change of the app entries; the editor's write
- * routes (T-43) call it after every successful write. It replaces the D1 change stamp
- * (every isolate then treats its cached entries as outdated) and drops the cached
- * entries of both virtual sources from this isolate's memory and from KV or the Cache
- * API. Never rejects: failures are logged, and a cache left behind is outdated by the
- * stamp or, if the stamp write failed too, by the TTL.
+ * Drops the cached entries of both virtual sources from this isolate's memory and from
+ * KV or the Cache API; the editor's write routes (T-43) call it after every successful
+ * write. Correctness does not depend on it: the write's own batch already replaced the
+ * D1 change stamp, so every isolate treats its cached entries as outdated anyway; this
+ * only frees the outdated copies. Never rejects: failures are logged.
  */
 export async function invalidateAppSources(
-  ctx: AppSourceCacheContext,
+  ctx: Pick<AppSourceCacheContext, "configHash" | "store" | "backend">,
 ): Promise<void> {
   const keys = await Promise.all(
     APP_SOURCES.map((source) => appSourceKey(source.id, ctx.configHash)),
   );
-  const results = await Promise.allSettled([
-    withSchema(ctx, () =>
-      ctx.db
-        .prepare(
-          "INSERT INTO kb_meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO UPDATE SET value = ?2",
-        )
-        .bind(STAMP_KEY, crypto.randomUUID())
-        .run(),
-    ),
-    ...keys.map((key) => ctx.store.delete(ctx.backend, key)),
-  ]);
-  const [stampResult, ...deletes] = results;
-  if (stampResult.status === "rejected") {
-    logWarn(
-      `app entries: change stamp write failed (${errorName(stampResult.reason)})`,
-    );
-  }
+  const deletes = await Promise.allSettled(
+    keys.map((key) => ctx.store.delete(ctx.backend, key)),
+  );
   if (deletes.some((result) => result.status === "rejected")) {
     logWarn(`app entries: ${ctx.backend.kind} cache delete failed`);
   }

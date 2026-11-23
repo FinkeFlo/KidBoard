@@ -22,6 +22,12 @@ Option 1.
 
 * **Secret** `KIDBOARD_PARENT_PIN`: 6 to 12 digits. Shorter, non-digit or the template
   value → the editor stays off and the worker logs a configuration warning (fail closed).
+* **Access token required:** the editor (and with it the app entries on the board and
+  the phone feed) is on only when `KIDBOARD_ACCESS_TOKEN` is set too (non-empty, not the
+  template value). Without it anyone who finds the URL could try PINs and run the
+  family into the lockout; the worker logs a configuration warning (never the values),
+  `/api/config` reports no `editor` flag and every `/api/parent/*` path is 404. The
+  read-only board keeps working without an access token as before.
 * **Unlock:** `POST /api/parent/unlock` with `{ pin }` (plus the normal access token, if
   one is set). Compared in constant time (same helper as the access token). Success →
   `{ token, expiresAt }`, a session token `v1.<expiryEpochSeconds>.<base64url HMAC-SHA-256>`
@@ -41,8 +47,12 @@ Option 1.
   test more than 5 PINs per window: synchronously in the isolate, then in D1 with one
   batch that inserts the attempt row only if no lockout is active and the window holds
   fewer than 5 attempts; not reserved → 429 without comparing. A wrong PIN keeps the
-  row as a failure; a right PIN deletes its reservation (a success writes that one
-  reservation and its delete, nothing else).
+  row, marked as a settled failure; a right PIN deletes its reservation and every
+  settled failure of the window (in D1 and in its isolate), so a parent's earlier typos
+  do not count against the next unlock. Reservations of parallel attempts still being
+  compared are not cleared: at most 5 PINs are compared at once, and without the right
+  PIN at most 5 per window. Another isolate's own copy of earlier failures ages out with
+  the window (fail closed).
 * **Tablet UI:** no visible "edit" button for children. The entry is a small, low-contrast
   ✏️ control in the nav rail that opens only after a 2-second press and hold (same pattern
   as the fullscreen control), then a PIN pad. The session lives in memory only (not in
@@ -51,7 +61,10 @@ Option 1.
 
 ## Consequences
 * A 6-digit PIN with a lockout of 5 tries per 15 minutes is ~1.75 years of expected
-  online guessing even with a stolen access token; acceptable for a family calendar.
+  online guessing even with a stolen access token; acceptable for a family calendar. A
+  right PIN resets the count, which helps only someone who already knows the PIN.
+* Families must set an access token to use the editor; a deployment without one stays
+  the read-only board (the deploy form asks for both).
 * The PIN is typed on the tablet in view of children; parents may change it any time
   (`wrangler secret put` / dashboard) and all sessions end.
 * Opening the editor from a phone works too (same URL with `?key=` once, then PIN).

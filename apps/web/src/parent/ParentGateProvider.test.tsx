@@ -16,6 +16,7 @@ import {
 } from "../data/testing.test-utils";
 import {
   PARENT_IDLE_LOCK_MS,
+  PARENT_IDLE_WARNING_MS,
   PARENT_SESSION_TTL_MS,
   type UnlockOutcome,
   useParentGate,
@@ -277,6 +278,66 @@ describe("ParentGateProvider", () => {
         setVisibility("visible");
       });
       expect(result.current.stage).toBe("closed");
+    });
+
+    it("warns 30 s before the idle lock; any input or stayActive hides the warning and restarts the time", async () => {
+      const result = await unlocked();
+      const warnAt = PARENT_IDLE_LOCK_MS - PARENT_IDLE_WARNING_MS;
+      act(() => {
+        vi.advanceTimersByTime(warnAt - 1000);
+      });
+      expect(result.current.idleWarning).toBe(false);
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(result.current.idleWarning).toBe(true);
+
+      // A touch hides it at once (no tick needed) and restarts the idle time.
+      act(() => {
+        document.dispatchEvent(new Event("pointerdown"));
+      });
+      expect(result.current.idleWarning).toBe(false);
+      act(() => {
+        vi.advanceTimersByTime(warnAt);
+      });
+      expect(result.current.idleWarning).toBe(true);
+
+      // "Keep editing": the full 3 minutes again.
+      act(() => {
+        result.current.stayActive();
+      });
+      expect(result.current.idleWarning).toBe(false);
+      act(() => {
+        vi.advanceTimersByTime(PARENT_IDLE_LOCK_MS - 1000);
+      });
+      expect(result.current.stage).toBe("editor");
+      expect(result.current.idleWarning).toBe(true);
+
+      // Ignored: it locks at 3 minutes and the warning goes with it.
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(result.current.stage).toBe("closed");
+      expect(result.current.idleWarning).toBe(false);
+    });
+
+    it("drops the warning when the tab is hidden (locks at once) and on reopening", async () => {
+      const result = await unlocked();
+      act(() => {
+        vi.advanceTimersByTime(PARENT_IDLE_LOCK_MS - 10_000);
+      });
+      expect(result.current.idleWarning).toBe(true);
+      act(() => {
+        setVisibility("hidden");
+      });
+      expect(result.current.stage).toBe("closed");
+      expect(result.current.idleWarning).toBe(false);
+      act(() => {
+        setVisibility("visible");
+        result.current.openPin();
+      });
+      expect(result.current.stage).toBe("pin");
+      expect(result.current.idleWarning).toBe(false);
     });
 
     it("stops listening once locked", async () => {

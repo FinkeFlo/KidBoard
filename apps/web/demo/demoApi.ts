@@ -26,6 +26,10 @@ import {
 export const DEMO_PARENT_PIN = "123456";
 /** Session length, as on the worker (ADR-0013). */
 const SESSION_MS = 15 * 60_000;
+/** Lockout rules, as on the worker (ADR-0013): 5 wrong PINs in 15 min lock 15 min. */
+export const DEMO_MAX_FAILURES = 5;
+const FAILURE_WINDOW_MS = 15 * 60_000;
+const LOCKOUT_MS = 15 * 60_000;
 /** Low-entropy synthetic session token prefix (not a signature). */
 const SESSION_PREFIX = "demo-session-";
 
@@ -44,8 +48,61 @@ export interface DemoApi {
 export const DEMO_FEED_URL =
   "/api/feed.ics?token=demo-feed-not-a-secret-0123456789";
 
+/**
+ * The demo's unlock limiter: the worker's visible behaviour (ADR-0013) in memory, so
+ * the PIN pad's "tries left" and lockout states can be tried: each wrong PIN answers
+ * 403 `wrong_pin` with the tries left (4, 3, 2, 1), the 5th within 15 minutes and
+ * every attempt during the following 15 minutes 429 `parent_lockout` with
+ * `Retry-After`; the right PIN clears the wrong ones. Restarting the demo server resets
+ * it.
+ */
+function demoLimiter(now: () => number): {
+  check: () => FakeResponse | null;
+  fail: () => FakeResponse;
+  succeed: () => void;
+} {
+  let failures: number[] = [];
+  let lockedUntil = 0;
+  const lockout = (untilMs: number): FakeResponse => {
+    const retryAfterSeconds = Math.max(1, Math.ceil((untilMs - now()) / 1000));
+    return {
+      status: 429,
+      headers: { "Retry-After": String(retryAfterSeconds) },
+      json: {
+        error: "parent_lockout",
+        message: "",
+        retryAfterSeconds,
+      },
+    };
+  };
+  return {
+    check: () => (lockedUntil > now() ? lockout(lockedUntil) : null),
+    fail: () => {
+      const at = now();
+      failures = [...failures.filter((t) => t > at - FAILURE_WINDOW_MS), at];
+      if (failures.length >= DEMO_MAX_FAILURES) {
+        failures = [];
+        lockedUntil = at + LOCKOUT_MS;
+        return lockout(lockedUntil);
+      }
+      return {
+        status: 403,
+        json: {
+          error: "wrong_pin",
+          message: "",
+          attemptsLeft: DEMO_MAX_FAILURES - failures.length,
+        },
+      };
+    },
+    succeed: () => {
+      failures = [];
+    },
+  };
+}
+
 export function createDemoApi(now: () => number = Date.now): DemoApi {
   const sessions = new Map<string, number>();
+  const limiter = demoLimiter(now);
   let counter = 0;
   const google = (range: DateRange): ReturnType<FakeEditor["agendaItems"]> => {
     const agenda = demoAgenda(demoToday(now()), new Date(now()).toISOString());
@@ -104,12 +161,10 @@ export function createDemoApi(now: () => number = Date.now): DemoApi {
         } catch {
           return { status: 400, json: { error: "bad_request", message: "" } };
         }
-        if (pin !== DEMO_PARENT_PIN) {
-          return {
-            status: 403,
-            json: { error: "wrong_pin", message: "", attemptsLeft: 4 },
-          };
-        }
+        const locked = limiter.check();
+        if (locked !== null) return locked;
+        if (pin !== DEMO_PARENT_PIN) return limiter.fail();
+        limiter.succeed();
         counter += 1;
         const token = `${SESSION_PREFIX}${String(counter)}`;
         const expiresAt = now() + SESSION_MS;

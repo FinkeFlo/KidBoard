@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { IdleWarning } from "./IdleWarning";
 import {
   PIN_MAX_LENGTH,
   PIN_MIN_LENGTH,
@@ -33,23 +34,30 @@ export function lockoutMinutesLeft(
   return Math.max(1, Math.ceil((until - now) / 60_000));
 }
 
+/** From this many slots on, the dots get smaller so 12 fit on a narrow phone too. */
+const COMPACT_DOTS_FROM = 9;
+
 function PinDots({ count }: { count: number }): React.JSX.Element {
   const { t } = useTranslation();
   const slots = Math.max(PIN_MIN_LENGTH, count);
+  const compact = slots >= COMPACT_DOTS_FROM;
   return (
     <div
       role="img"
       aria-label={t("parent.pin.entered", { count })}
       data-testid="pin-dots"
       data-count={count}
-      className="flex h-6 items-center justify-center gap-3"
+      data-compact={compact}
+      className={`flex min-h-6 max-w-full flex-wrap items-center justify-center ${
+        compact ? "gap-2" : "gap-3"
+      }`}
     >
       {Array.from({ length: slots }, (_, index) => (
         <span
           key={index}
-          className={`size-5 rounded-full border-3 ${
-            index < count ? "border-text bg-text" : "border-border"
-          }`}
+          className={`shrink-0 rounded-full ${
+            compact ? "size-4 border-2" : "size-5 border-3"
+          } ${index < count ? "border-text bg-text" : "border-border"}`}
         />
       ))}
     </div>
@@ -72,6 +80,7 @@ function DigitKey({
     <button
       type="button"
       disabled={disabled}
+      data-pin-digit={digit}
       onClick={() => {
         onPress(digit);
       }}
@@ -87,9 +96,16 @@ function DigitKey({
  * (dots only, the digits are never rendered), a 3 × 4 keypad of >= 64 px keys, OK and
  * Cancel. A wrong PIN clears the entry and shows the tries left (plus a short shake
  * only without reduced motion; the message carries the meaning); a lockout disables the
- * keypad and shows the minutes left, counted down while the pad is open. Physical
- * keyboards work too (digits, Backspace, Enter, Escape); held-key repeats are ignored,
- * so the Enter held to open the gate cannot type or submit here.
+ * keypad and shows the minutes left, counted down while the pad is open. At most
+ * {@link PIN_MAX_LENGTH} digits are taken (the digit keys disable at that length).
+ *
+ * Physical keyboards work too (digits, Backspace, Enter, Escape), wherever the focus is
+ * while the pad is open (a document listener: a key button that was disabled during
+ * the check drops the focus, and typing must go on), and the focus returns into the
+ * pad after every answer. Enter submits, also while a digit key has the focus (it does
+ * not press that key again); on OK, ⌫ and Cancel it activates them as usual.
+ * Held-key repeats are ignored, so the Enter or Space held to open the gate cannot
+ * type or submit here.
  */
 export function PinPad(): React.JSX.Element {
   const { t } = useTranslation();
@@ -106,6 +122,7 @@ export function PinPad(): React.JSX.Element {
   const lockedMinutes = lockoutMinutesLeft(gate.lockoutUntil, now);
   const locked = lockedMinutes !== null;
   const disabled = pending || locked;
+  const full = digits.length >= PIN_MAX_LENGTH;
 
   useEffect(() => {
     if (!locked) return undefined;
@@ -132,6 +149,14 @@ export function PinPad(): React.JSX.Element {
     setPending(true);
     const outcome = await gate.unlock(digits);
     setPending(false);
+    if (outcome.kind !== "unlocked" && outcome.kind !== "cancelled") {
+      // A key button disabled during the check dropped the focus: take it back, so
+      // typing (and Escape) keep working.
+      const element = dialog.current;
+      if (element !== null && !element.contains(document.activeElement)) {
+        element.focus();
+      }
+    }
     switch (outcome.kind) {
       case "unlocked":
       case "cancelled":
@@ -153,13 +178,22 @@ export function PinPad(): React.JSX.Element {
     }
   };
 
-  // Physical keyboard. A native listener on the dialog (latest handlers via a ref), as
-  // the dialog itself is no interactive element.
+  // Physical keyboard: a native listener on the document while the pad is open (latest
+  // handlers via a ref). The pad is modal and the board behind it inert, so every key
+  // belongs to the pad, even when the focus fell to <body>.
   const keyHandler = useRef<(event: KeyboardEvent) => void>(() => undefined);
   useEffect(() => {
     keyHandler.current = (event: KeyboardEvent): void => {
+      if (
+        event.defaultPrevented ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      ) {
+        return;
+      }
       if (event.repeat) {
-        // The Enter held to open the gate keeps repeating: ignore it.
+        // The Enter or Space held to open the gate keeps repeating: ignore it.
         event.preventDefault();
         return;
       }
@@ -172,25 +206,29 @@ export function PinPad(): React.JSX.Element {
       } else if (event.key === "Escape") {
         event.preventDefault();
         gate.close();
-      } else if (
-        event.key === "Enter" &&
-        !(event.target instanceof HTMLButtonElement)
-      ) {
+      } else if (event.key === "Enter") {
+        const target = event.target;
+        if (
+          target instanceof HTMLButtonElement &&
+          target.dataset.pinDigit === undefined
+        ) {
+          // OK, ⌫ and Cancel: their own click.
+          return;
+        }
+        // Elsewhere, and on a digit key: submit instead of pressing it again.
         event.preventDefault();
         void submit();
       }
     };
   });
   useEffect(() => {
-    const element = dialog.current;
-    if (element === null) return undefined;
-    element.focus();
+    dialog.current?.focus();
     const listener = (event: KeyboardEvent): void => {
       keyHandler.current(event);
     };
-    element.addEventListener("keydown", listener);
+    document.addEventListener("keydown", listener);
     return () => {
-      element.removeEventListener("keydown", listener);
+      document.removeEventListener("keydown", listener);
     };
   }, []);
 
@@ -268,7 +306,7 @@ export function PinPad(): React.JSX.Element {
             <DigitKey
               key={digit}
               digit={digit}
-              disabled={disabled}
+              disabled={disabled || full}
               onPress={press}
             />
           ))}
@@ -292,7 +330,11 @@ export function PinPad(): React.JSX.Element {
               <path d="M9 5h11v14H9l-6-7 6-7zM12 9l5 6M17 9l-5 6" />
             </svg>
           </button>
-          <DigitKey digit={BOTTOM_DIGIT} disabled={disabled} onPress={press} />
+          <DigitKey
+            digit={BOTTOM_DIGIT}
+            disabled={disabled || full}
+            onPress={press}
+          />
           <button
             type="button"
             disabled={disabled || digits.length < PIN_MIN_LENGTH}
@@ -311,6 +353,7 @@ export function PinPad(): React.JSX.Element {
         >
           {t("parent.pin.cancel")}
         </button>
+        <IdleWarning />
       </div>
     </div>
   );

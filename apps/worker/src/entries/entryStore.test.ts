@@ -13,6 +13,7 @@ import {
   type StoreResult,
 } from "./entryStore";
 import { SchemaGate } from "./schema";
+import { STAMP_KEY } from "./stamp";
 
 const db = testEnv.KIDBOARD_DATA;
 
@@ -494,6 +495,8 @@ describe("limits", () => {
     expect(ok(await s.importAll(full, "replace"))).toEqual({
       mode: "replace",
       imported: MAX_ENTRIES,
+      created: MAX_ENTRIES,
+      updated: 0,
     });
     expect(await rawRowCount()).toBe(MAX_ENTRIES);
 
@@ -590,6 +593,8 @@ describe("export / import", () => {
     expect(ok(await target.importAll(JSON.parse(text), "replace"))).toEqual({
       mode: "replace",
       imported: 3,
+      created: 3,
+      updated: 0,
     });
 
     const after = await target.list();
@@ -675,7 +680,9 @@ describe("export / import", () => {
       // The scratch value does not outlive the import.
       expect(
         await db
-          .prepare("SELECT COUNT(*) AS n FROM kb_meta")
+          .prepare(
+            "SELECT COUNT(*) AS n FROM kb_meta WHERE key = 'import_base_revision'",
+          )
           .first<number>("n"),
       ).toBe(0);
     },
@@ -750,7 +757,7 @@ describe("export / import", () => {
           "replace",
         ),
       ),
-    ).toEqual({ mode: "replace", imported: 2 });
+    ).toEqual({ mode: "replace", imported: 2, created: 1, updated: 1 });
     const stored = await s.list();
     expect(stored.map((e) => e.id).sort()).toEqual(
       [dentist.id, removedChild.id].sort(),
@@ -932,5 +939,88 @@ describe("schema on first use", () => {
     await expect(s.list()).rejects.toThrow();
     expect(await s.list()).toEqual([]);
     ok(await s.create(DENTIST));
+  });
+});
+
+describe("change stamp (one batch with every write)", () => {
+  async function stamp(): Promise<string | null> {
+    return db
+      .prepare("SELECT value FROM kb_meta WHERE key = ?")
+      .bind(STAMP_KEY)
+      .first<string>("value");
+  }
+
+  it("replaces the stamp with every kind of write", async () => {
+    const s = store();
+    const seen: (string | null)[] = [];
+    const expectNewStamp = async (): Promise<void> => {
+      const current = await stamp();
+      expect(current).toMatch(UUID_RE);
+      expect(seen).not.toContain(current);
+      seen.push(current);
+    };
+
+    const swim = ok(await s.create(SWIMMING));
+    await expectNewStamp();
+    ok(await s.update(swim.id, 1, { ...SWIMMING, startTime: "15:00" }));
+    await expectNewStamp();
+    ok(
+      await s.setOverride(swim.id, 2, "2026-03-16", {
+        ...SWIMMING,
+        startTime: "15:00",
+        date: "2026-03-16",
+        repeat: "none",
+      }),
+    );
+    await expectNewStamp();
+    ok(await s.addException(swim.id, 3, "2026-03-23"));
+    await expectNewStamp();
+    const doc = await s.exportAll();
+    ok(await s.remove(swim.id, 4));
+    await expectNewStamp();
+    ok(await s.importAll(doc, "merge"));
+    await expectNewStamp();
+    ok(await s.importAll(doc, "replace"));
+    await expectNewStamp();
+  });
+
+  it("rolls every write back when its stamp cannot be written (same transaction)", async () => {
+    const s = store();
+    const swim = ok(await s.create(SWIMMING));
+    const before = await s.exportAll();
+    // From here on, any write of the stamp aborts its statement.
+    for (const event of ["INSERT", "UPDATE"]) {
+      await db
+        .prepare(
+          `CREATE TRIGGER no_stamp_${event.toLowerCase()} BEFORE ${event} ON kb_meta
+           WHEN NEW.key = '${STAMP_KEY}' BEGIN SELECT RAISE(ABORT, 'no stamp'); END`,
+        )
+        .run();
+    }
+    const writes: [string, () => Promise<unknown>][] = [
+      ["create", () => s.create(DENTIST)],
+      ["update", () => s.update(swim.id, 1, { ...SWIMMING, title: "Neu" })],
+      [
+        "override",
+        () =>
+          s.setOverride(swim.id, 1, "2026-03-16", {
+            ...SWIMMING,
+            date: "2026-03-16",
+            repeat: "none",
+          }),
+      ],
+      ["exception", () => s.addException(swim.id, 1, "2026-03-16")],
+      ["remove", () => s.remove(swim.id, 1)],
+      ["merge import", () => s.importAll(before, "merge")],
+      ["replace import", () => s.importAll(before, "replace")],
+    ];
+    for (const [name, write] of writes) {
+      await expect(write(), name).rejects.toThrow();
+      expect(
+        { ...(await s.exportAll()), exportedAt: before.exportedAt },
+        name,
+      ).toEqual(before);
+    }
+    expect(await rawRowCount()).toBe(1);
   });
 });

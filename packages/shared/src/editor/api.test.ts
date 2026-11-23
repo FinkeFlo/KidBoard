@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   EditorErrorResponseSchema,
+  EditorImportResponseSchema,
   EditorListResponseSchema,
   EditorWriteResponseSchema,
 } from "./api";
@@ -121,6 +122,31 @@ describe("editor API schemas", () => {
         message: "x",
         limit: "disk",
       }).success,
+    ).toBe(false);
+  });
+
+  it("parse an import response with created and updated counts that add up", () => {
+    const ok = {
+      mode: "merge",
+      imported: 4,
+      created: 1,
+      updated: 3,
+      boardRefresh: "now",
+    };
+    expect(EditorImportResponseSchema.parse(ok)).toEqual(ok);
+    expect(
+      EditorImportResponseSchema.safeParse({ ...ok, created: 0 }).success,
+    ).toBe(false);
+    expect(
+      EditorImportResponseSchema.safeParse({
+        mode: "merge",
+        imported: 4,
+        boardRefresh: "now",
+      }).success,
+    ).toBe(false);
+    expect(
+      EditorImportResponseSchema.safeParse({ ...ok, updated: -1, created: 5 })
+        .success,
     ).toBe(false);
   });
 });

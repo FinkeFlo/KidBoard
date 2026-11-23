@@ -333,9 +333,12 @@ describe("fake editor API", () => {
     other.seed({ ...SWIM, title: "Other" });
     expect(
       call(other, "POST", "/api/parent/import?mode=merge", doc).json,
-    ).toMatchObject({ mode: "merge", imported: 1 });
+    ).toMatchObject({ mode: "merge", imported: 1, created: 1, updated: 0 });
     expect(other.entries()).toHaveLength(2);
-    call(other, "POST", "/api/parent/import?mode=replace", doc);
+    // The same document again: its entry is stored now, so it counts as updated.
+    expect(
+      call(other, "POST", "/api/parent/import?mode=replace", doc).json,
+    ).toMatchObject({ mode: "replace", imported: 1, created: 0, updated: 1 });
     expect(other.entries().map((e) => e.id)).toEqual([doc.entries[0]?.id]);
     expect(
       call(other, "POST", "/api/parent/import?mode=wipe", doc).status,

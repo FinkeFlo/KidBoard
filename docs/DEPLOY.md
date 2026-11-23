@@ -42,7 +42,7 @@ The worker reads exactly these names (`apps/worker/src/env.ts`):
 | `KIDBOARD_ALLOWED_ORIGINS` | variable            | no       | Only for cross-origin API use; the board itself is same-origin.                                  |
 | `KIDBOARD_CACHE_TTL`       | variable            | no       | Seconds a feed counts as fresh, default 3600.                                                    |
 | `KIDBOARD_CACHE`           | KV namespace binding | automatic | Declared without an id in `wrangler.jsonc`; Wrangler creates it on the first deploy.            |
-| `KIDBOARD_PARENT_PIN`      | secret              | no       | 6 to 12 digits; turns on the parent editor (with `KIDBOARD_DATA`). Unset, invalid or `REPLACE_ME` = editor off. |
+| `KIDBOARD_PARENT_PIN`      | secret              | no       | 6 to 12 digits; turns on the parent editor (with `KIDBOARD_DATA` and a set `KIDBOARD_ACCESS_TOKEN`). Unset, invalid or `REPLACE_ME`, or no access token = editor off. |
 | `KIDBOARD_DATA`            | D1 database binding | automatic | Entries made in the editor (ADR-0014). Declared without an id in `wrangler.jsonc`; Wrangler creates it on the first deploy, the worker creates its tables. |
 
 Plain-text variables set in the dashboard survive later deploys (`keep_vars: true`);

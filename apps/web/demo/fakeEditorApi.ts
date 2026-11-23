@@ -601,6 +601,10 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
         })),
       });
     }
+    // Like the worker: `updated` = ids stored before the import, in either mode.
+    const updated = doc.data.entries.filter((entry) =>
+      store.has(entry.id),
+    ).length;
     if (mode.data === "replace") store.clear();
     for (const entry of doc.data.entries) {
       store.set(entry.id, { ...entry, exdates: [...entry.exdates].sort() });
@@ -610,6 +614,8 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
       json: {
         mode: mode.data,
         imported: doc.data.entries.length,
+        created: doc.data.entries.length - updated,
+        updated,
         boardRefresh: BOARD_REFRESH_NOW,
       },
     };

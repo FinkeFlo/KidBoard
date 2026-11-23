@@ -2,6 +2,8 @@ import { createContext, type RefObject, useContext, useEffect } from "react";
 
 /** ADR-0013: the editor locks itself after 3 minutes without a touch or key. */
 export const PARENT_IDLE_LOCK_MS = 3 * 60_000;
+/** The "locking soon" warning shows this long before the idle lock. */
+export const PARENT_IDLE_WARNING_MS = 30_000;
 /** ADR-0013: a parent session is valid 15 minutes. */
 export const PARENT_SESSION_TTL_MS = 15 * 60_000;
 /** How often the open gate checks idle time and session expiry against the clock. */
@@ -45,6 +47,13 @@ export interface ParentGate {
   session: ParentSession | null;
   /** End of a lockout reported by the worker (epoch ms), or `null`. */
   lockoutUntil: number | null;
+  /**
+   * The gate is open and idle for {@link PARENT_IDLE_WARNING_MS} less than the idle
+   * lock: the "locking soon" warning shows.
+   */
+  idleWarning: boolean;
+  /** Counts as input: restarts the idle time and hides the warning. */
+  stayActive: () => void;
   /** Shows the PIN pad (after the hold on the entry). */
   openPin: () => void;
   /** Sends the PIN; on success the editor opens. */

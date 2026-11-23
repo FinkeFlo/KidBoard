@@ -39,20 +39,27 @@ then app entries live only in KidBoard.
   concurrency: an update names the revision it edited, a mismatch → 409), `kind`, `data`
   (the validated `EditorEntryInput` JSON of `packages/shared`, ADR-0012 model),
   `exdates` and per-occurrence overrides for "only this day" edits of a series,
-  `created_at`, `updated_at`. Limits: 1 000 entries, 8 KB per entry.
+  `created_at`, `updated_at`. Limits: 1 000 entries, 8 KB per entry. 1 000 entries is
+  also the supported size of one import: the import is written in one `db.batch` (one
+  transaction, all or nothing) with about one statement per entry, and its body limit is
+  sized for the largest export (about 8.3 MiB). Larger documents are refused
+  (`limit_reached`) rather than split, so an import never lands half-way.
 * **One read path:** the worker renders the stored entries as an in-memory iCalendar with
   ical.js (the same title and description conventions as hand-written Google events,
   ADR-0005/ADR-0010, through `composeTitle`/`composeDescription`/`buildRecurrence`) and
   feeds it through the existing expansion and normalization (ADR-0003). The board sees two
-  virtual sources `app-events` and `app-meals` next to the configured Google calendars;
-  their agenda cache entry is dropped after every write, so the board shows a change on
-  its next refresh (the editor triggers that refresh at once). Recurrence, DST, bring
+  virtual sources `app-events` and `app-meals` next to the configured Google calendars.
+  Every write replaces a random change stamp in D1 in the same batch as the write, so a
+  committed write always comes with a new stamp and every isolate rebuilds its cached
+  app sources on its next agenda request; the writer also drops its cached copies. The
+  board shows a change on its next refresh (the editor triggers that refresh at once). Recurrence, DST, bring
   lists and countdown therefore behave exactly as for Google events.
 * **Google entries stay read-only** in the editor (shown with "change in Google Calendar"),
   but can be used as templates ("make an app entry like this").
-* **Off by default:** the editor exists only with `KIDBOARD_DATA` bound and a valid
-  `KIDBOARD_PARENT_PIN` (ADR-0013); the deploy form asks for the PIN next to the access
-  token. Without it KidBoard is the read-only board it was.
+* **Off by default:** the editor exists only with `KIDBOARD_DATA` bound, a valid
+  `KIDBOARD_PARENT_PIN` and an access token `KIDBOARD_ACCESS_TOKEN` (ADR-0013); the deploy
+  form asks for the PIN next to the access token. Without them KidBoard is the
+  read-only board it was.
 * **Getting data out:** the parent area offers a JSON export and import (backup, moving to
   a new deployment), and an optional secret iCal feed of the app entries
   (`/api/feed.ics?token=<feed token>`) that parents can subscribe to in Google Calendar or Apple

@@ -39,17 +39,31 @@ afterEach(async () => {
   await reset();
 });
 
+/** The editor needs an access token (ADR-0013, fail closed), so every env has one. */
 function env(overrides: Partial<Env> = {}): Env {
   return {
     KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
     KIDBOARD_PARENT_PIN: PIN,
+    KIDBOARD_ACCESS_TOKEN: TOKEN,
     ...overrides,
   };
 }
 
+/** `init` with the access token as Bearer header, unless it names its own. */
+function withAccess(init: RequestInit = {}): RequestInit {
+  const headers = new Headers(init.headers);
+  if (!headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${TOKEN}`);
+  }
+  return { ...init, headers };
+}
+
 interface Harness {
   clock: { now: number };
+  /** A request with the access token (see {@link withAccess}). */
   call: (path: string, init?: RequestInit, e?: Env) => Promise<Response>;
+  /** A request exactly as given (no access token added). */
+  raw: (path: string, init?: RequestInit, e?: Env) => Promise<Response>;
   unlock: (pin: unknown, e?: Env) => Promise<Response>;
 }
 
@@ -57,15 +71,21 @@ interface Harness {
 function harness(): Harness {
   const clock = { now: NOW };
   const app = createApp({ now: () => clock.now });
-  const call = async (
+  const raw = async (
     path: string,
     init?: RequestInit,
     e: Env = env(),
   ): Promise<Response> =>
     app.fetch(new Request(`https://board.example.test${path}`, init), e);
+  const call = (
+    path: string,
+    init?: RequestInit,
+    e: Env = env(),
+  ): Promise<Response> => raw(path, withAccess(init), e);
   return {
     clock,
     call,
+    raw,
     unlock: (pin, e) =>
       call(
         "/api/parent/unlock",
@@ -219,8 +239,16 @@ describe("POST /api/parent/unlock", () => {
 
   it("still requires the access token in front of it", async () => {
     const h = harness();
-    const e = env({ KIDBOARD_ACCESS_TOKEN: TOKEN });
-    const denied = await h.unlock(PIN, e);
+    const e = env();
+    const denied = await h.raw(
+      "/api/parent/unlock",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: PIN }),
+      },
+      e,
+    );
     expect(denied.status).toBe(401);
     expect(await json(denied)).toMatchObject({ error: "unauthorized" });
     // A refused request never reaches the PIN check (no failure counted).
@@ -368,6 +396,24 @@ describe("lockout", () => {
     await unlockToken(harness());
     const isolates = Array.from({ length: 5 }, () => harness());
     const responses = await Promise.all(
+      isolates.flatMap((h, n) =>
+        Array.from({ length: 4 }, (_, i) =>
+          h.unlock(String(200000 + n * 10 + i)),
+        ),
+      ),
+    );
+    const statuses = responses.map((r) => r.status);
+    // Without the right PIN: exactly 5 PINs compared, every one left a failure row.
+    expect(statuses.filter((s) => s === 403).length).toBeLessThanOrEqual(5);
+    expect(await attemptRows()).toBe(5);
+    expect(statuses.filter((s) => s === 429).length).toBeGreaterThanOrEqual(15);
+    expect(statuses.every((s) => [403, 429].includes(s))).toBe(true);
+  });
+
+  it("with the right PIN in a parallel burst, never compares more than 5 PINs at once", async () => {
+    await unlockToken(harness());
+    const isolates = Array.from({ length: 5 }, () => harness());
+    const responses = await Promise.all(
       isolates.flatMap((h, n) => [
         ...Array.from({ length: 4 }, (_, i) =>
           h.unlock(String(200000 + n * 10 + i)),
@@ -377,9 +423,46 @@ describe("lockout", () => {
     );
     const statuses = responses.map((r) => r.status);
     const ok = statuses.filter((s) => s === 200).length;
-    expect(statuses.filter((s) => s === 403).length).toBeLessThanOrEqual(5);
-    expect((await attemptRows()) + ok).toBeLessThanOrEqual(5);
-    expect(statuses.filter((s) => s === 429).length).toBeGreaterThanOrEqual(16);
+    expect(ok).toBeLessThanOrEqual(1);
+    // The right PIN clears the failures settled before it, never the reservations
+    // still being compared: what is left in D1 never exceeds the limit, and the
+    // burst cannot test more PINs than 5 plus those that settled before a success.
+    expect(await attemptRows()).toBeLessThanOrEqual(5);
+    expect(statuses.filter((s) => s === 403).length).toBeLessThanOrEqual(
+      ok === 1 ? 9 : 5,
+    );
+    expect(statuses.every((s) => [200, 403, 429].includes(s))).toBe(true);
+  });
+
+  it("a right PIN clears the wrong PINs of the window, not only its own attempt", async () => {
+    const h = harness();
+    const wrong = await failTimes(h, 4);
+    expect(wrong.map((r) => r.status)).toEqual([403, 403, 403, 403]);
+    expect(await attemptRows()).toBe(4);
+    expect((await h.unlock(PIN)).status).toBe(200);
+    expect(await attemptRows()).toBe(0);
+    // A fresh count of 5: 4 more wrong PINs answer 403 with 4..1 left, the 5th locks.
+    const again = await failTimes(h, 5);
+    const left = await Promise.all(
+      again.slice(0, 4).map(async (r) => (await json(r)).attemptsLeft),
+    );
+    expect(left).toEqual([4, 3, 2, 1]);
+    expect(again[4]?.status).toBe(429);
+  });
+
+  it("a right PIN in another isolate clears the D1 failures; the first isolate's own copy still fails closed", async () => {
+    const first = harness();
+    await failTimes(first, 4);
+    const second = harness();
+    second.clock.now = first.clock.now;
+    expect((await second.unlock(PIN)).status).toBe(200);
+    expect(await attemptRows()).toBe(0);
+    // The first isolate still holds its 4 local failures (it never saw the success):
+    // one more wrong PIN there fails closed and locks that isolate.
+    first.clock.now = second.clock.now;
+    expect((await first.unlock(OTHER_PIN)).status).toBe(429);
+    // An isolate that saw the success counts afresh.
+    expect((await second.unlock(OTHER_PIN)).status).toBe(403);
   });
 
   it("a bad body does not use up an attempt", async () => {
@@ -416,7 +499,10 @@ describe("unlock reservations on failures", () => {
     // Test double around the real binding: only these three methods are used.
     return {
       prepare: (sql: string) => {
-        if (sql === "DELETE FROM kb_meta WHERE key = ?1" && left > 0) {
+        if (
+          sql.startsWith("DELETE FROM kb_meta WHERE key = ?1 OR") &&
+          left > 0
+        ) {
           left -= 1;
           return {
             bind: () => ({
@@ -439,7 +525,10 @@ describe("unlock reservations on failures", () => {
     const response = await app.fetch(
       new Request("https://board.example.test/api/parent/unlock", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${TOKEN}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ pin: PIN }),
       }),
       e,
@@ -567,6 +656,8 @@ describe("editor off", () => {
     ["template PIN", { KIDBOARD_PARENT_PIN: "REPLACE_ME" }],
     ["short PIN", { KIDBOARD_PARENT_PIN: "12345" }],
     ["no D1", { KIDBOARD_DATA: undefined }],
+    ["no access token", { KIDBOARD_ACCESS_TOKEN: undefined }],
+    ["an empty access token", { KIDBOARD_ACCESS_TOKEN: "" }],
   ] as [string, Partial<Env>][])(
     "%s → every /api/parent/* is 404",
     async (_, overrides) => {
@@ -620,7 +711,7 @@ describe("CORS on /api/parent/*", () => {
           "Access-Control-Request-Headers": "content-type,x-kidboard-parent",
         },
       },
-      env({ KIDBOARD_ALLOWED_ORIGINS: ORIGIN, KIDBOARD_ACCESS_TOKEN: TOKEN }),
+      env({ KIDBOARD_ALLOWED_ORIGINS: ORIGIN }),
     );
   }
 

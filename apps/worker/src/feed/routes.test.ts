@@ -204,9 +204,19 @@ describe("GET /api/feed.ics?token=", () => {
     expect(reply.text).toBe("");
   });
 
-  it("works without an access token configured, too", async () => {
-    const reply = await call(FEED_PATH, {}, env({}, ["KIDBOARD_ACCESS_TOKEN"]));
+  it("does not need the access token on the request", async () => {
+    const reply = await call(FEED_PATH);
     expect(reply.status).toBe(200);
+  });
+
+  it("is off (404) without an access token configured (fail closed, ADR-0013)", async () => {
+    for (const bindings of [
+      env({}, ["KIDBOARD_ACCESS_TOKEN"]),
+      env({ KIDBOARD_ACCESS_TOKEN: "" }),
+      env({ KIDBOARD_ACCESS_TOKEN: "REPLACE_ME-access-token" }),
+    ]) {
+      expectNotFound(await call(FEED_PATH, {}, bindings));
+    }
   });
 
   it("is 404 for a missing, empty, wrong or other-length token", async () => {

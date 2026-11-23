@@ -105,17 +105,25 @@ describe("ParentEntry", () => {
     expect(fireEvent.contextMenu(button)).toBe(false);
   });
 
-  it("opens after Enter is held 2 s; key repeats do not restart the hold", () => {
-    const button = entry();
-    button.focus();
-    expect(fireEvent.keyDown(button, { key: "Enter" })).toBe(false);
-    advance(1000);
-    fireEvent.keyDown(button, { key: "Enter", repeat: true });
-    advance(PARENT_HOLD_MS - 1000);
-    expect(gate.openPin).toHaveBeenCalledTimes(1);
-  });
+  it.each([
+    ["Enter", "Enter"],
+    ["Space", " "],
+  ])(
+    "opens after %s is held 2 s; key repeats do not restart the hold",
+    (_, key) => {
+      const button = entry();
+      button.focus();
+      expect(fireEvent.keyDown(button, { key })).toBe(false);
+      advance(1000);
+      fireEvent.keyDown(button, { key, repeat: true });
+      advance(PARENT_HOLD_MS - 1001);
+      expect(gate.openPin).not.toHaveBeenCalled();
+      advance(1);
+      expect(gate.openPin).toHaveBeenCalledTimes(1);
+    },
+  );
 
-  it("does not open on a short Enter, Space, a keyboard click or blur mid-hold", () => {
+  it("does not open on a short Enter or Space, a keyboard click or blur mid-hold", () => {
     const button = entry();
     button.focus();
     fireEvent.keyDown(button, { key: "Enter" });
@@ -123,7 +131,10 @@ describe("ParentEntry", () => {
     fireEvent.keyUp(button, { key: "Enter" });
     advance(PARENT_HOLD_MS);
     fireEvent.keyDown(button, { key: " " });
-    fireEvent.keyUp(button, { key: " " });
+    advance(PARENT_HOLD_MS - 1);
+    // Space is released before the 2 s: no click either.
+    expect(fireEvent.keyUp(button, { key: " " })).toBe(false);
+    advance(PARENT_HOLD_MS);
     // Assistive tech / keyboard activation is a click with detail 0.
     fireEvent.click(button, { detail: 0 });
     fireEvent.keyDown(button, { key: "Enter" });

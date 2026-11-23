@@ -194,8 +194,10 @@ function toDto(entry: AppEntry): AppEntry {
  * * `GET /templates` → up to 12 suggestions;
  * * `GET /export` (JSON download), `POST /import?mode=merge|replace`.
  *
- * Every successful write drops the board's app-source cache (`invalidateApps`) before
- * answering, so the agenda refetch the client starts at once shows the change.
+ * Every write replaces the D1 change stamp in its own batch (`EntryStore`, so every
+ * isolate notices it), and a successful one also drops the board's cached app sources
+ * (`invalidateApps`) before answering, so the agenda refetch the client starts at once
+ * shows the change.
  */
 export function registerEditorRoutes(
   app: Hono<AppEnv>,
@@ -501,6 +503,8 @@ export function registerEditorRoutes(
         const response: EditorImportResponse = {
           mode,
           imported: result.value.imported,
+          created: result.value.created,
+          updated: result.value.updated,
           boardRefresh: BOARD_REFRESH_NOW,
         };
         return c.json(response);

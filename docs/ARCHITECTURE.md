@@ -318,9 +318,16 @@ exception/override days must be occurrences of the series (weekday, `INTERVAL=2`
 parity, `until`); a series edit keeps only those that still are. Limits: 1 000 entries
 (count check inside the `INSERT`; imports end with a guard insert into `kb_guard` whose
 `CHECK` rolls the batch back; their base revision is read inside the same batch via `kb_meta`) and 8 KB per entry → `limit_reached`. Rows are re-validated
-on read; a corrupt row is skipped and logged by failure type only. `/api/config` reports
-`editor: true` only with the binding and a valid `KIDBOARD_PARENT_PIN`
-(`apps/worker/src/parent/pin.ts`); the key is omitted when false (older web bundles parse the config strictly) and `PublicConfigSchema` defaults it to `false` and strips
+on read; a corrupt row is skipped and logged by failure type only. Every write
+(`create`, `update`, `setOverride`, `addException`, `remove`, `importAll`) replaces the
+change stamp `kb_meta.entries_stamp` (a random UUID, `entries/stamp.ts`) in the same
+`db.batch` as the write itself: one transaction, so a committed write always comes with a
+new stamp (a refused one may bump it too, which only costs a cache rebuild). `/api/config`
+reports `editor: true` only with the binding, a valid `KIDBOARD_PARENT_PIN` and an access
+token `KIDBOARD_ACCESS_TOKEN` (`editorEnabled` in `apps/worker/src/parent/pin.ts`; fail
+closed: a PIN or the binding without the token logs a configuration warning and keeps the
+editor, the app sources on the board and the phone feed off, while the read-only board
+works as before); the key is omitted when false (older web bundles parse the config strictly) and `PublicConfigSchema` defaults it to `false` and strips
 unknown top-level keys.
 
 ### App entries on the board (T-41, ADR-0014)
@@ -343,10 +350,11 @@ UID and recurrence id: stable per entry and occurrence) behave as for Google eve
 read of a random D1 change stamp (`kb_meta.entries_stamp`); a cached `SourceEntry`
 (same store, keys and TTL as the feeds) is fresh only with that stamp, the current
 window and version; otherwise the entries are listed once for both kinds (`list(window)`)
-and rebuilt. `invalidateAppSources` (called by the T-43 write routes after every write)
-replaces the stamp and deletes both entries from memory and KV/Cache API; the stamp makes
-every isolate notice the write at once, which KV deletes alone would not (eventual
-consistency, per-isolate memory). D1 unavailable or a render failure → the cached entry
+and rebuilt. The stamp is replaced inside each write's own batch (see the entry store),
+so every isolate notices a committed write at once, which KV deletes alone would not
+(eventual consistency, per-isolate memory). `invalidateAppSources` (called by the T-43
+write routes after every successful write) only deletes both entries from this isolate's
+memory and KV/Cache API. D1 unavailable or a render failure → the cached entry
 as `stale`, else `error`; the configured calendars are unaffected. The D1 reads of one
 request (stamp and entry list) share a deadline of 2.5 s (`APP_SOURCES_D1_TIMEOUT_MS`);
 a hanging database counts as unavailable, so it never delays `/api/agenda`. With KV, the
@@ -355,7 +363,8 @@ TTL write-budget floor counts the two app sources.
 ### Parent lock (T-42, ADR-0013)
 
 `apps/worker/src/parent/routes.ts` is mounted at `/api/parent` behind the access token.
-Editor off (no `KIDBOARD_DATA` or no valid PIN) → every `/api/parent/*` is `404`; bodies
+Editor off (no `KIDBOARD_DATA`, no valid PIN or no access token) → every `/api/parent/*`
+is `404`; bodies
 are capped at 16 KB (`bodyLimit`, `413 payload_too_large`) and parsed with zod
 (`http/jsonBody.ts`, `400 bad_request`). `POST /api/parent/unlock` `{ pin }` compares with
 `tokensEqual` and returns `{ token, expiresAt }` (ISO UTC, now + 15 min); the token is
@@ -368,15 +377,19 @@ compare (`parent/lockout.ts`): synchronously per isolate, then by one D1 batch w
 conditional insert of a `kb_meta` row `parent_fail:<uuid>` → epoch s succeeds only
 without an active `parent_lock_until` and with fewer than 5 rows in the last 15 min (older
 rows are dropped); not reserved → `429 parent_lockout` with `Retry-After`, no compare. A
-wrong PIN keeps the row and, as the 5th in 15 min, writes `parent_lock_until` (now + 15
-min, also answered with 429); a right PIN deletes its row. Any other way out of `/unlock` (bad
+wrong PIN renames the row to `parent_fail:s:<uuid>` (a settled failure; still counted)
+and, as the 5th in 15 min, writes `parent_lock_until` (now + 15 min, also answered with
+429); a right PIN deletes its own row and every settled failure (here and in the isolate's
+copy), so earlier typos of the parent no longer count. Reservations of parallel attempts
+still being compared are kept, so at most 5 PINs are compared at once, and without the
+right PIN at most 5 per window. Any other way out of `/unlock` (bad
 body, refused by D1, a D1 error) drops the isolate's reservation (`try`/`finally`). If
-deleting the row of a right PIN fails, the session is still issued and the delete is
-retried once past the response (`waitUntil`); a row left behind ages out with the window.
+deleting the rows after a right PIN fails, the session is still issued and the delete is
+retried once past the response (`waitUntil`); rows left behind age out with the window.
+Another isolate keeps its own copy of earlier failures until they age out (fail closed).
 The lock condition counts all attempts in the window, including parallel ones still being
-compared, not only settled failures: deliberately conservative, it differs only for
-parallel attempts (one tablet does not produce them), and separating pending from failed
-rows in D1 would add a second row type and a settle write to this path.
+compared, not only settled failures: deliberately conservative; it differs only for
+parallel attempts, which one tablet does not produce.
 `requireParentSession` (`parent/session.ts`) guards editor routes: it verifies
 `X-KidBoard-Parent` (canonical base64url, `crypto.subtle.verify`, `now < exp ≤ now +
 15 min`) or answers `403 parent_locked`; `GET /api/parent/session` → `{ expiresAt }`. CORS (`http/cors.ts`):
@@ -427,24 +440,32 @@ schema gate) with `/api/agenda`.
   countdown come from the occurrence nearest to now.
 * `GET /export` → the `EntryStore.exportAll` document with `Content-Disposition:
   attachment; filename="kidboard-entries-<today>.json"` (exposed to listed CORS origins).
-  `POST /import?mode=merge|replace` (mode required) → `{ mode, imported, boardRefresh }`.
+  `POST /import?mode=merge|replace` (mode required) → `{ mode, imported, created,
+  updated, boardRefresh }` (`updated` = ids that were stored before the import).
   Imported entries are checked for their shape only, not against the config, so a
   backup from before a config change is restored and its leftovers surface as
   `unresolved` (`create`/`update`/`setOverride` still check the config);
   its body limit is `MAX_IMPORT_BODY_BYTES` (1 000 × (8 KB + 512 B) + 4 KB ≈ 8.3 MiB,
   enough for any export) instead of 16 KB and is checked after the session guard, so
-  only an unlocked parent can make the worker read that much.
-* Every successful write calls `invalidateAppSources` before answering, so the agenda
-  refetch the client starts at once shows the change.
+  only an unlocked parent can make the worker read that much. The supported import size
+  is the store limit (1 000 entries, ADR-0014), written in one D1 batch.
+* Every write replaces the change stamp in its own batch; a successful one also calls
+  `invalidateAppSources` before answering, so the agenda refetch the client starts at
+  once shows the change.
 
 **Web gate (T-44).** `apps/web/src/parent/`: with `config.editor` the nav rail shows a
-quiet pencil (`ParentEntry`, 64 px) that opens the PIN pad only after a 2 s pointer or
-Enter hold (ring after 0.3 s, so short taps show nothing). `ParentGateProvider` holds
+quiet pencil (`ParentEntry`, 64 px) that opens the PIN pad only after a 2 s pointer,
+Enter or Space hold (ring after 0.3 s, so short taps show nothing). The PIN pad takes at
+most 12 digits and listens to the keyboard on the document while open (typing and
+Escape keep working when a disabled key dropped the focus; Enter on a focused digit key
+submits). `ParentGateProvider` holds
 `closed → pin → editor` and the session token in React state only; `unlock` uses
 `ApiClient.unlockParent` (same access token as the board, but no TanStack query, so a
 403/429/401 never runs the board's 401 wipe). It locks on "Done"/cancel, when the tab is
 hidden, after 3 min without input and at the session end (a 1 s tick compares
-`Date.now()`, so sleeping timers cannot delay it); a late unlock answer is discarded.
+`Date.now()`, so sleeping timers cannot delay it); 30 s before the idle lock a calm
+"locking soon" banner (`IdleWarning`, assertive live region) offers "Keep editing". A
+late unlock answer is discarded.
 A lockout (`Retry-After`) is remembered in memory and shown as minutes left. While open
 the board is `inert` and its auto-return is paused. `EditorScreen` is the shell T-45 fills.
 
@@ -453,7 +474,7 @@ the board is `inert` and its auto-return is paused. `EditorScreen` is the shell 
 `GET /api/feed.ics?token=<KIDBOARD_FEED_TOKEN>` (`apps/worker/src/feed/`) publishes the
 app entries for calendar apps on the parents' phones (read-only there).
 
-* **On only when configured:** the editor is on (D1 + valid PIN) and
+* **On only when configured:** the editor is on (D1 + valid PIN + access token) and
   `KIDBOARD_FEED_TOKEN` is 32–256 characters of `A-Z a-z 0-9 _ -` without the template
   marker `REPLACE_ME` (`feed/token.ts`; e.g. `openssl rand -hex 32`). Unset → no feed;
   unusable → no feed and one warning per isolate (never the value). Every miss (feed

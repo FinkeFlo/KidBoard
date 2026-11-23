@@ -27,6 +27,7 @@ import {
   EntryStore,
   MAX_ENTRIES,
 } from "../entries/entryStore";
+import { STAMP_KEY } from "../entries/stamp";
 import type { Env } from "../env";
 import { MAX_IMPORT_BODY_BYTES, MAX_ISSUES } from "./editorRoutes";
 import { MAX_PARENT_BODY_BYTES } from "./routes";
@@ -1057,6 +1058,8 @@ describe("export and import", () => {
     expect(EditorImportResponseSchema.parse(restored.json)).toEqual({
       mode: "replace",
       imported: 1,
+      created: 0,
+      updated: 1,
       boardRefresh: "now",
     });
     const items = appItemsOf(await list(h));
@@ -1080,7 +1083,11 @@ describe("export and import", () => {
       "/api/parent/import?mode=merge",
       jsonInit("POST", doc),
     );
-    expect(EditorImportResponseSchema.parse(merged.json).imported).toBe(1);
+    expect(EditorImportResponseSchema.parse(merged.json)).toMatchObject({
+      imported: 1,
+      created: 1,
+      updated: 0,
+    });
     expect(
       appItemsOf(await list(fresh, "?from=2026-03-10&days=1"))
         .map((i) => i.title)
@@ -1222,5 +1229,88 @@ describe("export and import", () => {
     });
     expect(reply.status).toBe(403);
     expect(errorOf(reply).error).toBe("parent_locked");
+  });
+});
+
+describe("change stamp of every write route", () => {
+  async function stamp(): Promise<string | null> {
+    return db
+      .prepare("SELECT value FROM kb_meta WHERE key = ?")
+      .bind(STAMP_KEY)
+      .first<string>("value");
+  }
+
+  it("is replaced by create, patch (series and one day), delete (one day and series) and both imports", async () => {
+    const h = harness();
+    const seen = new Set<string | null>();
+    const expectNewStamp = async (step: string): Promise<void> => {
+      const current = await stamp();
+      expect(current, step).not.toBeNull();
+      expect(seen.has(current), step).toBe(false);
+      seen.add(current);
+    };
+    const expectOk = (reply: Reply): void => {
+      expect(reply.status, reply.text).toBe(200);
+    };
+
+    const { entry } = await createEntry(h, SWIM);
+    const id = String(entry?.id);
+    await expectNewStamp("create");
+    expectOk(
+      await h.editor(
+        `/api/parent/entries/${id}`,
+        jsonInit("PATCH", {
+          revision: 1,
+          entry: { ...SWIM, startTime: "15:00" },
+        }),
+      ),
+    );
+    await expectNewStamp("patch series");
+    expectOk(
+      await h.editor(
+        `/api/parent/entries/${id}?scope=one&date=2026-03-17`,
+        jsonInit("PATCH", {
+          revision: 2,
+          entry: { ...SWIM, date: "2026-03-18", repeat: "none" },
+        }),
+      ),
+    );
+    await expectNewStamp("patch one day");
+    expectOk(
+      await h.editor(
+        `/api/parent/entries/${id}?scope=one&date=2026-03-24&revision=3`,
+        { method: "DELETE" },
+      ),
+    );
+    await expectNewStamp("delete one day");
+    const doc = (await h.editor("/api/parent/export")).json;
+    expectOk(
+      await h.editor(`/api/parent/entries/${id}?revision=4`, {
+        method: "DELETE",
+      }),
+    );
+    await expectNewStamp("delete series");
+    expectOk(
+      await h.editor("/api/parent/import?mode=merge", jsonInit("POST", doc)),
+    );
+    await expectNewStamp("merge import");
+    expectOk(
+      await h.editor("/api/parent/import?mode=replace", jsonInit("POST", doc)),
+    );
+    await expectNewStamp("replace import");
+  });
+
+  it("makes another isolate's warm board show the write at once", async () => {
+    const writer = harness();
+    const reader = harness();
+    await createEntry(writer, SWIM);
+    expect(
+      (await reader.agenda()).events.filter((e) => e.title === "Schwimmen"),
+    ).toHaveLength(2);
+    await createEntry(writer, { ...SWIM, title: "Turnen", icon: "🤸" });
+    // The reader's memory layer still holds the old app sources; the stamp tells it.
+    expect(
+      (await reader.agenda()).events.filter((e) => e.title === "Turnen"),
+    ).toHaveLength(2);
   });
 });

@@ -14,6 +14,7 @@ import { z } from "zod";
 import { logWarn } from "../log";
 import { entryDateRange, isOccurrenceDate } from "./occurrences";
 import { SchemaGate } from "./schema";
+import { bumpStamp } from "./stamp";
 
 /** ADR-0014: at most 1 000 app entries per deployment. */
 export const MAX_ENTRIES = 1000;
@@ -90,6 +91,10 @@ export type ImportMode = "replace" | "merge";
 export interface ImportSummary {
   mode: ImportMode;
   imported: number;
+  /** Imported entries whose id was not stored before the import. */
+  created: number;
+  /** Imported entries that replaced a stored entry with the same id. */
+  updated: number;
 }
 
 export interface EntryStoreOptions {
@@ -320,25 +325,28 @@ export class EntryStore {
       const id = crypto.randomUUID();
       const at = this.timestamp();
       const range = entryDateRange(parts.data, parts.overrides);
-      // One statement: the count check and the insert are atomic.
-      const result = await this.db
-        .prepare(
-          `INSERT INTO app_entries (${COLUMNS}) SELECT ?, 1, ?, ?, ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM app_entries) < ?`,
-        )
-        .bind(
-          id,
-          parts.data.kind,
-          serialized.data,
-          serialized.exdates,
-          serialized.overrides,
-          range.first,
-          range.last,
-          at,
-          at,
-          MAX_ENTRIES,
-        )
-        .run();
-      if (result.meta.changes === 0) {
+      // One statement: the count check and the insert are atomic; the change stamp is
+      // replaced in the same batch (one transaction).
+      const [result] = await this.db.batch([
+        this.db
+          .prepare(
+            `INSERT INTO app_entries (${COLUMNS}) SELECT ?, 1, ?, ?, ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM app_entries) < ?`,
+          )
+          .bind(
+            id,
+            parts.data.kind,
+            serialized.data,
+            serialized.exdates,
+            serialized.overrides,
+            range.first,
+            range.last,
+            at,
+            at,
+            MAX_ENTRIES,
+          ),
+        bumpStamp(this.db),
+      ]);
+      if (result === undefined || result.meta.changes === 0) {
         return TOO_MANY;
       }
       return {
@@ -401,13 +409,15 @@ export class EntryStore {
       ]);
     }
     return this.run(async () => {
-      const deleted = await this.db
-        .prepare(
-          "DELETE FROM app_entries WHERE id = ? AND revision = ? RETURNING id",
-        )
-        .bind(id, revision)
-        .first();
-      return deleted === null
+      const [deleted] = await this.db.batch([
+        this.db
+          .prepare(
+            "DELETE FROM app_entries WHERE id = ? AND revision = ? RETURNING id",
+          )
+          .bind(id, revision),
+        bumpStamp(this.db),
+      ]);
+      return (deleted?.results.length ?? 0) === 0
         ? this.missOrConflict(id)
         : { ok: true, value: null };
     });
@@ -581,6 +591,7 @@ export class EntryStore {
           )
           .bind(MAX_ENTRIES),
         this.db.prepare(`DELETE FROM kb_meta WHERE key = '${IMPORT_BASE_KEY}'`),
+        bumpStamp(this.db),
       );
       try {
         await this.db.batch(statements);
@@ -599,7 +610,19 @@ export class EntryStore {
         }
         throw error;
       }
-      return { ok: true, value: { mode, imported: rows.length } };
+      // Counted against the ids read before the batch (for the parent's message only):
+      // entry ids are random, so a concurrent create cannot add one of them in between;
+      // only a delete racing the import could make one "updated" really "created".
+      const updated = rows.filter((row) => existingIds.has(row.id)).length;
+      return {
+        ok: true,
+        value: {
+          mode,
+          imported: rows.length,
+          created: rows.length - updated,
+          updated,
+        },
+      };
     });
   }
 
@@ -743,26 +766,30 @@ export class EntryStore {
       }
       const range = entryDateRange(parts.data, parts.overrides);
       const at = this.timestamp();
-      // The revision condition makes the write fail if another write came in between.
-      const written = await this.db
-        .prepare(
-          `UPDATE app_entries SET revision = revision + 1, kind = ?, data = ?, exdates = ?,
+      // The revision condition makes the write fail if another write came in between;
+      // the change stamp is replaced in the same batch (one transaction).
+      const [result] = await this.db.batch<{ revision: unknown }>([
+        this.db
+          .prepare(
+            `UPDATE app_entries SET revision = revision + 1, kind = ?, data = ?, exdates = ?,
              overrides = ?, first_date = ?, last_date = ?, updated_at = ?
            WHERE id = ? AND revision = ? RETURNING revision`,
-        )
-        .bind(
-          parts.data.kind,
-          serialized.data,
-          serialized.exdates,
-          serialized.overrides,
-          range.first,
-          range.last,
-          at,
-          id,
-          revision,
-        )
-        .first<number>("revision");
-      if (written === null) {
+          )
+          .bind(
+            parts.data.kind,
+            serialized.data,
+            serialized.exdates,
+            serialized.overrides,
+            range.first,
+            range.last,
+            at,
+            id,
+            revision,
+          ),
+        bumpStamp(this.db),
+      ]);
+      const written = result?.results[0]?.revision;
+      if (typeof written !== "number") {
         return this.missOrConflict(id);
       }
       return {

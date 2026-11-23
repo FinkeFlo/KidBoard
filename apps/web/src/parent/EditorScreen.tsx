@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import { IdleWarning } from "./IdleWarning";
 import { useParentGate } from "./parentGate";
 
 export interface EditorScreenProps {
@@ -54,6 +55,7 @@ export function EditorScreen({
           </p>
         )}
       </div>
+      <IdleWarning />
     </section>
   );
 }

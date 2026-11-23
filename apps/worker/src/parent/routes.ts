@@ -55,12 +55,14 @@ function isoSeconds(epochSeconds: number): string {
 /**
  * Parent lock routes (ADR-0013), mounted under `/api/parent`:
  *
- * * every path: editor off (no D1 binding or no valid PIN) → 404 `not_found`; bodies
- *   over {@link MAX_PARENT_BODY_BYTES} → 413 `payload_too_large`;
+ * * every path: editor off (`editorEnabled`: no D1 binding, no valid PIN or no access
+ *   token) → 404 `not_found`; bodies over {@link MAX_PARENT_BODY_BYTES} → 413
+ *   `payload_too_large`;
  * * `POST /unlock` `{ pin }` → `{ token, expiresAt }` (15 min); wrong PIN → 403
  *   `wrong_pin` with `attemptsLeft`; the 5th wrong PIN within 15 min and every request
  *   during the following 15 min → 429 `parent_lockout` with `Retry-After`. Each attempt
- *   is reserved against the limit before the PIN is compared (see `UnlockLimiter`);
+ *   is reserved against the limit before the PIN is compared; the right PIN clears the
+ *   wrong ones of the window (see `UnlockLimiter`);
  * * `GET /session` (needs {@link requireParentSession}) → `{ expiresAt }`;
  * * `GET /feed` (session) → `{ feedUrl }`, the relative phone feed path, only while
  *   `KIDBOARD_FEED_TOKEN` is valid (`ParentFeedResponseSchema`);
@@ -122,7 +124,7 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
       }
       if (!(await tokensEqual(body.value.pin, expected))) {
         settled = true;
-        const outcome = await limiter.fail(db, nowSeconds);
+        const outcome = await limiter.fail(db, reserved, nowSeconds);
         if (outcome.locked) {
           return lockout(c, outcome.retryAfterSeconds);
         }

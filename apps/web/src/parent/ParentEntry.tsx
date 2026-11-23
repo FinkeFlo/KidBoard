@@ -45,13 +45,17 @@ function HoldRing(): React.JSX.Element {
   );
 }
 
+/** Keys whose 2-second hold opens the gate, like a held pointer. */
+const HOLD_KEYS = new Set(["Enter", " "]);
+
 /**
  * Hidden entry to the parent area (ADR-0013) at the bottom of the navigation rail: a
  * small pencil in `--color-control-quiet` (no opacity, >= 3:1 non-text contrast) on a
  * full 64 px touch target. It opens the PIN pad only after {@link PARENT_HOLD_MS} of a
- * held pointer or a held Enter key; a ring fills meanwhile. Short taps, clicks, Space
- * and assistive-tech activation do nothing, so children cannot open it by accident.
- * Rendered only when the worker reports the editor as available.
+ * held pointer or a held Enter or Space key; a ring fills meanwhile. Short taps,
+ * clicks, short key presses and assistive-tech activation do nothing, so children
+ * cannot open it by accident. Rendered only when the worker reports the editor as
+ * available.
  */
 export function ParentEntry(): React.JSX.Element {
   const { t } = useTranslation();
@@ -107,13 +111,16 @@ export function ParentEntry(): React.JSX.Element {
         event.preventDefault();
       }}
       onKeyDown={(event) => {
-        if (event.key !== "Enter") return;
-        // No click on Enter: only a held Enter opens the gate.
+        if (!HOLD_KEYS.has(event.key)) return;
+        // No click (and no scrolling on Space): only a held key opens the gate.
         event.preventDefault();
         if (!event.repeat) start();
       }}
       onKeyUp={(event) => {
-        if (event.key === "Enter") cancel();
+        if (!HOLD_KEYS.has(event.key)) return;
+        // Space would click on release.
+        event.preventDefault();
+        cancel();
       }}
       onBlur={cancel}
       className="text-control-quiet min-h-touch min-w-touch focus-visible:outline-text relative flex shrink-0 touch-none items-center justify-center select-none focus-visible:outline-4 focus-visible:-outline-offset-4"

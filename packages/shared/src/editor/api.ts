@@ -205,12 +205,22 @@ export type EditorWriteResponse = z.output<typeof EditorWriteResponseSchema>;
 export const ImportModeSchema = z.enum(["merge", "replace"]);
 export type ImportModeValue = z.output<typeof ImportModeSchema>;
 
-/** `POST /api/parent/import?mode=merge|replace`. */
-export const EditorImportResponseSchema = z.object({
-  mode: ImportModeSchema,
-  imported: z.number().int().min(0),
-  boardRefresh: z.literal(BOARD_REFRESH_NOW),
-});
+/**
+ * `POST /api/parent/import?mode=merge|replace`: `imported` = `created` (ids that were
+ * not stored before) + `updated` (ids that replaced a stored entry).
+ */
+export const EditorImportResponseSchema = z
+  .object({
+    mode: ImportModeSchema,
+    imported: z.number().int().min(0),
+    created: z.number().int().min(0),
+    updated: z.number().int().min(0),
+    boardRefresh: z.literal(BOARD_REFRESH_NOW),
+  })
+  .refine((r) => r.created + r.updated === r.imported, {
+    path: ["imported"],
+    message: "imported must equal created + updated",
+  });
 export type EditorImportResponse = z.output<typeof EditorImportResponseSchema>;
 
 /**

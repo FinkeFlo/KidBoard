@@ -243,6 +243,85 @@ test.describe("parent gate (ADR-0013)", () => {
     );
   });
 
+  test("mouse, then keyboard: typing goes on after a wrong PIN, 12 digits fit, Enter on a digit key submits", async ({
+    page,
+  }) => {
+    await openBoard(page);
+    await holdEntry(page);
+    const dots = page.getByTestId("pin-dots");
+    // Wrong PIN with the mouse: the clicked OK is disabled while it is checked.
+    await typePin(page, "000000");
+    await expect(page.getByTestId("pin-feedback")).toContainText("Wrong PIN");
+
+    // The keyboard still works, and stops at 12 digits.
+    await page.keyboard.type("1234567890123");
+    await expect(dots).toHaveAttribute("data-count", "12");
+    const padBox = await pinPad(page).boundingBox();
+    const dotsBox = await dots.boundingBox();
+    if (padBox === null || dotsBox === null) throw new Error("missing boxes");
+    expect(dotsBox.x).toBeGreaterThanOrEqual(padBox.x);
+    expect(dotsBox.x + dotsBox.width).toBeLessThanOrEqual(
+      padBox.x + padBox.width,
+    );
+    for (let i = 0; i < 12; i += 1) await page.keyboard.press("Backspace");
+    await expect(dots).toHaveAttribute("data-count", "0");
+
+    // Digits clicked with the mouse (the last key keeps the focus), then Enter.
+    for (const digit of MOCK_PARENT_PIN) {
+      await pinPad(page)
+        .getByRole("button", { name: digit, exact: true })
+        .click();
+    }
+    await page.keyboard.press("Enter");
+    await expect(editor(page)).toBeVisible();
+  });
+
+  test("Escape after a wrong PIN closes the pad and returns the focus to the pencil", async ({
+    page,
+  }) => {
+    await openBoard(page);
+    await holdEntry(page);
+    await typePin(page, "000000");
+    await expect(page.getByTestId("pin-feedback")).toContainText("Wrong PIN");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(entry(page)).toBeFocused();
+  });
+
+  test("Space held 2 s on the pencil opens the PIN pad", async ({ page }) => {
+    await openBoard(page);
+    await entry(page).focus();
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(500);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.keyboard.down("Space");
+    await expect(pinPad(page)).toBeVisible({ timeout: HOLD_MS + 2000 });
+    await page.keyboard.up("Space");
+    await expect(page.getByTestId("pin-dots")).toHaveAttribute(
+      "data-count",
+      "0",
+    );
+  });
+
+  test("idle warning 30 s before the auto-lock; Keep editing keeps the editor open", async ({
+    page,
+  }) => {
+    await openBoard(page);
+    await unlock(page);
+    const warning = page.getByTestId("idle-warning");
+    await expect(warning).toHaveCount(0);
+    await setNow(
+      page,
+      new Date(Date.parse(NOW) + 2 * 60_000 + 35_000).toISOString(),
+      { wake: false },
+    );
+    await expect(warning).toBeVisible();
+    await expect(warning).toContainText("Locking soon");
+    await warning.getByRole("button", { name: "Keep editing" }).click();
+    await expect(warning).toHaveCount(0);
+    await expect(editor(page)).toBeVisible();
+  });
+
   test("auto-lock: after 3 minutes without a touch and when the tab is hidden", async ({
     page,
   }) => {

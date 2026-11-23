@@ -253,7 +253,13 @@ describe("ApiClient editor routes (T-43 API, T-45 client)", () => {
     const fake = createFakeFetch();
     fake.setReplies("/api/parent/import", {
       status: 200,
-      body: { mode: "replace", imported: 2, boardRefresh: "now" },
+      body: {
+        mode: "replace",
+        imported: 2,
+        created: 1,
+        updated: 1,
+        boardRefresh: "now",
+      },
     });
     const document = '{"format":"kidboard-entries","version":1,"entries":[]}';
     await expect(
@@ -262,7 +268,13 @@ describe("ApiClient editor routes (T-43 API, T-45 client)", () => {
         "replace",
         document,
       ),
-    ).resolves.toEqual({ mode: "replace", imported: 2, boardRefresh: "now" });
+    ).resolves.toEqual({
+      mode: "replace",
+      imported: 2,
+      created: 1,
+      updated: 1,
+      boardRefresh: "now",
+    });
     expect(fake.calls[0]?.url).toBe("/api/parent/import?mode=replace");
     expect(fake.calls[0]?.init?.body).toBe(document);
   });

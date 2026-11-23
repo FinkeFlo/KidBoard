@@ -33,8 +33,9 @@ function errorName(error: unknown): string {
  * `Cache-Control: no-store` (global middleware). Exempt from the access token
  * (`isFeedRequest`), because calendar apps subscribe by URL only.
  *
- * * editor off (no D1 binding or no valid PIN), token unset or invalid (see
- *   `feedTokenStatus`), missing or wrong `token` → 404 like any unknown path;
+ * * editor off (`editorEnabled`: no D1 binding, no valid PIN or no access token),
+ *   token unset or invalid (see `feedTokenStatus`), missing or wrong `token` → 404
+ *   like any unknown path;
  * * the token is compared in constant time (`tokensEqual`);
  * * invalid `KIDBOARD_CONFIG` → 500 `server_misconfigured`; D1 unavailable → 503
  *   without detail (type logged only).

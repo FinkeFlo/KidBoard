@@ -44,7 +44,7 @@ Der Worker liest genau diese Namen (`apps/worker/src/env.ts`):
 | `KIDBOARD_ALLOWED_ORIGINS` | Variable             | nein     | Nur für API-Zugriffe von anderen Origins; das Board selbst ist same-origin.                       |
 | `KIDBOARD_CACHE_TTL`       | Variable             | nein     | Sekunden, die ein Feed als frisch gilt, Standard 3600.                                            |
 | `KIDBOARD_CACHE`           | KV-Namespace-Binding | automatisch | Ohne ID in `wrangler.jsonc` deklariert; Wrangler legt ihn beim ersten Deploy an.               |
-| `KIDBOARD_PARENT_PIN`      | Secret               | nein     | 6 bis 12 Ziffern; schaltet den Eltern-Editor ein (mit `KIDBOARD_DATA`). Nicht gesetzt, ungültig oder `REPLACE_ME` = Editor aus. |
+| `KIDBOARD_PARENT_PIN`      | Secret               | nein     | 6 bis 12 Ziffern; schaltet den Eltern-Editor ein (mit `KIDBOARD_DATA` und gesetztem `KIDBOARD_ACCESS_TOKEN`). Nicht gesetzt, ungültig oder `REPLACE_ME`, oder kein Zugriffstoken = Editor aus. |
 | `KIDBOARD_DATA`            | D1-Datenbank-Binding | automatisch | Im Editor angelegte Einträge (ADR-0014). Ohne ID in `wrangler.jsonc` deklariert; Wrangler legt sie beim ersten Deploy an, der Worker seine Tabellen. |
 
 Im Dashboard gesetzte Klartext-Variablen bleiben bei späteren Deploys erhalten
