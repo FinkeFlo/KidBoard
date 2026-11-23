@@ -543,8 +543,12 @@ task; 🎒 means only "tomorrow bring" (rule 1).
      deduplicated per child); events for everyone (`childIds: []`) form one neutral group
      shown first; an event for several children adds its icons to each named child.
   3. Placement: inside today's overview column, between the event list and `MealPlates`,
-     led by 🎒; rendered only when non-empty; one row of fixed height (no wrapping), whole
-     icons only plus a plain-text "+N" per overflow (as `stripIconsThatFit`); the event list
+     led by 🎒 with a day cue (evening: arrow + tomorrow's short weekday + "Morgen"/"Tomorrow";
+     morning: "Heute"/"Today"; no 🌙); rendered only when non-empty; one row per group (fixed
+     height from the row count, no wrapping), rows granted only while the event list keeps its
+     minimum (`listMinRem`: done strip, now line, two slim tiles, "+N"); as a last resort the
+     remaining groups share the last row; whole icons only plus a plain-text "+N" per overflow
+     (as `stripIconsThatFit`); the event list
      above shrinks through the existing space-based steps (`useContentHeight`/`fitColumn`,
      the area is outside the `flex-1 min-h-0` list), so nothing scrolls. Not shown in the
      other overview columns or the week view.
@@ -832,6 +836,7 @@ stored in D1 instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
 | 2026-11-23 | New milestone M11 Parent editor (T-39–T-45, exit review + UI/UX click test) before v1.0.0; ADR-0012 (write via Google Calendar API with a service account, reading stays on iCal) and ADR-0013 (parent PIN, sessions, lockout); non-goals updated; T-28 also depends on M11; M12 setup wizard noted as an idea | Maintainer wants to maintain entries in the app (child, activity, once/weekly) instead of typing title conventions in Google Calendar |
 | 2026-11-23 | New milestone M10 School (bring list from event description, evening-before 🎒 reminder, later holidays/timetable), scheduled right after v1.0.0 | Maintainer request: school subjects where children must bring something |
 | 2026-11-23 | M10 School items 1–3 planned as a milestone before v1.0.0 (T-33 bring list parsing, T-34 subject icons + emoji baseline, T-35 bring chips, T-36 evening-before 🎒 area, T-37 fixtures/demo/e2e/screenshots, T-38 docs, M10 exit review); ADR-0010 (bring list from the description, server-side) and ADR-0011 (Emoji 13.0 baseline for built-in icons, 🛝 replaced); T-28 now depends on M10 and stays last; holiday feed and timetable stay in "Later" | Maintainer wants the school features in the first release; the release itself is cut later by the maintainer |
+| 2026-11-23 | T-36.3 reworded: the 🎒 area draws one row per group with a visible day cue, budgeted against the list minimum (`listMinRem`); bring chips on narrow tiles 28px (week-slim 24px) | M10 exit UI/UX check: a single shared row hid a child's school items behind "+4", and evening and morning looked identical |
 | 2026-11-23 | T-27a outcome: tile size ladder extended with space-based steps (`medium`, dense 2.75rem emoji, `slim` 2rem emoji row tiles; week `week-small`/`week-slim` with 16–18px time-of-day badge on the emoji corner) so "+N" only appears when another tile cannot fit; remaining week polish tracked as issue #5 | UI/UX dummy test loop (4 rounds): showing every event beats a larger emoji on dense days |
 | 2026-11-22 | M5b review: dense overview tiles may use ~3rem emoji (large tiles stay ≥ 3.5rem, T-30b criterion met); English title truncation, week past-event ranking, 🌞/☀️ pair, skeleton header jump become explicit T-27a checks; T-27 docs scope extended (overview, rail, states, `KB-*` codes, CONFIG `bands` wording) | M5b milestone review by reviewer-opus: 3.5rem emoji in a 4rem dense tile tucked under the child edge |
 | 2026-11-22 | release-please switched to manual dispatch; early 1.0.0 release PR closed by the maintainer, who cuts the release himself | The automatic release PR proposed 1.0.0 too early |
