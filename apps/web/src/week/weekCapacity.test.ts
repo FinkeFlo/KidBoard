@@ -6,7 +6,8 @@ import { fitWeekColumn, WEEK_SIZES } from "./weekCapacity";
 
 const WEEK = TILE_HEIGHT_REM.week;
 const DENSE = TILE_HEIGHT_REM["week-dense"];
-const MINI = TILE_HEIGHT_REM["week-mini"];
+const SMALL = TILE_HEIGHT_REM["week-small"];
+const SLIM = TILE_HEIGHT_REM["week-slim"];
 
 interface Item {
   id: number;
@@ -37,10 +38,16 @@ const today = (upcoming: number, past: number): Item[] => [
 ];
 
 describe("fitWeekColumn", () => {
-  it("steps from the normal to the dense to the mini week size", () => {
-    expect(WEEK_SIZES).toEqual(["week", "week-dense", "week-mini"]);
+  it("steps from the normal to the dense, the small and the slim week size", () => {
+    expect(WEEK_SIZES).toEqual([
+      "week",
+      "week-dense",
+      "week-small",
+      "week-slim",
+    ]);
     expect(DENSE).toBeLessThan(WEEK);
-    expect(MINI).toBeLessThan(DENSE);
+    expect(SMALL).toBeLessThan(DENSE);
+    expect(SLIM).toBeLessThan(SMALL);
   });
 
   it("shows everything until the column is measured", () => {
@@ -103,14 +110,18 @@ describe("fitWeekColumn", () => {
     expect(ids(shrunk.visible)).toEqual([0, 1, 2, 3, 4]);
     expect(shrunk.past).toHaveLength(4);
     expect(shrunk.hidden).toEqual([]);
-    // Mini tiles before anything is hidden.
-    expect(fitWeekColumn(items, rows(5, MINI, 1))).toMatchObject({
-      size: "week-mini",
+    // Small, then slim tiles before anything is hidden.
+    expect(fitWeekColumn(items, rows(5, SMALL, 1))).toMatchObject({
+      size: "week-small",
       hidden: [],
     });
-    // Room for three mini tiles, the strip and "+N": the last two upcoming are summed up.
-    const hidden = fitWeekColumn(items, rows(3, MINI, 2));
-    expect(hidden.size).toBe("week-mini");
+    expect(fitWeekColumn(items, rows(5, SLIM, 1))).toMatchObject({
+      size: "week-slim",
+      hidden: [],
+    });
+    // Room for three slim tiles, the strip and "+N": the last two upcoming are summed up.
+    const hidden = fitWeekColumn(items, rows(3, SLIM, 2));
+    expect(hidden.size).toBe("week-slim");
     expect(ids(hidden.visible)).toEqual([0, 1, 2]);
     expect(ids(hidden.hidden)).toEqual([3, 4]);
     expect(hidden.past).toHaveLength(4);
@@ -119,9 +130,9 @@ describe("fitWeekColumn", () => {
   });
 
   it("sums up the least important events, keeping room for the +N row", () => {
-    const height = rows(3, MINI, 1);
+    const height = rows(3, SLIM, 1);
     const fit = fitWeekColumn(list(8), height);
-    expect(fit.size).toBe("week-mini");
+    expect(fit.size).toBe("week-slim");
     expect(ids(fit.visible)).toEqual([0, 1, 2]);
     expect(ids(fit.hidden)).toEqual([3, 4, 5, 6, 7]);
     expect(fit.past).toEqual([]);
@@ -162,6 +173,35 @@ describe("fitWeekColumn", () => {
         }
       }
     }
+  });
+
+  it("sums up only when one more slim tile would not fit (no +N above free space)", () => {
+    for (let tiles = 1; tiles <= 7; tiles += 1) {
+      // Just too short for one more tile next to the "+N" row: exactly `tiles` stay.
+      const short = rows(tiles + 1, SLIM, 1) - 0.01;
+      const fit = fitWeekColumn(list(tiles + 3), short);
+      expect(fit.visible).toHaveLength(tiles);
+      // The space left below is less than one more tile with its gap.
+      expect(short - rows(tiles, SLIM, 1)).toBeLessThan(SLIM + COLUMN_GAP_REM);
+      // With room for that tile, it is shown.
+      expect(
+        fitWeekColumn(list(tiles + 3), rows(tiles + 1, SLIM, 1)).visible,
+      ).toHaveLength(tiles + 1);
+    }
+  });
+
+  it("keeps a busy today whole in the measured week column (1280x800: 23.8 rem)", () => {
+    // The demo's today at 10:20: two finished, six upcoming (one all-day).
+    const fit = fitWeekColumn(today(6, 2), 23.8);
+    expect(fit.size).toBe("week-slim");
+    expect(fit.visible).toHaveLength(6);
+    expect(fit.past).toHaveLength(2);
+    expect(fit.hidden).toEqual([]);
+    // At 16:10: four finished, four upcoming fit as small stacked tiles.
+    expect(fitWeekColumn(today(4, 4), 23.8)).toMatchObject({
+      size: "week-small",
+      hidden: [],
+    });
   });
 
   it("shows only +N in a column too short for one tile", () => {

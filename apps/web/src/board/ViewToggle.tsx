@@ -75,7 +75,14 @@ export function ViewToggle({
             } w-nav min-h-touch rounded-nav text-body focus-visible:outline-text flex h-30 flex-col items-center justify-center gap-2 font-black transition-transform duration-(--duration-fast) focus-visible:outline-4 focus-visible:outline-offset-2 active:scale-[0.97] motion-reduce:transition-none`}
           >
             {option === "day" ? (
-              <Emoji emoji="☀️" className="text-heading" />
+              // At night the active fill is a light tan, on which the dimmed sun fades:
+              // it then sits on a dark page-coloured disc (same flow height either way).
+              <span
+                data-testid="today-sun"
+                className={`${active ? "night:bg-surface" : ""} rounded-pill -my-1 grid size-10 place-items-center`}
+              >
+                <Emoji emoji="☀️" className="text-heading" />
+              </span>
             ) : (
               <WeekBars />
             )}

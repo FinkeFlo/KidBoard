@@ -69,17 +69,21 @@ const ROW = SUMMARY_ROW_REM + GAP;
 /** The now line with its gap. */
 const NOW_ROW = NOW_LINE_REM + GAP;
 
-function stubListHeight(heightRem: number): void {
+function stubListHeight(heightRem: number, widthRem = 40): void {
   vi.stubGlobal(
     "ResizeObserver",
     class {
       constructor(
         private readonly callback: (
-          entries: { contentRect: { height: number } }[],
+          entries: { contentRect: { height: number; width: number } }[],
         ) => void,
       ) {}
       observe(): void {
-        this.callback([{ contentRect: { height: heightRem * 16 } }]);
+        // Every observed element reports the same box: the column lists use the
+        // height, the "done" strip's icon area the width.
+        this.callback([
+          { contentRect: { height: heightRem * 16, width: widthRem * 16 } },
+        ]);
       }
       disconnect(): void {}
     },

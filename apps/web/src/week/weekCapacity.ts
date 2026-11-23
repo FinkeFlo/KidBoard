@@ -10,7 +10,8 @@ import { DENSE_FROM } from "../day/columnLayout";
 export const WEEK_SIZES: readonly TileSize[] = [
   "week",
   "week-dense",
-  "week-mini",
+  "week-small",
+  "week-slim",
 ];
 
 export interface WeekFit<T> {
@@ -43,11 +44,14 @@ function rowsRem(tiles: number, tileRem: number, summaries: number): number {
  * 1. every event as a tile at the normal size (past ones receded);
  * 2. otherwise *all* past events fold into the "done" strip (so a finished event never
  *    takes a slot an upcoming one needs), and the upcoming tiles shrink step by step
- *    ({@link WEEK_SIZES}: with a title line, a smaller one, then emoji and time only);
+ *    ({@link WEEK_SIZES}: stacked with a two-line title, stacked with a one-line title,
+ *    the same smaller, then a slim row of small emoji beside title and time; every step
+ *    keeps the title where the column is wide enough);
  * 3. only then the least important upcoming events are summed up in "+N", at the
  *    smallest size, with the largest number of tiles that still leaves room for it.
  *
- * A "+N" appears only when the tiles do not fit, never because of a fixed count. Nothing
+ * A "+N" appears only when one more tile at the smallest size would not fit, never
+ * because of a fixed count. Nothing
  * is lost: `visible + past + hidden` are the items. A column too short for even one tile
  * shows only the summaries.
  */
@@ -56,7 +60,7 @@ export function fitWeekColumn<T extends { status: EventStatus }>(
   heightRem: number | null,
 ): WeekFit<T> {
   const largest = WEEK_SIZES[0] ?? "week";
-  const smallest = WEEK_SIZES[WEEK_SIZES.length - 1] ?? "week-mini";
+  const smallest = WEEK_SIZES[WEEK_SIZES.length - 1] ?? "week-slim";
   const count = items.length;
   if (heightRem === null) {
     return {

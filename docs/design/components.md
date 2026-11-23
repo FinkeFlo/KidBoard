@@ -18,9 +18,10 @@ fixed per size, so a column can compute how many tiles fit.
 | `slim` | today, last step before "+N" | 44 | 32 (36) | `--text-tile-compact`, 1 line, time in the same row |
 | `compact` | other days | `--spacing-tile-compact` (76) | 40 (48) | `--text-tile-compact`, 2 lines |
 | `compact-dense` | other days, last step | 60 | 36 (44) | `--text-tile-compact`, 1 line |
-| `week` | week columns | 104 | 40 (no disc) | `--text-meta`, 1 line |
+| `week` | week columns | 116 | 40 (no disc) | `--text-meta`, 2 lines |
 | `week-dense` | week, 1st step down | 84 | 32 (no disc) | `--text-caption`, 1 line |
-| `week-mini` | week, last step before "+N" | 68 | 32 (no disc) | none (name only) |
+| `week-small` | week, 2nd step down | 76 | 28 (no disc) | `--text-caption`, 1 line |
+| `week-slim` | week, last step before "+N" | 48 | 28 (no disc), beside the text | `--text-caption`, 1 line, time below |
 
 - **Prominent (now, else next) in today's column:** about 1.3× taller with a larger emoji
   (large: 104 high, emoji 72) whenever a size still fits with it; it is the first thing
@@ -38,7 +39,8 @@ fixed per size, so a column can compute how many tiles fit.
 - **Badges:** circles `--color-child-N` with the child's emoji and a 2px ring
   (`--color-on-child`, night `--color-surface`), side by side inside the tile, overlapping
   by at most a quarter. Two-line titles float them at the end of the first line only.
-- **Time row:** time-of-day emoji 🌅 / 🌞 / 🌆 (at least 24px, also in the week; never 🌙)
+- **Time row:** time-of-day emoji 🌅 / 🌞 / 🌆 (at least 24px, also in the week down to
+  `week-dense`; `week-small` 18px, `week-slim` 16px on the emoji's corner; never 🌙)
   plus the time in `--text-meta`, `--color-text-muted`. All-day: a span icon (a bar
   between two end marks) and "Ganztägig".
 - **States:** upcoming; **current** ("jetzt"): 4px ring `--color-now` plus a clock cue on
@@ -46,9 +48,15 @@ fixed per size, so a column can compute how many tiles fit.
   ▶ cue on the disc (not the gold of today's column ring); **past**:
   `--color-surface-sunken` fill, `--color-text-muted`, grey emoji, no edge (never opacity:
   `--opacity-past*` fails AA on text). Now/next colours are person-neutral, never a child's.
-- **Week tiles:** stacked (emoji, one-line truncated title, time row), badges in the top
-  end corner. The title shows only where the column's list is at least 5.5rem wide (CSS
-  container query); `week-mini` drops it.
+- **Week tiles:** `week`, `week-dense` and `week-small` are stacked (emoji, title, time
+  row); the badges sit in their own column beside the emoji (side by side, overlapping by
+  at most a quarter, a 4px gap to the emoji, never on it or in the tile's corner).
+  `week` gives the title two lines (broken at spaces, no automatic hyphenation), the others
+  one truncated line. `week-slim` is a row: the emoji with its time-of-day icon on the
+  corner (as on the meal plates), beside it the title with the badges at its end and the
+  time below; an all-day `week-slim` tile shows the span icon and the badges in that row,
+  "Ganztägig" stays in the accessible name. The title shows wherever the column's list is
+  wide enough (5.5rem, `week-slim` 7rem; CSS container query), on today's column too.
 - **Night:** avatar discs, child edges and stripes are dimmed a quarter towards the page
   (`color-mix(in oklab, child 75%, surface)`); emoji are dimmed by the `Emoji` component.
 - **Rules:** accessible name = title, time, children, state ("Ballett, 15:30, Für Mia");
@@ -78,14 +86,17 @@ One column per day; events top to bottom in time order, meals at the bottom.
   "Nichts geplant" (`--text-meta`, muted).
 - **"vorbei" strip (36 high):** a check mark and "vorbei" (`--text-meta`), then up to 8 grey
   30px emoji with a small check badge, then "+N"; its accessible name lists every title.
+  Icons are never clipped: the strip measures its width and draws only whole icons, the
+  rest is counted in "+N" (with a screen-reader text).
 - **"+N" row (36 high):** the hidden events' emoji (26px, up to 4) and "+N" in
   `--text-meta`, muted, plain text: no border or fill, so it does not look like a button.
   Its screen-reader text names the titles.
 - **Week variant (7 equal columns):** weekday (`--text-tile`) and date; a fixed slot right
   of the date holds 🌙 (each day before the countdown day), the awaited event's emoji
   (the countdown day) or nothing, so all dates align. Same space rule with the week sizes
-  (`week` → `week-dense` → `week-mini`); the "vorbei" strip shows only the check mark, up
-  to 2 icons (24px) and "+N"; the "+N" row up to 2 emoji (22px). Weekend columns
+  (`week` → `week-dense` → `week-small` → `week-slim`; "+N" only when one more slim tile
+  would not fit); the "vorbei" strip shows only the check mark, up to 2 whole icons (24px)
+  and "+N"; the "+N" row up to 2 emoji (22px). Weekend columns
   `--color-surface-weekend`, label `--color-band-morning-accent`.
 - **Countdown day (week):** a 4px ring in `--color-band-evening-accent` (the moons' colour,
   person-neutral). Only if the awaited event belongs to exactly one child: that child's
@@ -141,7 +152,9 @@ Not interactive.
 Navigation rail on the right (`--spacing-nav` wide): buttons 104×120, radius `--radius-nav`,
 label `--text-body` 900. "Heute": ☀️ (also at night; it never becomes a moon). "Woche":
 seven bars, the first `--color-sun`, the rest `--color-border`. Active:
-`--color-nav-active` / `--color-on-nav-active` (night a little dimmer), `aria-pressed`;
+`--color-nav-active` / `--color-on-nav-active` (night a little dimmer), `aria-pressed`; at
+night the active "Heute" button's ☀️ sits on a 40px `--color-surface` disc (the dimmed sun
+would fade on the light tan fill);
 inactive: `--color-surface-raised` with a 3px inset `--color-border`. At the bottom of the
 rail: "Stand 15:18" (`--text-caption`, muted): the time of the last *successful* fetch.
 Below it, in the reserved bottom strip, the long-press fullscreen control (64px target,

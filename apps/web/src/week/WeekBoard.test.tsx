@@ -18,17 +18,21 @@ const CONFIG = {
 } as const;
 
 /** Makes every column list report `heightRem` (at a 16px root) through a stubbed observer. */
-function stubListHeight(heightRem: number): void {
+function stubListHeight(heightRem: number, widthRem = 40): void {
   vi.stubGlobal(
     "ResizeObserver",
     class {
       constructor(
         private readonly callback: (
-          entries: { contentRect: { height: number } }[],
+          entries: { contentRect: { height: number; width: number } }[],
         ) => void,
       ) {}
       observe(): void {
-        this.callback([{ contentRect: { height: heightRem * 16 } }]);
+        // Every observed element reports the same box: the column lists use the
+        // height, the "done" strip's icon area the width.
+        this.callback([
+          { contentRect: { height: heightRem * 16, width: widthRem * 16 } },
+        ]);
       }
       disconnect(): void {}
     },
@@ -198,11 +202,12 @@ describe("WeekBoard", () => {
   });
 
   it("sums up what does not fit as a quiet +N with small icons and a screen reader text", () => {
-    // Mini tiles: three plus the +N row (3 * 4.25 + 3 * 0.5 + 2.25 = 16.5 rem).
-    stubListHeight(16.75);
+    // Slim tiles: three plus the +N row (3 * 3 + 3 * 0.5 + 2.25 = 12.75 rem); a fourth
+    // would need 16.25 rem, all six 20.5 rem.
+    stubListHeight(13);
     const monday = renderWeek(hourly("2026-11-23", 6))[1] as HTMLElement;
     expect(tilesOf(monday)).toHaveLength(3);
-    expect(monday).toHaveAttribute("data-size", "week-mini");
+    expect(monday).toHaveAttribute("data-size", "week-slim");
     const more = within(monday).getByTestId("column-more");
     expect(more).toHaveAttribute("data-count", "3");
     expect(within(more).getByText("+3")).toHaveAttribute("aria-hidden", "true");
@@ -246,8 +251,36 @@ describe("WeekBoard", () => {
     expect(list.firstElementChild).toContainElement(strip);
   });
 
+  it("keeps a busy today whole and titled in a 1280x800 week column (no +N above free space)", () => {
+    // The measured list at 1280x800 is 23.8 rem: the strip plus six slim tiles fit
+    // (2.25 + 6 * 3 + 6 * 0.5 = 23.25 rem).
+    stubListHeight(23.8);
+    // Now is 12:00: Events 0..4 are over, 12:00 is current, 13:00..17:00 upcoming.
+    const today = renderWeek(hourly("2026-11-22", 11))[0] as HTMLElement;
+    expect(today).toHaveAttribute("data-size", "week-slim");
+    expect(within(today).queryByTestId("column-more")).toBeNull();
+    const tiles = tilesOf(today);
+    expect(tiles).toHaveLength(6);
+    // Today's tiles carry their titles like every other column's.
+    expect(
+      tiles.map((tile) => within(tile).getByTestId("tile-title").textContent),
+    ).toEqual([
+      "Event 5",
+      "Event 6",
+      "Event 7",
+      "Event 8",
+      "Event 9",
+      "Event 10",
+    ]);
+    expect(within(today).getByTestId("past-strip")).toHaveAttribute(
+      "data-count",
+      "5",
+    );
+  });
+
   it("hides only upcoming events after the strip, the least important last", () => {
-    // Two mini tiles, the strip and +N (2 * 4.25 + 3 * 0.5 + 2 * 2.25 = 14.5 rem).
+    // Two slim tiles, the strip and +N (2 * 3 + 3 * 0.5 + 2 * 2.25 = 12 rem); a third
+    // would need 15.5 rem.
     stubListHeight(14.75);
     const today = renderWeek(hourly("2026-11-22", 9))[0] as HTMLElement;
     expect(tilesOf(today).map((tile) => tile.dataset["status"])).toEqual([

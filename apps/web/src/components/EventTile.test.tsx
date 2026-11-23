@@ -189,6 +189,8 @@ describe("EventTile", () => {
       "compact-dense",
       "week",
       "week-dense",
+      "week-small",
+      "week-slim",
     ] as const;
     for (const size of sizes) {
       for (const prominent of [false, true]) {
@@ -407,7 +409,7 @@ describe("EventTile", () => {
     );
   });
 
-  it("week sizes stack emoji, a one-line title and the time, and keep the name", () => {
+  it("week sizes stack emoji, a title and the time, and keep the name", () => {
     render(
       <EventTile
         event={eventFixture({ childIds: ["mia"] })}
@@ -419,47 +421,123 @@ describe("EventTile", () => {
     );
     expect(tile()).toHaveAttribute("data-size", "week");
     expect(tile().className).toContain("flex-col");
-    // One truncated line, shown only where the week column is wide enough.
+    // Up to two lines, broken at spaces and never hyphenated automatically; shown only
+    // where the week column is wide enough.
     const title = within(tile()).getByTestId("tile-title");
     expect(title).toHaveTextContent("Swimming");
+    expect(title).toHaveClass("line-clamp-2", "break-words");
     const line = title.parentElement as HTMLElement;
-    expect(line).toHaveClass("truncate", "hidden", "@min-[5.5rem]:block");
+    expect(line).toHaveClass("hidden", "@min-[5.5rem]:block", "hyphens-manual");
+    expect(line.className).not.toContain("hyphens-auto");
     expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For Mia");
     const icon = within(tile()).getByText("🌞");
     // The time-of-day icon is as large as in the overview (>= 1.5rem).
     expect(icon).toHaveClass("text-[1.5rem]");
-    // No disc on the narrow week tiles; the badges sit inside the tile's corner.
+    // No disc on the narrow week tiles; the badges sit in their own grid column beside
+    // the emoji (never on top of it, never pinned into the corner).
     expect(within(tile()).queryByTestId("emoji-disc")).toBeNull();
-    expect(tile()).toContainElement(badges());
-    expect(TILE_HEIGHT_REM["week-dense"]).toBeLessThan(TILE_HEIGHT_REM.week);
-    // Emoji + title line + time row (1.5rem icon) + gaps fit both heights:
-    // week 2.5 + 1.3 + 1.5, dense 2 + 1.09 + 1.5 (rem).
-    expect(TILE_HEIGHT_REM.week).toBeGreaterThanOrEqual(2.5 + 1.3 + 1.5 + 0.25);
-    expect(TILE_HEIGHT_REM["week-dense"]).toBeGreaterThanOrEqual(
-      2 + 1.09 + 1.5 + 0.25,
+    const head = within(tile()).getByTestId("tile-head");
+    expect(head).toHaveClass("grid", "grid-cols-[1fr_auto_1fr]", "gap-1");
+    expect(head).toContainElement(badges());
+    expect(badges().parentElement).toHaveClass("col-start-3");
+    expect(badges().parentElement?.className).not.toContain("absolute");
+    expect(within(head).getByText("🏊").parentElement).toHaveClass(
+      "col-start-2",
+    );
+    // Emoji + two title lines (1.25 line height) + time row (1.5rem icon) + gaps, inside
+    // the 4px edge on both sides.
+    expect(TILE_HEIGHT_REM.week).toBeGreaterThanOrEqual(
+      2.5 + 2 * 1.25 + 1.5 + 0.25 + 0.5,
     );
   });
 
-  it("drops the title line at the last week step (mini), keeping it in the name", () => {
-    render(
-      <EventTile
-        event={eventFixture()}
-        childList={[]}
-        format={format}
-        timeOfDay="midday"
-        size="week-mini"
-      />,
-    );
-    expect(within(tile()).queryByTestId("tile-title")).toBeNull();
-    expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For everyone");
-    expect(within(tile()).getByText("🌞")).toHaveClass("text-[1.5rem]");
-    expect(TILE_HEIGHT_REM["week-mini"]).toBeLessThan(
+  it("shrinks through dense and small stacked week tiles, each keeping a one-line title", () => {
+    for (const size of ["week-dense", "week-small"] as const) {
+      const { unmount } = render(
+        <EventTile
+          event={eventFixture()}
+          childList={[]}
+          format={format}
+          timeOfDay="midday"
+          size={size}
+        />,
+      );
+      const title = within(tile()).getByTestId("tile-title");
+      expect(title).toHaveTextContent("Swimming");
+      expect(title).toHaveClass("block", "truncate");
+      expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For everyone");
+      unmount();
+    }
+    expect(TILE_HEIGHT_REM["week-dense"]).toBeLessThan(TILE_HEIGHT_REM.week);
+    expect(TILE_HEIGHT_REM["week-small"]).toBeLessThan(
       TILE_HEIGHT_REM["week-dense"],
     );
-    // Emoji 2rem + time row 1.5rem + gap fit.
-    expect(TILE_HEIGHT_REM["week-mini"]).toBeGreaterThanOrEqual(
-      2 + 1.5 + 0.125,
+    // dense: emoji 2 + title 1.09 + time 1.5; small: emoji 1.75 + title 1.09 + time
+    // 1.125 (rem), plus gaps and the 4px edge.
+    expect(TILE_HEIGHT_REM["week-dense"]).toBeGreaterThanOrEqual(
+      2 + 1.09 + 1.5 + 0.25 + 0.25,
     );
+    expect(TILE_HEIGHT_REM["week-small"]).toBeGreaterThanOrEqual(
+      1.75 + 1.09 + 1.125 + 0.25 + 0.5,
+    );
+  });
+
+  it("slimmest week tile: small emoji with its time-of-day icon, title with badges, then the time", () => {
+    render(
+      <EventTile
+        event={eventFixture({ childIds: ["mia"] })}
+        childList={[MIA]}
+        format={format}
+        timeOfDay="midday"
+        size="week-slim"
+      />,
+    );
+    expect(tile()).toHaveAttribute("data-size", "week-slim");
+    expect(tile().className).not.toContain("flex-col");
+    const title = within(tile()).getByTestId("tile-title");
+    expect(title).toHaveTextContent("Swimming");
+    // Shown where the column leaves the text room for it.
+    expect(title.parentElement).toHaveClass("hidden", "@min-[7rem]:block");
+    // The badges end the title's row; the time-of-day icon sits on the emoji's corner.
+    expect(title.parentElement?.parentElement).toContainElement(badges());
+    const corner = within(tile()).getByTestId("tile-time-of-day");
+    expect(corner).toHaveClass("absolute");
+    expect(within(corner).getByText("🌞")).toBeInTheDocument();
+    expect(within(tile()).getAllByText("🌞")).toHaveLength(1);
+    expect(within(tile()).getByText("2:30 PM")).toBeInTheDocument();
+    expect(tile()).toHaveAccessibleName("Swimming, 2:30 PM, For Mia");
+    expect(TILE_HEIGHT_REM["week-slim"]).toBeLessThan(
+      TILE_HEIGHT_REM["week-small"],
+    );
+    // Title row (1.25rem badge) + time row (1.09rem) inside the 4px edge.
+    expect(TILE_HEIGHT_REM["week-slim"]).toBeGreaterThanOrEqual(
+      1.25 + 1.09 + 0.5,
+    );
+  });
+
+  it("slimmest week tile, all day: the icon alone in the time row, the badges there too", () => {
+    render(
+      <EventTile
+        event={eventFixture({
+          allDay: true,
+          start: "2026-11-22",
+          end: "2026-11-23",
+          childIds: ["mia", "ben"],
+        })}
+        childList={[MIA, BEN]}
+        format={format}
+        size="week-slim"
+      />,
+    );
+    // Too narrow for the word: it stays in the accessible name only.
+    expect(within(tile()).queryByText("All day")).toBeNull();
+    expect(tile()).toHaveAccessibleName("Swimming, All day, For Mia and Ben");
+    const icon = within(tile()).getByTestId("all-day-icon");
+    // The title's row keeps its width: the badges move to the time row.
+    expect(icon.parentElement).toContainElement(badges());
+    expect(
+      within(tile()).getByTestId("tile-title").parentElement?.parentElement,
+    ).not.toContainElement(badges());
   });
 
   it("cuts a long time label in a narrow week tile instead of pushing it out", () => {
@@ -472,7 +550,7 @@ describe("EventTile", () => {
         })}
         childList={[]}
         format={format}
-        size="week-mini"
+        size="week-small"
       />,
     );
     const label = within(tile()).getByText("All day");

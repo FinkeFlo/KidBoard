@@ -189,7 +189,7 @@ export interface WeekBoardProps {
 
 /**
  * Seven day columns side by side (today first) in the overview's tile language: tinted
- * tiles with child badges, a one-line title and a time-of-day symbol, meals as a
+ * tiles with child badges, a title (where the column is wide enough) and a time-of-day symbol, meals as a
  * three-row list. How many tiles fit is measured per column (`fitWeekColumn`): finished
  * events fold into the "done" strip first, then the tiles shrink, and only then the least
  * important upcoming events become "+N" with their small icons. Presentational.

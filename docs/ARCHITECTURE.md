@@ -390,7 +390,9 @@ enlargement, like slim, skip that try); 3. only then the latest upcoming events 
 up in a trailing "+N" row at the smallest size, and only when one more tile would not fit
 there. `slim` (2.75rem, title and time in one row) is today's last step, so a whole day
 still fits where dense tiles would have needed "+N". The strip draws up to 8
-grey icons with a check mark, then counts the rest. "+N" shows the summed-up events as
+grey icons with a check mark, but only whole ones: it measures its icon area
+(`useContentWidth`) and `stripIconsThatFit` keeps as many as fit next to a "+N" that counts
+the rest (never a clipped icon). "+N" shows the summed-up events as
 small emoji followed by the count, as plain text (no border or fill, it is not a button).
 A **current event is never hidden or folded**; `MIN_TILES` (1) is the smallest tile count,
 so a tiny column may overflow rather than hide. Strip and "+N" name all their titles for
@@ -446,7 +448,8 @@ icons are at least 1.5rem, in the overview and the week.
 
 * **Loading:** `DayLoading` is a static skeleton with the view's layout: header, the four
   columns (today raised) and the rail in surface tokens, "Der Tag wird geholt ..." in the
-  bottom strip. No spinner, no animation.
+  bottom strip (touch height plus the burn-in room, as in `BoardFrame`, so the columns end
+  where the board's do). No spinner, no animation.
 * **Empty:** `DayEmpty` ("nothing planned" illustration) inside today's column; the meals
   stay visible. Another overview day without anything planned shows the quiet `DayFree`
   placeholder (a small kite and "Nothing planned").
@@ -483,7 +486,8 @@ wipe, with the device in `America/Los_Angeles`.
 `apps/web/src/board/`: `Board` loads config and agenda, then renders `BoardFrame`
 (`<main>`, header with weekday + date, the countdown (T-19) and `ChildLegend`, both
 `h-16` pills; the navigation rail `NavRail` on the right with the `ViewToggle` buttons
-"Today" (☀️, also at night) / "Week" (seven bars) and the "Stand HH:MM" line from the agenda
+"Today" (☀️, also at night; on the active button at night the sun sits on a dark
+`--color-surface` disc, as the dimmed sun fades on the light tan fill) / "Week" (seven bars) and the "Stand HH:MM" line from the agenda
 query's `dataUpdatedAt`, plain text, not a live region) around `OverviewBoard` or
 `WeekBoard`. The reserved bottom strip holds `DiscreetStatusBanner` and, centred under the
 rail (its bottom slot), the long-press `FullscreenControl` (a ring fills while it is
@@ -517,16 +521,23 @@ multi-day event continuing from an earlier day counts as the earliest), ties by 
 **Space-based layout:** like the overview, the week measures its columns
 (`useContentHeight`) and `fitWeekColumn` takes the first that fits: every event as a
 `week` tile (finished ones receded); else *all* finished events fold into the "done"
-strip (check mark, two grey checked icons, "+N", accessible name listing every title) and
-the upcoming tiles shrink `week` → `week-dense` → `week-mini`; only then the least
-important upcoming events are summed up in "+N" (their small emoji plus the count, plain
-text, no button look; the accessible label names the titles). Never a fixed count;
-`shown + folded + summed up` = the day's events. Week tiles are the overview's
-`EventTile` stacked: emoji, a one-line truncated title (CSS container query on the
-column's list: only where it is at least 5.5rem wide; `week-mini` drops it), then the
-1.5rem time-of-day icon and the time; tinted by the child (`resolveTileTint`) with edge or
-stripes and badges per child, so colour is never the only cue; events without a child are
-neutral.
+strip (check mark, up to two grey checked icons as far as they fit whole, "+N",
+accessible name listing every title) and the upcoming tiles shrink `week` (7.25rem) →
+`week-dense` (5.25) → `week-small` (4.75) → `week-slim` (3); only then the least important
+upcoming events are summed up in "+N" (their small emoji plus the count, plain text, no
+button look; the accessible label names the titles), and only when one more `week-slim`
+tile would not fit (at 1280x800 a column's list is about 23.8rem: the strip plus six slim
+tiles). Never a fixed count; `shown + folded + summed up` = the day's events. Week tiles
+are the overview's `EventTile`: `week` / `week-dense` / `week-small` stacked (emoji with the
+child badges in their own grid column beside it, never on top of it; the title, two lines
+broken at spaces for `week`, one truncated line below; then the time-of-day icon and the
+time), `week-slim` a row (1.75rem emoji with the time-of-day icon on its corner, as on the
+meal plates; beside it the title with the badges at its end, then the time; all-day: only
+the span icon, with the badges, the word stays in the name). Every size keeps the title
+where the column is wide enough (CSS container query on the column's list: 5.5rem,
+`week-slim` 7rem), so today's column reads like the others. Tinted by the child
+(`resolveTileTint`) with edge or stripes and badges per child, so colour is never the only
+cue; events without a child are neutral.
 **Countdown day:** every header has the same slot right of the date (so all dates align):
 one 🌙 on each day before the awaited day (the night still to sleep), the awaited event's
 icon on that day, empty after it. The awaited day gets a ring in the countdown colour

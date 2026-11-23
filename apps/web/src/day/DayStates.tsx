@@ -44,8 +44,9 @@ function SkeletonColumn({
  * Calm skeleton while nothing is known yet: the overview's header, four columns (today
  * raised and widest) and the rail, in surface tokens, plus "Der Tag wird geholt …" with
  * a sun in the bottom strip. No spinner and no animation at all (nothing moves, so it is
- * calm and reduced motion has nothing to reduce). Same frame paddings as `BoardFrame`,
- * so the board replaces it without a jump.
+ * calm and reduced motion has nothing to reduce). Same frame paddings as `BoardFrame`
+ * (its bottom strip is the touch height plus the burn-in room), so the board replaces it
+ * without a jump.
  */
 export function DayLoading(): React.JSX.Element {
   const { t } = useTranslation();
@@ -77,7 +78,7 @@ export function DayLoading(): React.JSX.Element {
       </div>
       <p
         role="status"
-        className="h-touch text-title text-text-muted flex shrink-0 items-center justify-center gap-3"
+        className="h-touch mt-burn-in text-title text-text-muted flex shrink-0 items-center justify-center gap-3"
       >
         <Emoji emoji="☀️" className="text-heading" />
         {t("day.loading")}

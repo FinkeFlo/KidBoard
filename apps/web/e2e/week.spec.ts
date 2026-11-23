@@ -105,8 +105,10 @@ test.describe("week view", () => {
     const goal = wednesday.getByTestId("column-target");
     await expect(goal).toContainText("🎂");
     await expect(goal).toContainText("🦊");
-    // A busy day shrinks to the last step (emoji and time) before it sums up.
-    await expect(wednesday).toHaveAttribute("data-size", "week-mini");
+    // A busy day shrinks to the last step (small emoji beside title and time) before it
+    // sums up, and keeps its titles.
+    await expect(wednesday).toHaveAttribute("data-size", "week-slim");
+    await expect(wednesday.getByTestId("tile-title").first()).toBeVisible();
     // One moon per night still to sleep: in each header before the target day.
     await expect(
       columns.evaluateAll((all) =>
