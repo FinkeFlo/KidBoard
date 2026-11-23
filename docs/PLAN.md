@@ -772,6 +772,24 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
   3. ~~User docs~~ deferred by the maintainer until the editor is final (README/DEPLOY/CONFIG
      sections for the editor, PIN, D1, backup and phone feed follow in a later task).
 
+- [ ] **T-46b Lean deploy form: Google calendars optional** (risk: **high** → Opus, deps: T-46, M11 click-test round 1)
+  Acceptance:
+  1. `KIDBOARD_CONFIG` may list no calendars (`calendars` defaults to `[]`); the board then
+     shows only the app sources (ADR-0014). With no calendars and the editor off the worker
+     logs one configuration warning and the board shows its normal empty state (no error).
+  2. The "Deploy to Cloudflare" form asks only for `KIDBOARD_ACCESS_TOKEN`,
+     `KIDBOARD_PARENT_PIN` and `KIDBOARD_CONFIG` (plus Cloudflare's own fields; KV and D1
+     "keep the default"): the `CAL_*_URL` entries in `.dev.vars.example` become commented,
+     optional examples, the template config has children but no calendars, and the binding
+     descriptions in `package.json` say in one plain sentence what to enter.
+  3. Adding Google later works by adding `calendars` to the config plus `CAL_<ID>_URL`
+     secrets in the dashboard; existing deployments with calendars behave unchanged.
+  4. Web: board, week view, meals and editor work with zero configured calendars (no meal
+     calendar → app meals only; Google template list empty); tests in shared, worker and
+     web; e2e/demo unchanged or extended; `docs/DEPLOY*.md` and `docs/CONFIG.md` adjust only
+     the rows/sentences that became wrong (full editor docs stay deferred).
+  5. ADR-0014 notes that app entries are the default source and Google feeds are optional.
+
 **M11 exit:** milestone review by `reviewer-opus` (write auth, lockout, D1 data integrity,
 privacy, conventions round trip, board parity of app entries), a T-27a-style UI/UX click
 test of the editor by three agents (Haiku, Sonnet, Opus) at both sizes, light/night, fixed
@@ -929,6 +947,7 @@ and re-checked by Sonnet until no blocking findings; CI green.
 | 2026-11-22 | Initial plan | Phase 0 |
 | 2026-11-23 | New milestone M9 Weather and what to wear (T-47–T-49) before v1.0.0, pulled forward from "Later"; ADR-0015; T-28 also depends on M9 | Maintainer request: weather with temperature and child-friendly clothing pictures for today and tomorrow |
 | 2026-11-23 | T-46: user docs for the editor (README, DEPLOY, CONFIG EN + DE) deferred | Maintainer: the feature is not final yet, docs would change too much |
+| 2026-11-23 | T-46b added: Google calendars optional, deploy form asks only for access token, PIN and config | Maintainer testing the deploy button: too many fields; with the editor storing entries in D1 the iCal feeds are no longer required |
 | 2026-11-23 | T-46 split: T-46a (worker phone feed) and T-46 (link in the parent area, e2e, docs); the feed token moves from a path segment to the query (`/api/feed.ics?token=`) | Workers Logs redact query strings (`redact_query_string`) but not path segments; the worker part could be built in parallel to T-45 |
 | 2026-11-23 | T-43: Google template suggestions use the cached feed window (today − 1 to today + 28) instead of 8 weeks back | Looking 8 weeks back would need a second feed expansion per request, outside the Workers CPU budget (ADR-0003); app entries still count 8 weeks back |
 | 2026-11-23 | T-42/T-43: PIN errors answer 403 (`wrong_pin`, `parent_locked`), 401 stays reserved for the access token; unlock attempts are reserved before the PIN compare (a success deletes its reservation) | The board client wipes its access token on any 401; reserving first closes the parallel-request bypass of the lockout (T-42 review) |
