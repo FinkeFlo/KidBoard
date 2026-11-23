@@ -682,8 +682,10 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
   Acceptance: ADR-0013 implemented and tested: PIN validation (6–12 digits, template →
   off); server secret generated once in D1; `POST /api/parent/unlock` constant-time
   compare, session token format and 15 min expiry (fake clock), wrong/expired/tampered/
-  other-PIN tokens → 401 `parent_locked`; lockout after 5 failures in 15 min → 429 +
-  `Retry-After`, reset after the window, success writes nothing; access token still
+  other-PIN tokens → 403 `parent_locked` (a wrong PIN → 403 `wrong_pin`; 401 stays reserved for the access token);
+  every attempt is reserved before the compare (per isolate and atomically in D1, a success
+  deletes its reservation); lockout after 5 failures in 15 min → 429 + `Retry-After`, reset
+  after the window; access token still
   required in front of it; CORS adds `POST, PATCH, DELETE`, `Content-Type` and
   `X-KidBoard-Parent` for allowed origins only; request bodies limited to 16 KB and parsed
   with zod; editor off → all `/api/parent/*` 404; `.dev.vars.example` and the deploy-button
@@ -704,7 +706,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
      the last 8 weeks and next 4 (same icon + title + children), most frequent first.
   4. `GET /api/parent/export` (JSON download) and `POST /api/parent/import`
      (`merge`|`replace`, validated, size-limited).
-  5. Tests for every route incl. auth (no session → 401), validation errors with field
+  5. Tests for every route incl. auth (no session → 403 `parent_locked`), validation errors with field
      codes for the UI, conflict, limits, and that responses never contain Google
      descriptions or secrets.
 
@@ -832,6 +834,7 @@ stored in D1 instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-23 | T-42/T-43: PIN errors answer 403 (`wrong_pin`, `parent_locked`), 401 stays reserved for the access token; unlock attempts are reserved before the PIN compare (a success deletes its reservation) | The board client wipes its access token on any 401; reserving first closes the parallel-request bypass of the lockout (T-42 review) |
 | 2026-11-23 | M11 reworked after the maintainer's storage decision: app entries stored by KidBoard in the family's D1 (ADR-0014) instead of writing to Google; tasks now T-39–T-46 (entry store, board merge, parent lock, editor API, gate, screens, phone feed/docs); ADR-0012 deferred to an optional later Google sync | Per-family Google Cloud setup judged too complicated; central Google sign-in needs verification and a central service |
 | 2026-11-23 | New milestone M11 Parent editor (T-39–T-45, exit review + UI/UX click test) before v1.0.0; ADR-0012 (write via Google Calendar API with a service account, reading stays on iCal) and ADR-0013 (parent PIN, sessions, lockout); non-goals updated; T-28 also depends on M11; M12 setup wizard noted as an idea | Maintainer wants to maintain entries in the app (child, activity, once/weekly) instead of typing title conventions in Google Calendar |
 | 2026-11-23 | New milestone M10 School (bring list from event description, evening-before 🎒 reminder, later holidays/timetable), scheduled right after v1.0.0 | Maintainer request: school subjects where children must bring something |
