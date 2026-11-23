@@ -440,6 +440,155 @@ not address. These rules apply to every M5b task:
 
 **M5b exit:** milestone review, CI green.
 
+## M10 – School (before v1.0.0)
+
+Built before the release (T-28 waits for M10); the number stays from the "Later" list.
+School children without a new calendar kind or config: subjects stay normal recurring
+events in the events calendar (e.g. `Mia: 🏊 Schwimmen`, weekly; holidays by deleting single
+occurrences, EXDATE already works). Decisions: [ADR-0010](adr/0010-bring-list-from-description.md)
+(bring list from the description, server-side), [ADR-0011](adr/0011-emoji-version-baseline.md)
+(emoji baseline Emoji 13.0 for built-in icons). Merge rules 1–6 of M5b apply to every M10
+task; 🎒 means only "tomorrow bring" (rule 1).
+
+- [ ] **T-33 Bring list: parsing and event DTO** (risk: **high** → Opus, deps: M5b)
+  Goal: a `Mitbringen:` / `Bring:` description line becomes an icon list on `CalendarEvent`,
+  and nothing else of the description reaches the client (ADR-0010).
+  Acceptance:
+  1. Pure `parseBringList(description): string[]` in `packages/shared` (runtime-agnostic),
+     table-driven tests: `Mitbringen: 👟 🩱 🧴`, `bring:`/`BRING :` (case-insensitive,
+     optional space before the colon), leading whitespace and bullets (`-`, `*`, `•`),
+     keyword only at a line start and as a whole word (`Bringdienst:`, `Bitte mitbringen:`
+     and a keyword mid-line do not match), several bring lines merged in order, text and
+     digits between the emoji dropped (`Mitbringen: 👟 Turnschuhe, 🩱` → 👟 🩱), text-only
+     symbols (`©`, `#`, `1`) dropped, ZWJ/skin-tone/flag/keycap/VS16 emoji kept whole,
+     duplicates removed (with and without VS16), more than 8 icons capped at 8, a bring line
+     without emoji → `[]`, empty/absent description → `[]`.
+  2. Google-style formatted descriptions: `<br>`, `<br/>`, `</p>`, `</div>`, `</li>` count as
+     line breaks, `<b>Mitbringen:</b> 👟` matches, `&nbsp;` between keyword and emoji works;
+     HTML-looking content (`<img src=x onerror=…>`, `<script>`) yields only the emoji of the
+     bring line. Input bounded (first 8 KB of the description, first 500 characters of a
+     bring line); a 5 MB description and a line of 100 000 emoji finish fast (test with a
+     time budget) and never throw.
+  3. `CalendarEventSchema` gets optional `bring` (array of `EmojiSchema`, max 8), omitted when
+     empty; an agenda without `bring` (old persisted client data, old worker cache entry)
+     still validates (test); ARCHITECTURE data model and "Title conventions" (new rule 7) and
+     ADR-0005 cross-reference updated.
+  4. `normalize` sets `bring` for events only (meals ignore bring lines); `#countdown` and a
+     bring line in one description both work. ical.js description unescaping (`\n`, `\,`)
+     verified via Context7 and covered by a fixture.
+  5. Synthetic `fixtures/ics/bring.ics` (weekly series with a bring list, a `RECURRENCE-ID`
+     override with a different bring list, an EXDATE, an HTML description, an all-day event
+     with a bring list, a meal with a bring line, a description with a private note marker
+     `TESTONLY-private-note`); worker integration test asserts the bring lists per
+     occurrence and that the marker and the word `Mitbringen` appear in no response body or
+     console output.
+  6. Worker cache: entries normalized before this change are not served as fresh (cache entry
+     version or key bumped), so bring lists appear right after a deploy; last-good fallback
+     to an old entry still works (test).
+
+- [ ] **T-34 Subject fallback icons and emoji baseline** (risk: medium, deps: M5b)
+  Goal: common school subjects get a picture without an emoji in the title; no built-in icon
+  is newer than the baseline (ADR-0011).
+  Acceptance:
+  1. Fallback table extended (DE + EN, whole-word, case-insensitive, umlaut-aware), at
+     least: Kunst/art 🎨, Sport/PE/Sportunterricht 👟, Musik/music 🎵 (existing entry kept),
+     Mathe/Mathematik/math/maths 🔢, Deutsch/German and Englisch/English 📖,
+     Sachkunde/Sachunterricht/science 🔬, Werken/crafts 🔨, Schwimmunterricht 🏊 (existing
+     entry extended); Turnen stays 🤸, Schule stays 🏫; no keyword maps to 🎒 (rule 1).
+  2. Table-driven parser tests for every new keyword in both languages, compound titles
+     (`Mia: Kunst AG` → 🎨), first-match rule with several keywords, no false hit inside
+     words (`Sportplatzfest` does not match `sport`; `Kunststoff` not `kunst`); known
+     ambiguity of `Art` in German documented in the table comment.
+  3. Baseline test per ADR-0011: every emoji in the fallback table, the default icons and the
+     default countdown emoji has emoji version ≤ 13.0 according to `emojibase-data`
+     (devDependency, verified via Context7 and npm metadata); a web test covers the UI emoji
+     constants (rail, states, 🎒, time-of-day icons). 🛝 is replaced by an older glyph in the
+     table, demo data and e2e fixtures; a test with 🪈 in the table data fails (negative case).
+  4. ARCHITECTURE "Title conventions" rule 5 examples and the README title table list the
+     subject icons.
+
+- [ ] **T-35 Bring chips on tiles** (risk: medium, deps: T-33)
+  Goal: an event's bring list is visible as small emoji chips on its tile in the overview
+  and the week.
+  Acceptance:
+  1. `EventTile` shows `bring` as emoji chips (through `<Emoji>`, React text only, no
+     `dangerouslySetInnerHTML`) on every overview and week size; only whole chips that fit
+     the tile width are shown, the rest as a plain-text "+N" (as `stripIconsThatFit`); the
+     tile has one accessible description listing all icons ("Bring along: 👟 🩱", i18n DE +
+     EN), chips themselves decorative.
+  2. Chips fit into the existing tile heights (`TILE_HEIGHT_REM` unchanged), or, if a size
+     must grow, `columnCapacity`/`fitWeekColumn` constants and the density matrix e2e are
+     updated so 1–12 events with bring lists still fit 1280×800 and 2000×1200 without
+     scrolling; property-style sweep in `columnCapacity.test.ts` with bring lists.
+  3. Past tiles and the "vorbei"/"done" strip show no chips; current/next cues (rule 3) and
+     the child tint/badges stay unchanged; chips readable on every child tint and at night
+     (contrast test for the chip surface token if a new token is added).
+  4. An XSS-looking title together with a bring list still renders as text (component test).
+
+- [ ] **T-36 Evening-before 🎒 "tomorrow bring" area** (risk: **high** → Opus, deps: T-33, T-35)
+  Goal: the evening before, the today column shows what to pack for the next day, per
+  child, until the event has started.
+  Acceptance:
+  1. Pure `buildBringReminder(agenda, config, now)` (config zone only, never the device
+     zone): from `bands.eveningStart` until midnight it collects the bring lists of
+     **tomorrow's** events; from midnight until `bands.eveningStart` it collects those of
+     **today's** events that have not started yet (timed: until their start; all-day: until
+     `bands.middayStart`); each event's icons leave the area when its time is over, the area
+     is empty when nothing is left. Unit tests at every boundary (eveningStart − 1 min /
+     exact, midnight, event start − 1 min / exact, middayStart for all-day), DST spring-forward
+     and fall-back evenings, device zone ≠ config zone, multi-day timed event continuing into
+     tomorrow (not counted again), recurring event with an override.
+  2. Grouping: one group per child in config order (child's avatar badge and tint, icons
+     deduplicated per child); events for everyone (`childIds: []`) form one neutral group
+     shown first; an event for several children adds its icons to each named child.
+  3. Placement: inside today's overview column, between the event list and `MealPlates`,
+     led by 🎒; rendered only when non-empty; one row of fixed height (no wrapping), whole
+     icons only plus a plain-text "+N" per overflow (as `stripIconsThatFit`); the event list
+     above shrinks through the existing space-based steps (`useContentHeight`/`fitColumn`,
+     the area is outside the `flex-1 min-h-0` list), so nothing scrolls. Not shown in the
+     other overview columns or the week view.
+  4. A11y and i18n: a labelled region ("Pack for tomorrow" / "Für morgen einpacken", the
+     morning variant "Today bring" / "Heute mitbringen") whose accessible name lists every
+     child and icon, nothing hidden silently (rule 2); not a live region; no touch
+     interaction (no touch target needed), DE + EN.
+  5. Night mode: the area stays visible (useful before night mode ends in the morning),
+     rendered with night tokens and the dimmed `<Emoji>`; contrast of its surface/text pairs
+     tested in both themes. 🎒 is used nowhere else in the UI or built-in tables (rule 1,
+     test).
+  6. Midnight rollover (`useToday`) switches from "tomorrow" to "today" without reload, also
+     offline with persisted data (test with fake timers).
+  7. ARCHITECTURE overview section documents the window, grouping and placement.
+
+- [ ] **T-37 Fixtures, demo data, e2e and screenshots** (risk: medium, deps: T-34, T-36)
+  Acceptance:
+  1. `apps/web/demo/demoData.ts` (relative dates): school subjects with fallback icons and
+     bring lists for Mia 🦊 and Ben 🐻 so tomorrow has bring items; `demoData.test.ts`
+     validates it against the shared schema.
+  2. `e2e/bring.spec.ts` (e2e clock, device zone `America/Los_Angeles`): chips on overview
+     and week tiles; area absent before `eveningStart`, present from it with both children,
+     still present next morning, an event's icons gone once it started; night mode; the
+     description marker never appears in the DOM.
+  3. Density e2e re-run with the area present (3 children with bring lists, 1–12 events in
+     today's column) at 1280×800 and 2000×1200, incl. burn-in corners: no scrolling, no clipped
+     icon, `shown + hidden === n`.
+  4. Screenshots `docs/screenshots/day-bring-evening-*` (light + night) and a week shot with
+     chips at both sizes, generated by the screenshot job.
+
+- [ ] **T-38 School docs** (risk: low, deps: T-37)
+  Acceptance: README + README.de: feature bullet, a "Bring list" section (how to write
+  `Mitbringen: 👟 🩱` / `Bring: 👟 🩱` on its own line in the Google Calendar event
+  description on phone and web, text next to the emoji is allowed but never shown, the rest
+  of the description stays private and is never sent to the tablet, recurring series vs.
+  "only this event", when the 🎒 area appears and disappears), subject fallback icons in
+  the title table, the emoji baseline (Android 11+) in the kiosk tips, the new screenshots;
+  `docs/CONFIG.md` EN + DE: `bands.eveningStart` also starts the 🎒 area, `bands.middayStart`
+  ends it for all-day events; troubleshooting entry "bring icons do not show" (own line,
+  colon, emoji, cache delay up to `KIDBOARD_CACHE_TTL`).
+
+**M10 exit:** milestone review by `reviewer-opus` (privacy of descriptions, parser
+robustness, layout without scrolling), a short T-27a-style UI/UX check of the new surfaces
+(one Sonnet agent, both sizes, light/night, findings fixed via the loop), CI green.
+
 ## M6 – Deploy, docs, v1.0.0
 
 - [x] **T-25 Cloudflare deploy** (risk: **high** → Opus, deps: M5; built before M5b, see change log)
@@ -474,7 +623,7 @@ not address. These rules apply to every M5b task:
   ranking for leftover slots, 🌞 vs ☀️ glanceability, faint emoji on light tints, skeleton → board
   header jump, all states at both sizes light/night with 3 children and 1–12 events.
 
-- [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27a)
+- [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27a, M10; last task before the release)
   Acceptance: full review by `reviewer-opus`; gitleaks over full history clean;
   `pnpm audit --prod` without high/critical; release-please release `v1.0.0` published;
   branch-protection settings documented/applied; `CLAUDE.md` switched to PR workflow;
@@ -483,21 +632,9 @@ not address. These rules apply to every M5b task:
 
 ## M7+ – Later (not in MVP)
 
-* **M10 School** (first milestone after v1.0.0, before M7) – support school children without a
-  new calendar kind or config: school subjects stay normal recurring events in the events
-  calendar (e.g. `Mia: 🏊 Schwimmen`, weekly; holidays by deleting single occurrences, EXDATE
-  already works).
-  1. *Bring list:* a description line `Mitbringen:` / `Bring:` followed by emoji (e.g.
-     `Mitbringen: 👟 🩱 🧴`) is parsed server-side (like `#countdown`) into a list of icons on
-     the event DTO and shown as small emoji chips on the tile (icons only, readable without text).
-  2. *Pack the bag the evening before:* from `bands.eveningStart` the today view shows a 🎒
-     "tomorrow bring" area with all bring-list icons of the next day, grouped per child; it stays
-     visible the next morning until the event starts.
-  3. Fallback icons for more subjects (e.g. art 🎨, PE 👟); avoid emoji newer than the tablet
-     baseline (ADR-0009), e.g. 🪈.
-  4. Later, if wanted: optional school-holiday feed (public iCal per region) that hides events
-     marked `#schule` during holidays; a full timetable as a separate per-child view (all
-     subjects would crowd the board).
+* **M10 School, later** (the rest of M10 after T-33–T-38, if wanted): optional
+  school-holiday feed (public iCal per region) that hides events marked `#schule` during
+  holidays; a full timetable as a separate per-child view (all subjects would crowd the board).
 * **M7 Routines** – routine checklist (e.g. brush teeth, get dressed) with reward stars,
   stored locally on the tablet; optional emoji asset set (ADR-0009).
 * **M8 Parent mode** – PIN-protected settings overlay (refresh, night mode override, locale).
@@ -512,6 +649,7 @@ not address. These rules apply to every M5b task:
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
 | 2026-11-23 | New milestone M10 School (bring list from event description, evening-before 🎒 reminder, later holidays/timetable), scheduled right after v1.0.0 | Maintainer request: school subjects where children must bring something |
+| 2026-11-23 | M10 School items 1–3 planned as a milestone before v1.0.0 (T-33 bring list parsing, T-34 subject icons + emoji baseline, T-35 bring chips, T-36 evening-before 🎒 area, T-37 fixtures/demo/e2e/screenshots, T-38 docs, M10 exit review); ADR-0010 (bring list from the description, server-side) and ADR-0011 (Emoji 13.0 baseline for built-in icons, 🛝 replaced); T-28 now depends on M10 and stays last; holiday feed and timetable stay in "Later" | Maintainer wants the school features in the first release; the release itself is cut later by the maintainer |
 | 2026-11-23 | T-27a outcome: tile size ladder extended with space-based steps (`medium`, dense 2.75rem emoji, `slim` 2rem emoji row tiles; week `week-small`/`week-slim` with 16–18px time-of-day badge on the emoji corner) so "+N" only appears when another tile cannot fit; remaining week polish tracked as issue #5 | UI/UX dummy test loop (4 rounds): showing every event beats a larger emoji on dense days |
 | 2026-11-22 | M5b review: dense overview tiles may use ~3rem emoji (large tiles stay ≥ 3.5rem, T-30b criterion met); English title truncation, week past-event ranking, 🌞/☀️ pair, skeleton header jump become explicit T-27a checks; T-27 docs scope extended (overview, rail, states, `KB-*` codes, CONFIG `bands` wording) | M5b milestone review by reviewer-opus: 3.5rem emoji in a 4rem dense tile tucked under the child edge |
 | 2026-11-22 | release-please switched to manual dispatch; early 1.0.0 release PR closed by the maintainer, who cuts the release himself | The automatic release PR proposed 1.0.0 too early |
