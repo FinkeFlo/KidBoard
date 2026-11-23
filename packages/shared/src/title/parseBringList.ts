@@ -4,9 +4,8 @@ import { isEmojiGrapheme } from "../primitives";
 export const BRING_MAX = 8;
 
 /**
- * Only the first 8 KB of a description are scanned (ADR-0010), counted in UTF-16 code
- * units: 8 192 code units are at most 8 KB of Latin-1 text and bound the work for any
- * input size.
+ * Only the first 8 192 UTF-16 code units of a description are scanned (ADR-0010); this
+ * bounds the work for any input size.
  */
 export const BRING_SCAN_LIMIT = 8 * 1024;
 
@@ -116,15 +115,20 @@ export function parseBringList(description: string | undefined): string[] {
       if (offset + index >= BRING_LINE_LIMIT) {
         break;
       }
-      if (!isEmojiGrapheme(segment)) {
-        continue;
-      }
       const key = segment.replace(VS16, "");
-      if (seen.has(key)) {
+      // A redundant VS16 after an emoji-presentation character (`👟\uFE0F`) is not
+      // matched as one emoji; such a grapheme is kept without it. Text-style symbols
+      // that need VS16 (`☀️`) are kept as typed.
+      const icon = isEmojiGrapheme(segment)
+        ? segment
+        : key !== segment && isEmojiGrapheme(key)
+          ? key
+          : undefined;
+      if (icon === undefined || seen.has(key)) {
         continue;
       }
       seen.add(key);
-      icons.push(segment);
+      icons.push(icon);
       if (icons.length === BRING_MAX) {
         return icons;
       }

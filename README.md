@@ -119,11 +119,16 @@ The title is the only interface: write it, KidBoard turns it into a picture.
 | `All: 🌳 Zoo trip`             | 🌳            | Zoo trip         | everyone | -                     |
 | `🏫 Kita` (Kids)               | 🏫            | Kita             | everyone | -                     |
 | `Dentist`                      | 🦷 (fallback) | Dentist          | everyone | -                     |
+| `Mia: Art club`                | 🎨 (fallback) | Art club         | Mia      | -                     |
 | `Tip: bring a hat`             | 📅 (fallback) | Tip: bring a hat | everyone | -                     |
 | `🎂 Anna's birthday`           | 🎂            | Anna's birthday  | everyone | - (countdown)         |
 | `Lunch: 🍝 Spaghetti` (Meals)  | 🍝            | Spaghetti        | -        | lunch                 |
 | `Dinner: Pizza` (Meals)        | 🍕 (fallback) | Pizza            | -        | dinner                |
 | `🥣 Muesli` (Meals)            | 🥣            | Muesli           | -        | unspecified (all-day) |
+
+School subjects get an icon without an emoji in the title: Art 🎨, PE/Sport 👟, Music 🎵,
+Math 🔢, German/English 📖, Science 🔬, Crafts 🔨, Swimming lessons 🏊 (German names work too,
+e.g. `Kunst`, `Mathe`, `Sachkunde`, `Werken`).
 
 German works the same: `Mittag: 🍝 Spaghetti`, `Mia: Ballett`. Full rules:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#title-conventions-parsing-rules).

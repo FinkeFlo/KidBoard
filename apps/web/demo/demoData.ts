@@ -112,7 +112,7 @@ const WEEK: Slot[][] = [
   [
     { title: "Dentist", icon: "🦷", time: "09:00", childIds: ["ben"] },
     { title: "Music class", icon: "🎻", time: "10:30", childIds: ["mia"] },
-    { title: "Playground", icon: "🛝", time: "16:00" },
+    { title: "Playground", icon: "🎠", time: "16:00" },
     { title: "Story time", icon: "📖", time: "19:00" },
   ],
   [{ title: "Playdate", icon: "🧸", time: "15:00", childIds: ["ben"] }],

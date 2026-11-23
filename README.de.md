@@ -122,11 +122,16 @@ Der Titel ist die einzige Schnittstelle: schreiben, KidBoard macht ein Bild dara
 | `Alle: 🌳 Ausflug`             | 🌳            | Ausflug               | alle     | -                      |
 | `🏫 Kita` (Kinder)             | 🏫            | Kita                  | alle     | -                      |
 | `Zahnarzt`                     | 🦷 (Fallback) | Zahnarzt              | alle     | -                      |
+| `Mia: Kunst AG`                | 🎨 (Fallback) | Kunst AG              | Mia      | -                      |
 | `Tipp: Mütze mitnehmen`        | 📅 (Fallback) | Tipp: Mütze mitnehmen | alle     | -                      |
 | `🎂 Annas Geburtstag`          | 🎂            | Annas Geburtstag      | alle     | - (Countdown)          |
 | `Mittag: 🍝 Spaghetti` (Essen) | 🍝            | Spaghetti             | -        | Mittag                 |
 | `Dinner: Pizza` (Essen)        | 🍕 (Fallback) | Pizza                 | -        | Abendessen             |
 | `🥣 Müsli` (Essen)             | 🥣            | Müsli                 | -        | unbestimmt (ganztägig) |
+
+Schulfächer bekommen ohne Emoji im Titel ein Bild: Kunst 🎨, Sport 👟, Musik 🎵, Mathe 🔢,
+Deutsch/Englisch 📖, Sachkunde 🔬, Werken 🔨, Schwimmunterricht 🏊 (englische Namen
+funktionieren auch).
 
 Alle Regeln (englisch): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#title-conventions-parsing-rules).
 

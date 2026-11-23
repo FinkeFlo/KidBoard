@@ -103,6 +103,15 @@ describe("parseBringList – keyword and line rules (AC 1)", () => {
     expect(parseBringList("Bring: 👋🏽 👋🏻")).toEqual(["👋🏽", "👋🏻"]);
   });
 
+  it("keeps emoji with a redundant VS16 and deduplicates them", () => {
+    expect(parseBringList("Bring: 👟\uFE0F")).toEqual(["👟"]);
+    expect(parseBringList("Bring: 👟\uFE0F 🩱\uFE0F")).toEqual(["👟", "🩱"]);
+    expect(parseBringList("Bring: 👟\uFE0F 👟 🧴")).toEqual(["👟", "🧴"]);
+    expect(parseBringList("Bring: 👟 👟\uFE0F")).toEqual(["👟"]);
+    // A lone VS16 or one after text is still not an emoji.
+    expect(parseBringList("Bring: a\uFE0F \uFE0F")).toEqual([]);
+  });
+
   it(`caps at ${String(BRING_MAX)} icons, across lines too`, () => {
     const ten = "👟 🩱 🧴 🎨 🧦 🍎 🥤 📚 🖍️ 🧢";
     expect(parseBringList(`Bring: ${ten}`)).toEqual([

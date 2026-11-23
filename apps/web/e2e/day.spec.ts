@@ -15,7 +15,7 @@ const EVENTS: MockEvent[] = [
   { title: "Music class", icon: "🎻", time: "10:00", childIds: ["ben", "mia"] },
   { title: "Lunch with Grandma", icon: "👵", time: "11:30" },
   { title: "Football", icon: "⚽", time: "12:00", childIds: ["ben"] },
-  { title: "Playground", icon: "🛝", time: "15:00" },
+  { title: "Playground", icon: "🎠", time: "15:00" },
   { title: "Bath time", icon: "🛁", time: "18:00" },
   { title: "Story time", icon: "📖", time: "19:00" },
   { title: "Library", icon: "📚", time: "15:30", day: 1, childIds: ["mia"] },

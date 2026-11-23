@@ -7,6 +7,10 @@ interface FallbackEntry {
   readonly keywords: readonly string[];
 }
 
+/**
+ * Every emoji here, the defaults and the UI emoji must be Emoji <= 13.0 (ADR-0011).
+ * No keyword maps to 🎒: that icon is reserved for the bring area (ADR-0010, rule 1).
+ */
 export const FALLBACK_ICON_TABLE: readonly FallbackEntry[] = [
   {
     icon: "🏫",
@@ -39,10 +43,27 @@ export const FALLBACK_ICON_TABLE: readonly FallbackEntry[] = [
     keywords: ["friseur", "haarschnitt", "haircut", "hairdresser"],
   },
   { icon: "⚽", keywords: ["fußball", "fussball", "football", "soccer"] },
-  { icon: "🏊", keywords: ["schwimmen", "schwimmbad", "swimming", "pool"] },
+  {
+    icon: "🏊",
+    keywords: [
+      "schwimmen",
+      "schwimmbad",
+      "schwimmunterricht",
+      "swimming",
+      "pool",
+    ],
+  },
   { icon: "🩰", keywords: ["ballett", "ballet"] },
   { icon: "🎹", keywords: ["klavier", "piano"] },
   { icon: "🎸", keywords: ["gitarre", "guitar"] },
+  // School subjects (T-34). `art` is also a common German word ("Art", kind/sort):
+  // a title such as "Art der Feier" gets 🎨. Parents can set an emoji in the title.
+  { icon: "🎨", keywords: ["kunst", "art"] },
+  { icon: "👟", keywords: ["sport", "sportunterricht", "pe"] },
+  { icon: "🔢", keywords: ["mathe", "mathematik", "math", "maths"] },
+  { icon: "📖", keywords: ["deutsch", "englisch", "german", "english"] },
+  { icon: "🔬", keywords: ["sachkunde", "sachunterricht", "science"] },
+  { icon: "🔨", keywords: ["werken", "crafts"] },
   { icon: "🎵", keywords: ["musik", "music", "chor", "choir"] },
   { icon: "🤸", keywords: ["turnen", "gymnastics"] },
   { icon: "💃", keywords: ["tanzen", "tanz", "dance"] },
@@ -51,7 +72,7 @@ export const FALLBACK_ICON_TABLE: readonly FallbackEntry[] = [
   { icon: "🎾", keywords: ["tennis"] },
   { icon: "🐴", keywords: ["reiten", "riding"] },
   { icon: "🎬", keywords: ["kino", "cinema", "movie"] },
-  { icon: "🛝", keywords: ["spielplatz", "playground"] },
+  { icon: "🎠", keywords: ["spielplatz", "playground"] },
   { icon: "🦁", keywords: ["zoo"] },
   { icon: "🛁", keywords: ["baden", "bad", "bath"] },
   {

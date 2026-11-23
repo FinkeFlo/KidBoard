@@ -146,7 +146,10 @@ Order of operations on the raw `SUMMARY`:
    sequences like 👨‍👩‍👧, skin tones like 👋🏽, flags, keycaps), becomes `icon`.
    Detection uses `emoji-regex` on the first `Intl.Segmenter` grapheme.
 5. **Fallback icon** – if no emoji: keyword table (DE + EN, e.g. "Kita"→🏫,
-   "Geburtstag"/"birthday"→🎂, "Arzt"/"doctor"→🩺), else 📅 for events and 🍽️ for meals.
+   "Geburtstag"/"birthday"→🎂, "Arzt"/"doctor"→🩺; school subjects: Kunst/art→🎨,
+   Sport/PE→👟, Musik/music→🎵, Mathe/math→🔢, Deutsch/Englisch→📖, Sachkunde/science→🔬,
+   Werken/crafts→🔨, Schwimmunterricht→🏊; never 🎒, which is reserved for the bring area;
+   every built-in emoji is Emoji ≤ 13.0, ADR-0011), else 📅 for events and 🍽️ for meals.
 6. **Countdown flag** – `true` if the icon is in `config.countdown.emojis`
    (default 🎂 🎉 🎁 🎄 🐣 ✈️ 🏖️) or the event description contains `#countdown`.
 7. **Bring list** (events only, ADR-0010) – `parseBringList(description)` in

@@ -212,7 +212,8 @@ describe("fallback icons (rule 5)", () => {
     ["Flug nach Rom", "✈️"],
     ["Weihnachten", "🎄"],
     ["Easter brunch", "🐣"],
-    ["Spielplatz", "🛝"],
+    ["Spielplatz", "🎠"],
+    ["Playground", "🎠"],
     ["Zoo", "🦁"],
     ["Hausaufgaben", "📚"],
     ["Pizza", "🍕"],
@@ -330,5 +331,88 @@ describe("empty and hostile input", () => {
       title: "<b onclick=x>Party</b>",
       icon: "🎉",
     });
+  });
+});
+
+describe("school subject fallback icons (T-34)", () => {
+  // `Art` is also a German word ("Art der Feier"); it maps to 🎨 in both languages.
+  it.each([
+    ["Kunst", "🎨"],
+    ["kunst", "🎨"],
+    ["Art", "🎨"],
+    ["Sport", "👟"],
+    ["Sportunterricht", "👟"],
+    ["PE", "👟"],
+    ["pe", "👟"],
+    ["Musik", "🎵"],
+    ["Music", "🎵"],
+    ["Mathe", "🔢"],
+    ["Mathematik", "🔢"],
+    ["Math", "🔢"],
+    ["Maths", "🔢"],
+    ["Deutsch", "📖"],
+    ["German", "📖"],
+    ["Englisch", "📖"],
+    ["English", "📖"],
+    ["Sachkunde", "🔬"],
+    ["Sachunterricht", "🔬"],
+    ["Science", "🔬"],
+    ["Werken", "🔨"],
+    ["Crafts", "🔨"],
+    ["Schwimmunterricht", "🏊"],
+    ["Schwimmen", "🏊"],
+    ["Turnen", "🤸"],
+    ["Schule", "🏫"],
+  ])("%s -> %s", (raw, icon) => {
+    expect(findFallbackIcon(raw)).toBe(icon);
+    expect(parse(raw)).toMatchObject({ icon, iconIsFallback: true });
+  });
+
+  it("works in compound titles and with a child prefix", () => {
+    expect(parse("Mia: Kunst AG")).toMatchObject({
+      icon: "🎨",
+      childIds: ["mia"],
+      iconIsFallback: true,
+    });
+    expect(findFallbackIcon("Ben: Mathe-Nachhilfe")).toBe("🔢");
+    expect(findFallbackIcon("Sport (Halle 2)")).toBe("👟");
+    expect(findFallbackIcon("Englisch, 3. Stunde")).toBe("📖");
+  });
+
+  it("earliest keyword wins with several subjects", () => {
+    expect(findFallbackIcon("Kunst und Sport")).toBe("🎨");
+    expect(findFallbackIcon("Sport und Kunst")).toBe("👟");
+    expect(findFallbackIcon("Mathe, Deutsch, Englisch")).toBe("🔢");
+    expect(findFallbackIcon("Schule: Werken")).toBe("🏫");
+  });
+
+  it.each([
+    "Sportplatzfest",
+    "Kunststoff",
+    "Kunstwerk",
+    "Mathematiker",
+    "Artikel",
+    "Party",
+    "Sportler",
+    "Werkstatt",
+    "Englischunterricht",
+    "Peter",
+  ])("no false hit inside the word %s", (raw) => {
+    expect(findFallbackIcon(raw)).not.toBe("🎨");
+    expect(findFallbackIcon(raw)).not.toBe("👟");
+    expect(findFallbackIcon(raw)).not.toBe("🔢");
+    expect(findFallbackIcon(raw)).not.toBe("📖");
+    expect(findFallbackIcon(raw)).not.toBe("🔨");
+  });
+
+  it("an explicit leading emoji beats the subject keyword", () => {
+    expect(parse("🧸 Kunst")).toMatchObject({
+      icon: "🧸",
+      iconIsFallback: false,
+    });
+  });
+
+  it("no keyword maps to the bring bag 🎒", () => {
+    expect(findFallbackIcon("Rucksack Schule Sport Kunst")).not.toBe("🎒");
   });
 });

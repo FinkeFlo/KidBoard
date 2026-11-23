@@ -486,7 +486,7 @@ task; 🎒 means only "tomorrow bring" (rule 1).
      version or key bumped), so bring lists appear right after a deploy; last-good fallback
      to an old entry still works (test).
 
-- [ ] **T-34 Subject fallback icons and emoji baseline** (risk: medium, deps: M5b)
+- [x] **T-34 Subject fallback icons and emoji baseline** (risk: medium, deps: M5b)
   Goal: common school subjects get a picture without an emoji in the title; no built-in icon
   is newer than the baseline (ADR-0011).
   Acceptance:

@@ -73,3 +73,5 @@ convention is ours, the emoji detection reuses the existing helpers). Rules:
   version 1 (written before `bring` existed) are never served as fresh, so bring lists
   appear on the first request after a deploy; they stay valid as last-good under the same
   key until the next successful refresh overwrites them.
+* Rollback: after a rollback to a worker that only knows version 1, version 2 cache
+  entries fail validation there and act as a cache miss until they are rewritten.

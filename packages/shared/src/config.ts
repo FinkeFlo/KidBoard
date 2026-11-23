@@ -56,7 +56,15 @@ const NightModeSchema = z
   })
   .refine((n) => n.start !== n.end, { message: "start and end must differ" });
 
-const DEFAULT_COUNTDOWN_EMOJIS = ["🎂", "🎉", "🎁", "🎄", "🐣", "✈️", "🏖️"];
+export const DEFAULT_COUNTDOWN_EMOJIS = [
+  "🎂",
+  "🎉",
+  "🎁",
+  "🎄",
+  "🐣",
+  "✈️",
+  "🏖️",
+];
 
 const CountdownSchema = z.strictObject({
   emojis: z.array(EmojiSchema).default(DEFAULT_COUNTDOWN_EMOJIS),
