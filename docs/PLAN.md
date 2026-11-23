@@ -772,7 +772,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
   3. ~~User docs~~ deferred by the maintainer until the editor is final (README/DEPLOY/CONFIG
      sections for the editor, PIN, D1, backup and phone feed follow in a later task).
 
-- [ ] **T-46b Lean deploy form: Google calendars optional** (risk: **high** → Opus, deps: T-46, M11 click-test round 1)
+- [x] **T-46b Lean deploy form: Google calendars optional** (risk: **high** → Opus, deps: T-46, M11 click-test round 1)
   Acceptance:
   1. `KIDBOARD_CONFIG` may list no calendars (`calendars` defaults to `[]`); the board then
      shows only the app sources (ADR-0014). With no calendars and the editor off the worker
