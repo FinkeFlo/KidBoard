@@ -15,9 +15,9 @@ operation, works offline with the last known state.
 
 ## Non-goals (MVP)
 
-* Google OAuth consent flows and tokens on the tablet (editing goes through a service
-  account on the worker, M11 / ADR-0012).
-* Accounts, databases, multi-family hosting.
+* Writing to Google Calendar and Google OAuth (app entries are stored by KidBoard itself,
+  M11 / ADR-0014; an optional Google sync is a later idea, ADR-0012).
+* Accounts, multi-family hosting. (The family's own D1 database stores app entries, M11.)
 * Copying anything from third-party products (texts, graphics, names, layouts).
 * Routines, weather (→ M7+). (Parent PIN for the editor: M11 / ADR-0013.)
 * Portrait layout and phones (should not break, but not designed for).
@@ -594,12 +594,14 @@ robustness, layout without scrolling), a short T-27a-style UI/UX check of the ne
 
 Parents add and change entries on the tablet (or a phone) instead of typing title
 conventions in Google Calendar: pick the child, the activity icon, once or weekly, done.
-Decisions: [ADR-0012](adr/0012-write-via-google-calendar-api.md) (Google Calendar API via a
-service account, reading stays on iCal, editor writes the existing conventions) and
-[ADR-0013](adr/0013-parent-lock.md) (parent PIN, short sessions, lockout, hidden entry).
-M11 touches no M10 file except the nav rail and i18n files and may be worked in parallel to
-T-36–T-38 (rebase often). Merge rules 1–6 of M5b apply. The editor is a parent surface:
-touch targets ≥ 48 px (≥ 64 px for the hold-to-open entry and the PIN pad), WCAG AA, DE + EN.
+Decisions: [ADR-0014](adr/0014-app-entries-in-d1.md) (app entries stored by KidBoard in
+the family's own Cloudflare D1, merged with the Google feeds through the existing iCal
+pipeline, no Google setup), [ADR-0013](adr/0013-parent-lock.md) (parent PIN, short
+sessions, lockout, hidden entry) and [ADR-0012](adr/0012-write-via-google-calendar-api.md)
+(deferred: optional Google sync via a service account, later). M11 touches no M10 file
+except the nav rail and i18n files and may be worked in parallel to T-36–T-38 (rebase
+often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch targets ≥ 48 px
+(≥ 64 px for the hold-to-open entry and the PIN pad), WCAG AA, DE + EN.
 
 - [ ] **T-39 Editor model: compose and parse entries** (risk: **high** → Opus, deps: T-33)
   Goal: one pure, runtime-agnostic description of an editor entry in `packages/shared` and
@@ -634,119 +636,138 @@ touch targets ≥ 48 px (≥ 64 px for the hold-to-open entry and the PIN pad), 
      through `parseBringList`, times in the config zone, never the device zone); tests for
      timed, all-day, multi-day, series master, instance, meal.
   6. `pickTargetCalendar(entry, writableSources, config)` implements the ADR-0012 rule;
-     table tests. ARCHITECTURE gets an "Editor" section (model, conventions, target rule).
+     table tests. (Criteria 5–6 prepare the optional Google sync of ADR-0012.) ARCHITECTURE gets an "Editor" section (model, conventions, target rule).
 
-- [ ] **T-40 Worker: Google service account client** (risk: **high** → Opus, deps: T-39)
-  Goal: the worker can call the Calendar API for shared calendars without leaking secrets.
+- [ ] **T-40 Worker: entry store in D1** (risk: **high** → Opus, deps: T-39)
+  Goal: app entries are stored durably in the family's own deployment, with no setup step.
   Acceptance:
-  1. `jose` added to the worker (version and Workers support verified via Context7 or the
-     installed sources); `GOOGLE_SERVICE_ACCOUNT_KEY` parsed with zod (bad JSON, missing
-     fields, template value → editor off with one logged warning naming the variable, never
-     its content); access token via JWT bearer grant, cached per isolate until 60 s before
-     expiry, concurrent callers share one token request (tests with a fake token endpoint
-     and a generated test key pair, never a committed real-looking key).
-  2. Google calendar id per source: `CAL_<ID>_GOOGLE_ID` or derived from the secret iCal
-     address (URL-decoded path segment of `calendar.google.com/calendar/ical/<id>/private-…`;
-     anything else → not writable); tests incl. `%40`, `#` ids, non-Google feeds.
-  3. Small typed client (`listInstances(from, to)`, `getEvent`, `insert`, `patch`,
-     `remove`) with timeout (10 s), response size limit, `fetch` only; Google errors mapped
-     to `not_shared` (403/404 on the calendar), `not_found`, `conflict` (412), `rate_limited`
-     (429/403 rate reasons), `upstream` – never forwarding Google's message text, the
-     calendar id or the token to the client or logs (test asserts absence in bodies and
-     console output).
-  4. `/api/config` gains `editor: boolean` (true only with a valid key, a valid PIN per
-     ADR-0013 and at least one writable source); old clients ignore it; shared
-     `PublicConfigSchema` updated with a default `false`.
-  5. `.dev.vars.example`, `env.ts` typed; CONFIG docs follow in T-45.
+  1. `KIDBOARD_DATA` D1 binding without an id in `wrangler.jsonc` (auto-provisioning and
+     vitest/`wrangler dev` local database verified via Context7 or installed sources);
+     `env.ts` typed; the worker creates its tables on first use (`CREATE TABLE IF NOT
+     EXISTS`, schema version row), idempotent and safe under concurrent first requests.
+  2. Small repository module: `list(from?, to?)`, `get(id)`, `create(input)`,
+     `update(id, revision, input)` (revision mismatch → `conflict`), `remove(id, revision)`,
+     `addException(id, date)` / `setOverride(id, date, input)` for "only this day",
+     `exportAll()` / `importAll(doc, mode)`; every input validated with the T-39 schemas;
+     limits 1 000 entries, 8 KB per entry (→ `limit_reached`); prepared statements only.
+  3. `/api/config` gains `editor: boolean` (true only with `KIDBOARD_DATA` bound and a valid
+     PIN per ADR-0013); shared `PublicConfigSchema` defaults it to `false`; old clients
+     ignore it.
+  4. Tests with the local D1 of the vitest plugin: CRUD, revision conflicts, exceptions and
+     overrides, limits, export → import round trip, table creation from an empty database,
+     binding absent → editor off and `/api/agenda` unchanged.
 
-- [ ] **T-41 Worker: parent lock** (risk: **high** → Opus, deps: T-40)
+- [ ] **T-41 Worker: app entries on the board** (risk: **high** → Opus, deps: T-40)
+  Goal: entries from the app appear on the board exactly like Google events.
+  Acceptance:
+  1. Entries rendered as an in-memory iCalendar with ical.js (`composeTitle`,
+     `composeDescription`, `buildRecurrence`, `TZID` = config zone; EXDATE for removed
+     days, `RECURRENCE-ID` components for "only this day" overrides) and passed through the
+     existing `expandCalendar`/`normalize` path as two virtual sources `app-events`
+     (kind events) and `app-meals` (kind meals); ids stable per entry and occurrence.
+  2. The virtual sources appear in `AgendaResponse.sources` only when the editor is on;
+     their cache entry is dropped after every write (memory + KV/Cache API) so the next
+     `/api/agenda` reflects the change; D1 unavailable → their status `stale` (last good)
+     or `error`, the Google sources unaffected.
+  3. Integration tests: once, weekly, every 2 weeks, until, all-day, multi-day, meal,
+     bring list, countdown, override and exception, a DST week in `Europe/Berlin`, device
+     zone ≠ config zone; an entry's title text with HTML-looking content comes out as plain
+     text; the round trip entry → agenda event keeps children, icon, title, slot, bring.
+
+- [ ] **T-42 Worker: parent lock** (risk: **high** → Opus, deps: T-40)
   Acceptance: ADR-0013 implemented and tested: PIN validation (6–12 digits, template →
-  off); `POST /api/parent/unlock` constant-time compare, session token format and 15 min
-  expiry (fake clock), wrong/expired/tampered/other-PIN tokens → 401 `parent_locked`;
-  lockout after 5 failures in 15 min → 429 + `Retry-After`, reset after the window, success
-  does not write KV; works with KV, Cache API fallback and memory; access token still
+  off); server secret generated once in D1; `POST /api/parent/unlock` constant-time
+  compare, session token format and 15 min expiry (fake clock), wrong/expired/tampered/
+  other-PIN tokens → 401 `parent_locked`; lockout after 5 failures in 15 min → 429 +
+  `Retry-After`, reset after the window, success writes nothing; access token still
   required in front of it; CORS adds `POST, PATCH, DELETE`, `Content-Type` and
-  `X-KidBoard-Parent` for allowed origins only; request bodies limited to 8 KB and parsed
-  with zod; editor off → all `/api/parent/*` 404.
+  `X-KidBoard-Parent` for allowed origins only; request bodies limited to 16 KB and parsed
+  with zod; editor off → all `/api/parent/*` 404; `.dev.vars.example` and the deploy-button
+  variables list `KIDBOARD_PARENT_PIN`.
 
-- [ ] **T-42 Worker: editor API** (risk: **high** → Opus, deps: T-41)
+- [ ] **T-43 Worker: editor API** (risk: **high** → Opus, deps: T-41, T-42)
   Acceptance:
   1. `GET /api/parent/entries?from&days` (≤ 31 days, same window rules as `/api/agenda`)
-     → `EditorEntry[]` of all writable sources (instances, series info, `repeatEditable`)
-     plus per-source status (`ok`/`not_shared`/`error`); `GET /api/parent/templates` → up to
-     12 frequent entries (same icon + title + children, last 8 weeks + next 4) for one-tap
-     reuse, most frequent first.
-  2. `POST /api/parent/entries` (create), `PATCH /api/parent/entries/:id?scope=one|series`,
-     `DELETE /api/parent/entries/:id?scope=one|series`; series patch keeps EXDATEs and the
-     untouched description; `scope=one` on an instance edits/deletes only that day;
-     entries of sources that are not writable → 404; `If-Match`/etag from the listing used
-     so a concurrent edit in Google returns 409 `conflict`.
-  3. After every successful write the affected source's cached agenda entry is dropped
-     (memory + KV/Cache API) and the response says `boardRefresh: "soon"`; test: the next
-     `/api/agenda` refetches the feed.
-  4. Fake Google server in tests covering create/edit/delete for once, weekly, interval 2,
-     until, all-day, multi-day, meal, instance vs series, not shared, conflict, rate limit;
-     responses never contain descriptions other than the bring list (privacy, ADR-0010).
+     → app entries (editable, with revision, series info) and Google occurrences (read-only,
+     `origin: "google"`, title/icon/children/time only, never descriptions beyond the
+     bring list), sorted by start.
+  2. `POST /api/parent/entries`, `PATCH /api/parent/entries/:id?scope=one|series&date=`,
+     `DELETE /api/parent/entries/:id?scope=one|series&date=`; `scope=one` on a series
+     writes an exception or override for that date only; series edits keep exceptions
+     whose dates still exist; revision mismatch → 409 `conflict`; response
+     `{ entry, boardRefresh: "now" }`.
+  3. `GET /api/parent/templates` → up to 12 suggestions from app and Google entries of
+     the last 8 weeks and next 4 (same icon + title + children), most frequent first.
+  4. `GET /api/parent/export` (JSON download) and `POST /api/parent/import`
+     (`merge`|`replace`, validated, size-limited).
+  5. Tests for every route incl. auth (no session → 401), validation errors with field
+     codes for the UI, conflict, limits, and that responses never contain Google
+     descriptions or secrets.
 
-- [ ] **T-43 Web: parent gate** (risk: medium, deps: T-41)
+- [ ] **T-44 Web: parent gate** (risk: medium, deps: T-42)
   Acceptance: ✏️ entry in the nav rail only when `config.editor` is true, opens after a
   2 s press and hold (≥ 64 px target, progress ring, `prefers-reduced-motion` respected,
   keyboard: Enter held 2 s), short taps do nothing visible; PIN pad (≥ 64 px keys, digits
-  masked, error shake without motion when reduced, lockout message with minutes left);
+  masked, error feedback without motion when reduced, lockout message with minutes left);
   session in memory only; auto-lock after 3 min idle, on `visibilitychange` hidden and on
   "Done"; board auto-return paused while open; i18n DE + EN; component tests and an e2e
   with the mock API (unlock, wrong PIN, lockout, auto-lock).
 
-- [ ] **T-44 Web: editor screens** (risk: **high** → Opus, deps: T-42, T-43)
+- [ ] **T-45 Web: editor screens** (risk: **high** → Opus, deps: T-43, T-44)
   Goal: adding a weekly swimming lesson for one child takes under 20 seconds and no typing
   except the optional name.
   Acceptance:
   1. **List:** next 14 days grouped by day (today first), each entry as the child sees it
-     (reusing `EventTile` look), meals per slot, 🔁 marker for series; tap → edit sheet;
-     per-source warnings (`not_shared`: "Share calendar X with the service account").
+     (reusing the `EventTile` look), meals per slot, 🔁 marker for series, Google entries
+     marked "from Google Calendar – change it there" with a "use as template" action.
   2. **New entry flow** (one screen, large controls): *who* (child avatars, multi-select,
      "Alle"), *what* (activity catalogue of ≥ 40 icons in 6 groups – sport, school/kita,
      friends & play, appointments, outings, celebrations – each with a DE/EN label that
-     pre-fills the title; plus "your own emoji" input validated by `EmojiSchema`; all
-     built-in icons within the ADR-0011 baseline, test), *when* (today/tomorrow/date
-     chips, time wheel or all-day, duration presets), *repeat* (once / weekly with weekday
-     chips preset to the chosen date's weekday, every 1 or 2 weeks, optional end date or
-     "until the summer holidays" free date), *bring* (≈ 16 common items as toggle chips +
-     own emoji), *countdown* toggle ("count the sleeps"), and a **live preview** tile.
-  3. **Templates:** a "Again" row with the templates from T-42 and built-in quick picks
+     pre-fills the title; plus "your own emoji" validated by `EmojiSchema`; all built-in
+     icons within the ADR-0011 baseline, test), *when* (today/tomorrow/date chips, time or
+     all-day, duration presets), *repeat* (once / weekly with weekday chips preset to the
+     chosen date's weekday, every 1 or 2 weeks, optional end date), *bring* (≈ 16 common
+     items as toggle chips + own emoji), *countdown* toggle ("count the sleeps"), and a
+     **live preview** tile.
+  3. **Templates:** an "Again" row with the T-43 suggestions and built-in quick picks
      (e.g. 🏊 Swimming weekly, 🎂 Birthday with countdown, 🦷 Dentist) that pre-fill the form.
   4. **Meals:** "What's for dinner?" mode: day + slot chips, dish catalogue (≈ 24 dishes
-     with icons), own emoji/text; "repeat last week's meals" copies the 7 meals of the
-     previous week to this week in one confirmed step.
+     with icons), own emoji/text; "repeat last week's meals" copies the previous week's
+     app meals to this week in one confirmed step.
   5. **Edit/delete:** same form pre-filled; for series a clear choice "only on <date>" /
-     "every week" (and "repeat can only be changed in Google Calendar" when
-     `repeatEditable` is false); delete asks once with an undo-free confirmation naming the
-     entry; after saving a calm toast "Saved – the board updates within a few minutes" and
-     the agenda query is invalidated.
-  6. Demo build (`pnpm dev:demo`) runs the editor against an in-memory fake API (PIN
-     `123456` shown in the demo only), so the UI/UX test needs no Google account.
-  7. Errors (offline, `not_shared`, `conflict`, `rate_limited`, `parent_locked`) as calm
-     messages with the `KB-*` code style; nothing lost on a failed save (form kept).
-  8. Component tests for every control, a11y (labels, roles, focus order, AA contrast in
-     light and night), XSS-looking titles render as text.
+     "every week"; delete asks once, naming the entry; after saving a calm toast and the
+     agenda query is refetched so the board shows the change at once.
+  6. **Backup:** export (download JSON) and import (merge/replace with confirmation) in a
+     small "Data" section.
+  7. Demo build (`pnpm dev:demo`) runs the editor against an in-memory fake API (PIN
+     `123456` shown in the demo only), so the UI/UX test needs no deployment.
+  8. Errors (offline, `conflict`, `limit_reached`, `parent_locked`, validation) as calm
+     messages in the `KB-*` style; nothing lost on a failed save (form kept). Component
+     tests for every control, a11y (labels, roles, focus order, AA contrast in light and
+     night), XSS-looking titles render as text.
 
-- [ ] **T-45 Editor e2e, screenshots and docs** (risk: medium, deps: T-44)
-  Acceptance: Playwright e2e at 1280×800 and 2000×1200 against the mock API (create once,
-  create weekly, edit one vs series, delete, meal, template, lockout, auto-lock, offline);
-  screenshots `docs/screenshots/editor-*` (light/night); README + README.de "Edit on the
-  tablet" section; `docs/DEPLOY.md` + `DEPLOY.de.md` step-by-step Google Cloud setup
-  (project, Calendar API, service account, JSON key, sharing each calendar with "Make
-  changes to events", `GOOGLE_SERVICE_ACCOUNT_KEY`, `KIDBOARD_PARENT_PIN`, optional
-  `CAL_<ID>_GOOGLE_ID`, Workspace restrictions, how to revoke); CONFIG EN + DE;
-  troubleshooting for `not_shared`, lockout, "board shows the change only later".
+- [ ] **T-46 Phone feed, e2e, screenshots and docs** (risk: medium, deps: T-45)
+  Acceptance:
+  1. Optional secret feed of the app entries: `GET /api/feed/<KIDBOARD_FEED_TOKEN>.ics`
+     (only when that secret is set, ≥ 32 chars, constant-time compare, no access token
+     needed so calendar apps can subscribe, `Cache-Control: no-store`), same iCalendar as
+     T-41; the parent area shows the subscribe link with a copy button; tests.
+  2. Playwright e2e at 1280×800 and 2000×1200 against the mock API (create once, create
+     weekly, edit one vs series, delete, meal, template, export/import, lockout,
+     auto-lock, offline); screenshots `docs/screenshots/editor-*` (light/night).
+  3. README + README.de "Edit on the tablet" section (what is stored where, Google entries
+     stay read-only, backup, phone feed); `docs/DEPLOY.md` + `DEPLOY.de.md`: PIN in the
+     deploy form, D1 provisioned automatically, Time Travel restore, changing the PIN;
+     CONFIG EN + DE; troubleshooting (lockout, editor button missing, conflict).
 
-**M11 exit:** milestone review by `reviewer-opus` (secrets, write auth, lockout, privacy of
-descriptions, conventions round-trip), a T-27a-style UI/UX click test of the editor by three
-agents (Haiku, Sonnet, Opus) at both sizes, light/night, fixed via the builder/reviewer loop
-and re-checked by Sonnet until no blocking findings; CI green.
+**M11 exit:** milestone review by `reviewer-opus` (write auth, lockout, D1 data integrity,
+privacy, conventions round trip, board parity of app entries), a T-27a-style UI/UX click
+test of the editor by three agents (Haiku, Sonnet, Opus) at both sizes, light/night, fixed
+via the builder/reviewer loop and re-checked by Sonnet until no blocking findings; CI green.
 
-**M12 idea (not planned yet):** click-through setup wizard (children, colours, avatars,
-calendars) stored in KV instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
+**Later (M12 ideas, not planned yet):** optional Google sync of app entries via a service
+account (ADR-0012); click-through setup wizard (children, colours, avatars, calendars)
+stored in D1 instead of the `KIDBOARD_CONFIG` JSON, behind the same parent lock.
 
 ## M6 – Deploy, docs, v1.0.0
 
@@ -807,6 +828,7 @@ calendars) stored in KV instead of the `KIDBOARD_CONFIG` JSON, behind the same p
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-23 | M11 reworked after the maintainer's storage decision: app entries stored by KidBoard in the family's D1 (ADR-0014) instead of writing to Google; tasks now T-39–T-46 (entry store, board merge, parent lock, editor API, gate, screens, phone feed/docs); ADR-0012 deferred to an optional later Google sync | Per-family Google Cloud setup judged too complicated; central Google sign-in needs verification and a central service |
 | 2026-11-23 | New milestone M11 Parent editor (T-39–T-45, exit review + UI/UX click test) before v1.0.0; ADR-0012 (write via Google Calendar API with a service account, reading stays on iCal) and ADR-0013 (parent PIN, sessions, lockout); non-goals updated; T-28 also depends on M11; M12 setup wizard noted as an idea | Maintainer wants to maintain entries in the app (child, activity, once/weekly) instead of typing title conventions in Google Calendar |
 | 2026-11-23 | New milestone M10 School (bring list from event description, evening-before 🎒 reminder, later holidays/timetable), scheduled right after v1.0.0 | Maintainer request: school subjects where children must bring something |
 | 2026-11-23 | M10 School items 1–3 planned as a milestone before v1.0.0 (T-33 bring list parsing, T-34 subject icons + emoji baseline, T-35 bring chips, T-36 evening-before 🎒 area, T-37 fixtures/demo/e2e/screenshots, T-38 docs, M10 exit review); ADR-0010 (bring list from the description, server-side) and ADR-0011 (Emoji 13.0 baseline for built-in icons, 🛝 replaced); T-28 now depends on M10 and stays last; holiday feed and timetable stay in "Later" | Maintainer wants the school features in the first release; the release itself is cut later by the maintainer |

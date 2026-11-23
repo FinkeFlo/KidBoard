@@ -4,10 +4,10 @@
 - Date: 2026-11-23
 
 ## Context
-The editor (ADR-0012) runs on the same wall tablet the children use. Children aged 3–8
+The editor (ADR-0014) runs on the same wall tablet the children use. Children aged 3–8
 must not reach it by accident, and someone who only has the board's access token (it is in
 the tablet's storage and in the `/?key=` link) must not be able to change the family's
-calendars. There are no user accounts and no database (ADR-0002).
+calendars. There are no user accounts (ADR-0002).
 
 ## Options
 1. **Parent PIN checked by the worker**, exchanged for a short-lived signed session token.
@@ -25,16 +25,16 @@ Option 1.
 * **Unlock:** `POST /api/parent/unlock` with `{ pin }` (plus the normal access token, if
   one is set). Compared in constant time (same helper as the access token). Success →
   `{ token, expiresAt }`, a session token `v1.<expiryEpochSeconds>.<base64url HMAC-SHA-256>`
-  signed with a key derived from the PIN and the service account key id, valid 15 minutes.
-  Changing the PIN or the key invalidates all sessions. No server-side session store.
+  signed with a key derived from the PIN and a random 32-byte server secret that the worker
+  generates once and keeps in D1 (ADR-0014), valid 15 minutes. Changing the PIN invalidates
+  all sessions. No server-side session store.
 * **Write and editor-read routes** (`/api/parent/*` except `unlock`) need
   `X-KidBoard-Parent: <session token>` in addition to the access token; expired or wrong
   → 401 `parent_locked`. Bearer header, no cookies → no CSRF; CORS for listed origins
   additionally allows `POST, PATCH, DELETE` and the two headers.
 * **Lockout:** after 5 wrong PINs within 15 minutes the unlock route answers 429
-  `parent_lockout` (with `Retry-After`) for 15 minutes. Counted in the cache backend of
-  ADR-0006 (KV when bound; one write per *failed* attempt only, so the KV budget is not
-  touched in normal use) plus a per-isolate counter. Not per IP: a family has one board.
+  `parent_lockout` (with `Retry-After`) for 15 minutes. Counted in D1 (ADR-0014,
+  strongly consistent; one write per *failed* attempt only) plus a per-isolate counter. Not per IP: a family has one board.
 * **Tablet UI:** no visible "edit" button for children. The entry is a small, low-contrast
   ✏️ control in the nav rail that opens only after a 2-second press and hold (same pattern
   as the fullscreen control), then a PIN pad. The session lives in memory only (not in

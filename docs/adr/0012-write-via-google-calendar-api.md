@@ -1,6 +1,7 @@
 # ADR-0012: Editing entries through the Google Calendar API with a service account
 
-- Status: accepted
+- Status: deferred – the default storage for app entries is ADR-0014; this ADR is the
+  design for an optional Google sync added later
 - Date: 2026-11-23
 
 ## Context
