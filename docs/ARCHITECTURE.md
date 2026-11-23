@@ -204,6 +204,102 @@ Order of operations on the raw `SUMMARY`:
 * All-day events use date-only strings with exclusive end, multi-day events appear on
   every covered day.
 
+## Editor (T-39, ADR-0012)
+
+The parent editor writes the *same* conventions a parent would type in Google Calendar,
+so the board keeps reading only the iCal feeds. The model lives in
+`packages/shared/src/editor/` (pure, runtime-agnostic, exported from `@kidboard/shared`);
+the worker (T-40–T-42) only adds Google auth and REST calls.
+
+**Model.** `EditorEntryInputSchema` (zod, strict) is what the editor sends: `kind`
+(`event`/`meal`), `childIds` (`[]` = everyone, always `[]` for meals), `icon` (one emoji),
+`title` (trimmed, whitespace collapsed like `parseTitle`, 1–60 characters, one line),
+`allDay`, `date`, `startTime`/`endTime` (`HH:mm`, end after start, default one hour later
+on the wall clock, `endDate` for timed entries that end on a later day) or all-day
+`endDate` (exclusive), `repeat` (`none` | `{ weekly: { weekdays 1–7, interval 1|2,
+until? } }`, the first date must be a rule weekday), `bring` (≤ 8 unique emoji, events),
+`countdown` (events), `slot` (meals). `EditorEntrySchema` adds the Google `id`, `etag`,
+`sourceId`, `recurringEventId` (instances) and `repeatEditable`; it allows what Google may
+hold (empty or long titles, zero-length events). `parseEditorEntryInput(value, config,
+{ sourceId })` adds the config checks (known children, a countdown icon implies
+`countdown: true`, title writable) and returns issue codes for the UI.
+
+**Conventions written** (`WriteLocale` = explicit editor locale, else `config.locale`,
+`auto` → German):
+
+| Entry | Calendar | Title |
+|---|---|---|
+| Mia, 🏊 Schwimmen | shared | `Mia: 🏊 Schwimmen` |
+| Mia + Ben, 🛁 Baden | shared | `Mia, Ben: 🛁 Baden` (config order) |
+| everyone, 🏫 Kita | shared | `🏫 Kita` |
+| Ben, ⚽ Fußball | Ben's | `⚽ Fußball` |
+| everyone, 🚌 Ausflug | Ben's | `Alle: 🚌 Ausflug` / `All: …` |
+| lunch, 🍝 Spaghetti | meals | `Mittag: 🍝 Spaghetti` / `Lunch: …` |
+| unspecified, 🥣 Müsli | meals | `🥣 Müsli` |
+
+* `composeTitle` always writes `[children: ][meal slot: ]icon text`. `parseTitle` takes
+  prefixes in any order until nothing changes, so a text that itself starts with a child
+  prefix (`Mia: Geheimnis`, `Alle: …`) gets an explicit child part (`Alle:` for everyone,
+  the child's name in its own calendar), which stops the search; a text starting with an
+  emoji keeps it as text because the icon comes first; meal words are plain text in
+  event calendars and after a slot prefix. Every result is re-parsed; anything that would
+  not read back with the same children, icon, title and slot throws
+  `EditorCompositionError` (e.g. an `unspecified` meal whose text starts with `Mittag:`,
+  child names containing `:`/`,`). A generated round-trip table covers umlaut names,
+  child/meal-word/colon titles and ZWJ/VS16/skin-tone/flag/keycap icons.
+* `composeDescription` changes only bring lines and the `#countdown` marker and keeps
+  every other line and its HTML byte for byte: unchanged bring icons and marker state →
+  the description as is; the first bring line is replaced in place (its tags kept),
+  further ones removed with their line break (`<p>` emptied by the removal goes too);
+  without one, `Mitbringen: 👟 🩱` / `Bring: …` is appended (`<br>` in HTML, `\n`
+  otherwise; first line if it would fall outside the 8 KB scan window). Free text on a
+  replaced or removed bring line (words, a `#countdown` on it) is dropped with the old
+  icons. Bring-like lines inside `<script>`/`<style>` are not touched (the reader ignores
+  them). `parseBringList(result)` equals `bring`.
+* Countdown: an icon from `config.countdown.emojis` is a countdown by itself, so the
+  marker is written only for other icons with `countdown: true`; for countdown icons an
+  existing marker keeps its state (re-appended as its own line if it sat on a rewritten
+  bring line). `countdown: false` removes every marker, including markers inside
+  `<script>`/`<style>` (the reader's `#countdown` check sees the raw description).
+  Marker presence is decided on the rewritten text.
+* Meals keep their description untouched (no bring list, no countdown).
+
+**Times and recurrence.** All conversions take `config.timeZone` explicitly (shared
+`zonedTime` helpers on `@date-fns/tz` `tzOffset`, RFC 5545 gap/overlap rules as in the
+worker), never the device zone. Timed events are written as RFC 3339 with that zone's
+offset *and* `timeZone: config.timeZone` on start and end, so Google expands series in
+the configured zone and DST keeps the wall-clock time; all-day events use `date` with an
+exclusive end. `resolveTimedRange` resolves start and end together: without `endTime`
+the end is one hour later on the wall clock, or 60 real minutes when the start lies in
+a spring-forward gap (Berlin 02:30 → 03:30–04:30); an explicit end that is not after the
+resolved start (Berlin 2026-03-29 02:30–03:00) is rejected (`time_range_invalid` in
+`parseEditorEntryInput`, `RangeError` in `toGoogleEvent`), never clamped. Shared tests
+run with the process zone set to `Pacific/Kiritimati` (vitest `env.TZ`) so any use of
+the device zone fails. `buildRecurrenceRule` returns the rule value
+`FREQ=WEEKLY;BYDAY=…[;INTERVAL=2][;UNTIL=…]` (for ical.js `ICAL.Recur.fromString` when
+app entries are rendered, ADR-0014); `buildRecurrence` wraps it as one `RRULE:` line; `UNTIL` is a DATE for all-day series
+and, for timed series, UTC at the last second of the last local day (computed with that
+day's offset). `parseRecurrence` returns the editor form only for exactly that shape
+(missing `BYDAY` = start weekday, `WKST` only where it changes nothing, UTC/DATE/floating
+`UNTIL` mapped to the last local day it covers) and `null` (→ `repeatEditable: false`,
+recurrence never written back) for `COUNT`, other `BY…` parts or frequencies, `RDATE`,
+`EXRULE` or several `RRULE`s. On master edits `EXDATE` lines are kept byte for byte, or
+rebased to the new start time when the series' time of day changes; instances never
+carry a recurrence. `toGoogleEvent` / `fromGoogleEvent` convert between the model and
+the zod-typed Google `Event` subset (`id`, `etag`, `status`, `summary`, `description`,
+`start`/`end`, `recurrence`, `recurringEventId`, `originalStartTime`; unknown fields
+stripped); cancelled or unreadable events → `null`.
+
+**Target calendar** (`pickTargetCalendar(entry, writableSources, config)`, "first" =
+config order): new events go to the single selected child's calendar if writable, else
+the first writable `events` calendar without `childId`; new meals to the first writable
+`meals` calendar. Existing entries stay in their calendar while it can express them; a
+child's calendar always implies its child, so it can hold "everyone" (`Alle:`) or sets
+containing its child but not others. Otherwise the result is `move: true` with
+`fromSourceId` (the worker uses `events.move`, then patches); an instance cannot move on
+its own (`instance_cannot_move`), an unknown or read-only current calendar is
+`source_not_writable`, no fitting calendar is `no_writable_calendar`.
+
 ## Caching & offline (summary – details in [ADR-0006](adr/0006-caching-offline.md))
 
 | Layer | What | Lifetime |

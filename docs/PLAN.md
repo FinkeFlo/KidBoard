@@ -603,7 +603,7 @@ except the nav rail and i18n files and may be worked in parallel to T-36–T-38 
 often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch targets ≥ 48 px
 (≥ 64 px for the hold-to-open entry and the PIN pad), WCAG AA, DE + EN.
 
-- [ ] **T-39 Editor model: compose and parse entries** (risk: **high** → Opus, deps: T-33)
+- [x] **T-39 Editor model: compose and parse entries** (risk: **high** → Opus, deps: T-33)
   Goal: one pure, runtime-agnostic description of an editor entry in `packages/shared` and
   loss-free conversion to and from Google event fields.
   Acceptance:

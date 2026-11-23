@@ -41,7 +41,8 @@ const ALL_WORDS = new Set(["alle", "all", "everyone"]);
 const NAME_SEPARATOR = /\s*,\s*|\s*[+&]\s*|\s+(?:und|and)\s+/iu;
 const MEAL_PREFIX =
   /^(frühstück|breakfast|mittagessen|mittag|lunch|abendessen|abend|dinner)\s*:\s*/iu;
-const COUNTDOWN_TAG = /(?<![\p{L}\p{N}_])#countdown(?![\p{L}\p{N}_])/iu;
+/** The `#countdown` description marker (whole word, case-insensitive; no `g` flag, safe for `.test`). */
+export const COUNTDOWN_TAG = /(?<![\p{L}\p{N}_])#countdown(?![\p{L}\p{N}_])/iu;
 const VS16 = /️/gu;
 
 const MEAL_SLOTS: Record<string, MealSlot> = {
@@ -99,6 +100,17 @@ function matchChildPrefix(
     ids: everyone ? [] : ids,
     rest: text.slice(colon + 1).trim(),
   };
+}
+
+/**
+ * True if `text` starts with a child prefix that {@link parseTitle} would consume
+ * (`Mia: …`, `Mia, Ben: …`, `Alle: …`). Used by the editor to escape such titles.
+ */
+export function startsWithChildPrefix(
+  text: string,
+  children: readonly Child[],
+): boolean {
+  return matchChildPrefix(text, children) !== undefined;
 }
 
 function normalizeEmoji(value: string): string {

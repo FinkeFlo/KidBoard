@@ -29,6 +29,13 @@ const HTML_TAG = /<[^<>\r\n]*>/gu;
 const HTML_ENTITY = /&(?:nbsp|#160|#x0*a0|amp);/giu;
 const LINE_BREAK = /\r\n|[\n\r\u2028\u2029]/u;
 /**
+ * Every line boundary of a raw description as one pattern (text breaks and the HTML
+ * breaks above, same lines as the matching here); used by the editor to replace lines
+ * in place. Global: reset `lastIndex` or use `split`/`matchAll`.
+ */
+export const DESCRIPTION_LINE_BOUNDARY =
+  /\r\n|[\n\r\u2028\u2029]|<br\s*(?:\/\s*)?>|<\/(?:p|div|li)\s*>/giu;
+/**
  * Line start: optional whitespace and bullets, keyword, optional whitespace, colon. No
  * nested quantifiers; the keyword must be directly followed by `\s*:` (whole word).
  */
@@ -42,15 +49,15 @@ function decodeEntity(entity: string): string {
 }
 
 /**
- * Removes `<script>`/`<style>` elements with their content (emoji in code are not part
- * of the line). One forward pass: every search starts after the previous match; once no
- * closing tag of a kind is found, that kind is not searched again (none can follow), so
- * the work stays linear. An unclosed start tag is removed later with the other tags.
+ * `[start, end)` ranges of the closed `<script>`/`<style>` elements of `text` (with their
+ * content; emoji in code are not part of any line). One forward pass: every search
+ * starts after the previous match; once no closing tag of a kind is found, that kind is
+ * not searched again (none can follow), so the work stays linear. An unclosed start tag
+ * yields no range (it is removed later with the other tags).
  */
-function dropRawTextElements(text: string): string {
+export function rawTextElementRanges(text: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
   const unclosed = new Set<string>();
-  let out = "";
-  let pos = 0;
   let searchFrom = 0;
   for (;;) {
     RAW_TEXT_OPEN.lastIndex = searchFrom;
@@ -70,11 +77,36 @@ function dropRawTextElements(text: string): string {
       unclosed.add(kind);
       continue;
     }
-    out += text.slice(pos, open.index);
-    pos = end.index + end[0].length;
-    searchFrom = pos;
+    ranges.push([open.index, end.index + end[0].length]);
+    searchFrom = end.index + end[0].length;
+  }
+  return ranges;
+}
+
+/** Removes `<script>`/`<style>` elements with their content (see {@link rawTextElementRanges}). */
+function dropRawTextElements(text: string): string {
+  let out = "";
+  let pos = 0;
+  for (const [start, end] of rawTextElementRanges(text)) {
+    out += text.slice(pos, start);
+    pos = end;
   }
   return out + text.slice(pos);
+}
+
+/**
+ * Plain text of one line of a raw description (a piece between two line boundaries):
+ * tags removed, `&nbsp;`/`&amp;` decoded. For matching only, never rendered.
+ */
+export function descriptionLineText(rawLine: string): string {
+  return rawLine.replace(HTML_TAG, "").replace(HTML_ENTITY, decodeEntity);
+}
+
+/** True if one raw description line (see {@link descriptionLineText}) is a bring line. */
+export function isBringLine(rawLine: string): boolean {
+  return BRING_KEYWORD.test(
+    descriptionLineText(rawLine).slice(0, BRING_LINE_LIMIT),
+  );
 }
 
 /** Plain-text lines of a (possibly HTML-formatted) description; only used for matching. */
