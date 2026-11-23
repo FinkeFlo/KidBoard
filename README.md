@@ -17,6 +17,10 @@ server side and shows a calm overview and week view.
   holiday, ...); on the big day it turns into a party popper.
 - **Meals:** breakfast, lunch and dinner from a separate calendar, shown as plates under each
   day.
+- **School: "what to bring":** write `Bring: 👟 🩱` in the event description and the tile
+  shows small emoji chips; from the evening before a 🎒 area on today's card tells each child
+  what to pack, until the event starts. School subjects get an icon without any emoji in
+  the title.
 - **Emoji icons:** the emoji in an event title is the picture; titles without one get a
   keyword fallback (German + English).
 - **One or several children:** each child has an emoji and a colour, used as tile tint and
@@ -40,6 +44,9 @@ in [`docs/screenshots/`](docs/screenshots/)).
 The "How many sleeps?" countdown turns into a party popper on the big day:
 
 ![Overview, countdown reaches today](docs/screenshots/day-countdown-today-1280x800.png)
+
+| ![Evening before school: 🎒 area with what to bring](docs/screenshots/day-bring-evening-light-1280x800.png) | ![Week view with bring icons on the tiles](docs/screenshots/week-bring-light-1280x800.png) |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 
 States:
 
@@ -77,7 +84,8 @@ Good to know:
   link is enough. For other adults, share the calendar the normal way with their Google
   account, so you never have to hand out the link.
 - **Private details end up on the board.** Whatever is in the title of an event is shown on
-  the wall. Keep sensitive things out of titles.
+  the wall. Keep sensitive things out of titles. Descriptions stay on the server; only the
+  emoji of a bring line (see [Bring list](#bring-list)) are used.
 - Google may take a while (minutes up to a few hours) to reflect edits in the iCal feed, and
   KidBoard caches feeds (default one hour, `KIDBOARD_CACHE_TTL`). A new event therefore does
   not show up instantly.
@@ -120,6 +128,8 @@ The title is the only interface: write it, KidBoard turns it into a picture.
 | `🏫 Kita` (Kids)               | 🏫            | Kita             | everyone | -                     |
 | `Dentist`                      | 🦷 (fallback) | Dentist          | everyone | -                     |
 | `Mia: Art club`                | 🎨 (fallback) | Art club         | Mia      | -                     |
+| `Mia: Swimming lessons`        | 🏊 (fallback) | Swimming lessons | Mia      | -                     |
+| `Math` (Kids)                  | 🔢 (fallback) | Math             | everyone | -                     |
 | `Tip: bring a hat`             | 📅 (fallback) | Tip: bring a hat | everyone | -                     |
 | `🎂 Anna's birthday`           | 🎂            | Anna's birthday  | everyone | - (countdown)         |
 | `Lunch: 🍝 Spaghetti` (Meals)  | 🍝            | Spaghetti        | -        | lunch                 |
@@ -128,10 +138,50 @@ The title is the only interface: write it, KidBoard turns it into a picture.
 
 School subjects get an icon without an emoji in the title: Art 🎨, PE/Sport 👟, Music 🎵,
 Math 🔢, German/English 📖, Science 🔬, Crafts 🔨, Swimming lessons 🏊 (German names work too,
-e.g. `Kunst`, `Mathe`, `Sachkunde`, `Werken`).
+e.g. `Kunst`, `Mathe`, `Sachkunde`, `Werken`). An emoji in the title always wins. The 🎒 is
+never a fallback icon: it only marks the bring area (see [Bring list](#bring-list)).
 
 German works the same: `Mittag: 🍝 Spaghetti`, `Mia: Ballett`. Full rules:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#title-conventions-parsing-rules).
+
+## Bring list
+
+Children should know what to pack: PE kit, swimsuit, paint shirt. Write it into the
+**description** of the event in Google Calendar, on a line of its own that starts with
+`Bring:` (German `Mitbringen:` works too, upper/lower case does not matter):
+
+```text
+Bring: 👟 🩱 🧴
+```
+
+- **Phone (Google Calendar app) and web:** open the event, edit it, and put the line into the
+  "Add description" field (web: the description box below the time). A bullet in front
+  (`- Bring: 👟`) is fine, and so is formatted text.
+- **Only the emoji count.** Text next to them is allowed (`Bring: 👟 sports shoes, 🩱`) but
+  never shown: the board is for children who cannot read. Duplicates are dropped, at most 8
+  icons per event. Several `Bring:` lines are merged. A line like `Please bring: 👟` is not
+  a bring line, because the line has to start with the keyword and a colon.
+- **Everything else in the description stays private.** The server reads the description,
+  keeps only the emoji of the bring line and sends nothing else to the tablet: no other text,
+  phone number or address ever leaves the server, not even into the offline copy. Meals
+  ignore bring lines.
+- **On the tile:** the emoji appear as small chips on the event's tile (overview and week
+  view) until the event is over.
+- **The 🎒 area:** from the evening before, as soon as the evening begins (`bands.eveningStart`,
+  default 17:00, see [docs/CONFIG.md](docs/CONFIG.md)), today's card shows a 🎒 row "Pack for
+  tomorrow" with the icons of tomorrow's events, one pill per child (events for everyone
+  first). After midnight it turns into "Today bring" and every event's icons disappear when
+  that event starts. For all-day events (for example a school day without a start time) the
+  icons stay until midday (`bands.middayStart`, default 11:00). When nothing is left to pack
+  the row disappears. It is only shown in today's column of the overview, not in the week
+  view.
+- **Weekly subjects:** create the lesson as a recurring event (for example every Tuesday
+  `Mia: 🏊 Swimming lessons`) and put the bring line into the description once; it applies to
+  every occurrence. For one single day choose "This event" when saving and write a different
+  line (or none) for it. Holidays: delete only that single occurrence ("This event"), then
+  nothing is shown and nothing has to be packed that day.
+- **Delay:** new descriptions show up after Google updates the feed and KidBoard's cache
+  expires (up to `KIDBOARD_CACHE_TTL`, default one hour).
 
 ## Configuration
 
@@ -175,6 +225,12 @@ vary slightly by version: keep the screen on, enable kiosk mode / fullscreen, re
 network reconnect, and restart the app after a crash. Leave "clear cache/data on start"
 off, otherwise the stored token and the offline plan are lost.
 
+**Emoji support (Android 11 or newer).** KidBoard draws the emoji of the tablet itself. Every
+icon the app brings along (fallback icons, 🎒, the default countdown icons) is Emoji 13.0 or
+older, which Android 11 (2020) and newer show completely. Emoji that you type yourself in
+titles and bring lists are shown as they are: a very new emoji may appear as an empty box on
+an older tablet, so on a tablet with Android 10 or older prefer classic emoji.
+
 **Installed PWA.** In Chrome open the board and choose "Install app" / "Add to Home screen".
 The installed app runs fullscreen without browser bars and keeps working offline with the
 last good plan. Open the link with `?key=` once inside the installed app (or first in the
@@ -207,16 +263,17 @@ pins the burn-in shift to one of eight positions instead of following the clock.
 
 ## Troubleshooting
 
-| What you see                                                 | What to do                                                                                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| "This tablet needs a new access link" (**KB-401**)           | The access token is missing, wrong or was changed. Open the tablet link with `?key=<token>` once more.             |
-| "Offline · as of ..." (**KB-OFF** if there is no saved plan) | No internet. The last good plan stays visible; the board reloads by itself when the network is back.               |
-| "Can't update · as of ..."                                   | The tablet cannot reach the server; the last good plan stays. Check Wi-Fi and the server, it retries by itself.    |
-| "Maybe not current · as of ..."                              | The server could not reach Google and shows the last good copy (up to 7 days). Check the calendar link, see below. |
-| "Back in a moment" with an error code                        | A reload usually fixes it ("Reload now"). The code tells a helper what happened, see the list below.               |
-| Wrong day, or times shifted by hours                         | Set `timeZone` in `KIDBOARD_CONFIG` (e.g. `Europe/Berlin`). The tablet's own time zone is ignored on purpose.      |
-| A calendar is empty or missing                               | Is `CAL_<ID>_URL` set and does the `<ID>` match the calendar `id`? Is it the secret iCal address? See DEPLOY.md.   |
-| New events do not show                                       | Feeds are cached (default one hour) and Google updates the feed with a delay. Wait, or lower `KIDBOARD_CACHE_TTL`. |
+| What you see                                                 | What to do                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "This tablet needs a new access link" (**KB-401**)           | The access token is missing, wrong or was changed. Open the tablet link with `?key=<token>` once more.                                                                                                                                                                                                                                                                                         |
+| "Offline · as of ..." (**KB-OFF** if there is no saved plan) | No internet. The last good plan stays visible; the board reloads by itself when the network is back.                                                                                                                                                                                                                                                                                           |
+| "Can't update · as of ..."                                   | The tablet cannot reach the server; the last good plan stays. Check Wi-Fi and the server, it retries by itself.                                                                                                                                                                                                                                                                                |
+| "Maybe not current · as of ..."                              | The server could not reach Google and shows the last good copy (up to 7 days). Check the calendar link, see below.                                                                                                                                                                                                                                                                             |
+| "Back in a moment" with an error code                        | A reload usually fixes it ("Reload now"). The code tells a helper what happened, see the list below.                                                                                                                                                                                                                                                                                           |
+| Wrong day, or times shifted by hours                         | Set `timeZone` in `KIDBOARD_CONFIG` (e.g. `Europe/Berlin`). The tablet's own time zone is ignored on purpose.                                                                                                                                                                                                                                                                                  |
+| A calendar is empty or missing                               | Is `CAL_<ID>_URL` set and does the `<ID>` match the calendar `id`? Is it the secret iCal address? See DEPLOY.md.                                                                                                                                                                                                                                                                               |
+| Bring icons do not show                                      | The line must be on its own, start with `Bring:` or `Mitbringen:` **with the colon**, and contain at least one emoji (text-only symbols are ignored). It belongs in the description, not the title. Then wait: Google and the cache delay changes (up to `KIDBOARD_CACHE_TTL`, default one hour). The 🎒 area appears only from `bands.eveningStart` the day before, and only on today's card. |
+| New events do not show                                       | Feeds are cached (default one hour) and Google updates the feed with a delay. Wait, or lower `KIDBOARD_CACHE_TTL`.                                                                                                                                                                                                                                                                             |
 
 Error codes shown on the error card ("Error code for parents"):
 
@@ -245,7 +302,9 @@ appointments) are stored in your Worker's cache for a while (fresh about an hour
 copy up to seven days) and in the tablet's local storage for offline use. The tablet access
 token is kept in the tablet's local storage and removed from the address bar after first use.
 Use the access token, because otherwise anyone who learns your Worker URL can read the
-calendar through the API. No data is sent anywhere else.
+calendar through the API. Of an event's description only the emoji of a `Bring:` line ever leave the server; the rest
+of the description is never sent to the tablet, stored in its offline copy or logged. No data
+is sent anywhere else.
 
 ## Development
 

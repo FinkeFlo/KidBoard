@@ -17,6 +17,10 @@ iCal-Adressen serverseitig und zeigt eine ruhige Übersicht und Wochenansicht.
   (Geburtstag, Urlaub, ...); am großen Tag wird daraus ein Konfetti-Popper.
 - **Mahlzeiten:** Frühstück, Mittag und Abendessen aus einem eigenen Kalender, als Teller
   unter jedem Tag.
+- **Schule: "Was mitbringen?":** `Mitbringen: 👟 🩱` in die Terminbeschreibung schreiben, und
+  die Kachel zeigt kleine Emoji-Chips; ab dem Vorabend sagt ein 🎒-Bereich auf der heutigen
+  Karte jedem Kind, was einzupacken ist, bis der Termin beginnt. Schulfächer bekommen ein
+  Icon, ganz ohne Emoji im Titel.
 - **Emoji-Icons:** das Emoji im Termintitel ist das Bild; Titel ohne Emoji bekommen ein
   Stichwort-Icon (Deutsch + Englisch).
 - **Ein oder mehrere Kinder:** jedes Kind hat ein Emoji und eine Farbe, genutzt als
@@ -41,6 +45,9 @@ Synthetische Demo-Daten (erzeugt mit `pnpm screenshots`; alle Bilder gibt es auc
 Der Countdown "Wie oft noch schlafen?" wird am großen Tag zum Konfetti-Popper:
 
 ![Übersicht, Countdown erreicht heute](docs/screenshots/day-countdown-today-1280x800.png)
+
+| ![Vorabend vor der Schule: 🎒-Bereich mit dem, was mit muss](docs/screenshots/day-bring-evening-light-1280x800.png) | ![Wochenansicht mit Mitbringen-Icons auf den Kacheln](docs/screenshots/week-bring-light-1280x800.png) |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 
 Zustände:
 
@@ -79,7 +86,8 @@ Gut zu wissen:
   genügt. Für andere Erwachsene den Kalender normal mit deren Google-Konto teilen, dann musst
   du den Link nie herausgeben.
 - **Private Details landen auf dem Board.** Was im Titel steht, hängt an der Wand. Sensibles
-  gehört nicht in Titel.
+  gehört nicht in Titel. Beschreibungen bleiben auf dem Server; nur die Emoji einer
+  Mitbringen-Zeile (siehe [Mitbringen-Liste](#mitbringen-liste)) werden genutzt.
 - Google braucht manchmal eine Weile (Minuten bis einige Stunden), bis Änderungen im iCal-Feed
   erscheinen, und KidBoard puffert Feeds (Standard eine Stunde, `KIDBOARD_CACHE_TTL`). Ein
   neuer Termin erscheint also nicht sofort.
@@ -123,6 +131,8 @@ Der Titel ist die einzige Schnittstelle: schreiben, KidBoard macht ein Bild dara
 | `🏫 Kita` (Kinder)             | 🏫            | Kita                  | alle     | -                      |
 | `Zahnarzt`                     | 🦷 (Fallback) | Zahnarzt              | alle     | -                      |
 | `Mia: Kunst AG`                | 🎨 (Fallback) | Kunst AG              | Mia      | -                      |
+| `Mia: Schwimmunterricht`       | 🏊 (Fallback) | Schwimmunterricht     | Mia      | -                      |
+| `Mathe` (Kinder)               | 🔢 (Fallback) | Mathe                 | alle     | -                      |
 | `Tipp: Mütze mitnehmen`        | 📅 (Fallback) | Tipp: Mütze mitnehmen | alle     | -                      |
 | `🎂 Annas Geburtstag`          | 🎂            | Annas Geburtstag      | alle     | - (Countdown)          |
 | `Mittag: 🍝 Spaghetti` (Essen) | 🍝            | Spaghetti             | -        | Mittag                 |
@@ -131,9 +141,52 @@ Der Titel ist die einzige Schnittstelle: schreiben, KidBoard macht ein Bild dara
 
 Schulfächer bekommen ohne Emoji im Titel ein Bild: Kunst 🎨, Sport 👟, Musik 🎵, Mathe 🔢,
 Deutsch/Englisch 📖, Sachkunde 🔬, Werken 🔨, Schwimmunterricht 🏊 (englische Namen
-funktionieren auch).
+funktionieren auch). Ein Emoji im Titel gewinnt immer. Das 🎒 ist nie ein Fallback-Icon: es
+kennzeichnet nur den Mitbringen-Bereich (siehe [Mitbringen-Liste](#mitbringen-liste)).
 
 Alle Regeln (englisch): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#title-conventions-parsing-rules).
+
+## Mitbringen-Liste
+
+Kinder sollen wissen, was einzupacken ist: Sportzeug, Badesachen, Malkittel. Das kommt in
+die **Beschreibung** des Termins im Google Kalender, in eine eigene Zeile, die mit
+`Mitbringen:` beginnt (englisch `Bring:` geht auch, Groß-/Kleinschreibung egal):
+
+```text
+Mitbringen: 👟 🩱 🧴
+```
+
+- **Handy (Google-Kalender-App) und Web:** den Termin öffnen, bearbeiten und die Zeile in das
+  Feld "Beschreibung hinzufügen" schreiben (Web: das Beschreibungsfeld unter der Uhrzeit).
+  Ein Aufzählungszeichen davor (`- Mitbringen: 👟`) ist in Ordnung, ebenso formatierter Text.
+- **Nur die Emoji zählen.** Text neben den Emoji ist erlaubt (`Mitbringen: 👟 Turnschuhe, 🩱`),
+  wird aber nie angezeigt: das Board ist für Kinder, die noch nicht lesen können. Doppelte
+  werden entfernt, höchstens 8 Icons pro Termin. Mehrere `Mitbringen:`-Zeilen werden
+  zusammengeführt. Eine Zeile wie `Bitte mitbringen: 👟` ist keine Mitbringen-Zeile, denn
+  die Zeile muss mit dem Stichwort und einem Doppelpunkt beginnen.
+- **Alles andere in der Beschreibung bleibt privat.** Der Server liest die Beschreibung,
+  behält nur die Emoji der Mitbringen-Zeile und schickt nichts anderes ans Tablet: kein
+  sonstiger Text, keine Telefonnummer, keine Adresse verlässt den Server, auch nicht in die
+  Offline-Kopie. Mahlzeiten ignorieren Mitbringen-Zeilen.
+- **Auf der Kachel:** die Emoji erscheinen als kleine Chips auf der Kachel des Termins
+  (Übersicht und Wochenansicht), bis der Termin vorbei ist.
+- **Der 🎒-Bereich:** ab dem Vorabend, sobald der Abend beginnt (`bands.eveningStart`,
+  Standard 17:00, siehe [docs/CONFIG.md](docs/CONFIG.md)), zeigt die heutige Karte eine
+  🎒-Zeile "Für morgen einpacken" mit den Icons der Termine von morgen, eine Pille pro Kind
+  (Termine für alle zuerst). Nach Mitternacht wird daraus "Heute mitbringen", und die Icons
+  eines Termins verschwinden, sobald er beginnt. Bei ganztägigen Terminen (zum Beispiel ein
+  Schultag ohne Startzeit) bleiben die Icons bis zum Mittag (`bands.middayStart`, Standard
+  11:00). Ist nichts mehr einzupacken, verschwindet die Zeile. Sie erscheint nur in der
+  heutigen Spalte der Übersicht, nicht in der Wochenansicht.
+- **Wöchentliche Fächer:** die Stunde als Serientermin anlegen (zum Beispiel jeden Dienstag
+  `Mia: 🏊 Schwimmunterricht`) und die Mitbringen-Zeile einmal in die Beschreibung schreiben;
+  sie gilt für jeden Termin der Serie. Für einen einzelnen Tag beim Speichern "Nur dieser
+  Termin" wählen und dort eine andere Zeile (oder keine) schreiben. Ferien: nur diesen
+  einzelnen Termin löschen ("Nur dieser Termin"), dann wird an dem Tag nichts angezeigt und
+  nichts eingepackt.
+- **Verzögerung:** neue Beschreibungen erscheinen, nachdem Google den Feed aktualisiert hat
+  und der Cache von KidBoard abgelaufen ist (bis zu `KIDBOARD_CACHE_TTL`, Standard eine
+  Stunde).
 
 ## Konfiguration
 
@@ -180,6 +233,13 @@ Kiosk-Modus / Vollbild, bei Netzwerk-Wiederkehr neu laden, App nach Absturz neu 
 "Cache/Daten beim Start löschen" ausgeschaltet lassen, sonst gehen das gespeicherte Token und
 der Offline-Plan verloren.
 
+**Emoji-Unterstützung (Android 11 oder neuer).** KidBoard zeichnet die Emoji des Tablets
+selbst. Jedes Icon, das die App mitbringt (Fallback-Icons, 🎒, die Standard-Countdown-Icons),
+ist Emoji 13.0 oder älter und wird von Android 11 (2020) und neuer vollständig angezeigt. Emoji,
+die du selbst in Titeln und Mitbringen-Listen tippst, werden unverändert gezeigt: ein sehr
+neues Emoji kann auf einem älteren Tablet als leeres Kästchen erscheinen, daher auf einem
+Tablet mit Android 10 oder älter klassische Emoji bevorzugen.
+
 **Installierte PWA.** In Chrome das Board öffnen und "App installieren" / "Zum Startbildschirm
 hinzufügen" wählen. Die installierte App läuft im Vollbild ohne Browserleisten und arbeitet
 offline mit dem letzten guten Plan weiter. Den Link mit `?key=` einmal in der installierten
@@ -217,16 +277,17 @@ statt der Uhr zu folgen.
 
 ## Fehlersuche
 
-| Was du siehst                                                               | Was zu tun ist                                                                                                                     |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| "Dieses Tablet braucht einen neuen Zugangslink" (**KB-401**)                | Das Zugriffstoken fehlt, ist falsch oder wurde geändert. Den Tablet-Link mit `?key=<token>` noch einmal öffnen.                    |
-| "Offline · Stand von ..." (**KB-OFF**, wenn noch kein Plan gespeichert ist) | Kein Internet. Der letzte gute Plan bleibt sichtbar; das Board lädt von selbst neu, sobald das Netz zurück ist.                    |
-| "Aktualisieren klappt nicht · Stand von ..."                                | Das Tablet erreicht den Server nicht; der letzte gute Plan bleibt. WLAN und Server prüfen, es versucht es von selbst wieder.       |
-| "Vielleicht nicht aktuell · Stand von ..."                                  | Der Server erreicht Google nicht und zeigt die letzte gute Kopie (bis 7 Tage). Kalender-Link prüfen, siehe unten.                  |
-| "Gleich geht's weiter" mit Fehlercode                                       | Meist hilft "Jetzt neu laden". Der Code sagt einem Helfer, was passiert ist, siehe Liste unten.                                    |
-| Falscher Tag oder um Stunden verschobene Zeiten                             | `timeZone` in `KIDBOARD_CONFIG` setzen (z. B. `Europe/Berlin`). Die Zeitzone des Tablets wird bewusst ignoriert.                   |
-| Ein Kalender ist leer oder fehlt                                            | Ist `CAL_<ID>_URL` gesetzt und passt `<ID>` zur Kalender-`id`? Ist es die geheime iCal-Adresse? Siehe DEPLOY.de.md.                |
-| Neue Termine erscheinen nicht                                               | Feeds werden gepuffert (Standard eine Stunde) und Google aktualisiert den Feed verzögert. Warten oder `KIDBOARD_CACHE_TTL` senken. |
+| Was du siehst                                                               | Was zu tun ist                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Dieses Tablet braucht einen neuen Zugangslink" (**KB-401**)                | Das Zugriffstoken fehlt, ist falsch oder wurde geändert. Den Tablet-Link mit `?key=<token>` noch einmal öffnen.                                                                                                                                                                                                                                                                                                                     |
+| "Offline · Stand von ..." (**KB-OFF**, wenn noch kein Plan gespeichert ist) | Kein Internet. Der letzte gute Plan bleibt sichtbar; das Board lädt von selbst neu, sobald das Netz zurück ist.                                                                                                                                                                                                                                                                                                                     |
+| "Aktualisieren klappt nicht · Stand von ..."                                | Das Tablet erreicht den Server nicht; der letzte gute Plan bleibt. WLAN und Server prüfen, es versucht es von selbst wieder.                                                                                                                                                                                                                                                                                                        |
+| "Vielleicht nicht aktuell · Stand von ..."                                  | Der Server erreicht Google nicht und zeigt die letzte gute Kopie (bis 7 Tage). Kalender-Link prüfen, siehe unten.                                                                                                                                                                                                                                                                                                                   |
+| "Gleich geht's weiter" mit Fehlercode                                       | Meist hilft "Jetzt neu laden". Der Code sagt einem Helfer, was passiert ist, siehe Liste unten.                                                                                                                                                                                                                                                                                                                                     |
+| Falscher Tag oder um Stunden verschobene Zeiten                             | `timeZone` in `KIDBOARD_CONFIG` setzen (z. B. `Europe/Berlin`). Die Zeitzone des Tablets wird bewusst ignoriert.                                                                                                                                                                                                                                                                                                                    |
+| Ein Kalender ist leer oder fehlt                                            | Ist `CAL_<ID>_URL` gesetzt und passt `<ID>` zur Kalender-`id`? Ist es die geheime iCal-Adresse? Siehe DEPLOY.de.md.                                                                                                                                                                                                                                                                                                                 |
+| Mitbringen-Icons erscheinen nicht                                           | Die Zeile muss für sich stehen, mit `Mitbringen:` oder `Bring:` **samt Doppelpunkt** beginnen und mindestens ein Emoji enthalten (reine Text-Symbole zählen nicht). Sie gehört in die Beschreibung, nicht in den Titel. Dann warten: Google und der Cache verzögern Änderungen (bis zu `KIDBOARD_CACHE_TTL`, Standard eine Stunde). Der 🎒-Bereich erscheint erst ab `bands.eveningStart` am Vortag und nur auf der heutigen Karte. |
+| Neue Termine erscheinen nicht                                               | Feeds werden gepuffert (Standard eine Stunde) und Google aktualisiert den Feed verzögert. Warten oder `KIDBOARD_CACHE_TTL` senken.                                                                                                                                                                                                                                                                                                  |
 
 Fehlercodes auf der Fehlerkarte ("Fehlercode für Eltern"):
 
@@ -255,7 +316,9 @@ Termine der Kinder) liegen eine Weile im Cache deines Workers (frisch etwa eine 
 gute Kopie bis zu sieben Tage) und für den Offline-Betrieb im lokalen Speicher des Tablets.
 Das Zugriffstoken liegt im lokalen Speicher des Tablets und wird nach dem ersten Öffnen aus der
 Adresszeile entfernt. Nutze das Zugriffstoken, sonst kann jeder, der deine Worker-URL kennt,
-den Kalender über die API lesen. Es werden keine Daten an andere Stellen gesendet.
+den Kalender über die API lesen. Von der Beschreibung eines Termins verlassen nur die Emoji einer `Mitbringen:`-Zeile den
+Server; der Rest der Beschreibung wird nie ans Tablet geschickt, nicht in dessen Offline-Kopie
+gespeichert und nicht protokolliert. Es werden keine Daten an andere Stellen gesendet.
 
 ## Entwicklung
 

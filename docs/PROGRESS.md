@@ -43,6 +43,7 @@ One row per completed task. Escalations to Opus are logged with their reason.
 | 2026-11-23 | T-34 Subject fallback icons and emoji baseline | Sonnet (builder) | Sonnet (reviewer) | 1 | PASS round 1; 🛝 → 🎠 (Emoji 13.0 baseline, ADR-0011); bring list keeps emoji with redundant VS16 |
 | 2026-11-23 | T-35 Bring chips on tiles | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; narrow tiles grow by a chip row (BRING_EXTRA_REM), today's tiles keep height; night chip contrast for M10 exit review |
 | 2026-11-23 | T-36 Evening-before 🎒 "tomorrow bring" area | Opus (builder-opus) | Opus (reviewer-opus) | 1 | PASS round 1; resumed from interrupted partial work; night chip token --color-chip; nit: two-digit +N width for T-37 e2e |
+| 2026-11-23 | T-38 School docs | Sonnet (builder) | Sonnet (reviewer, together with T-37) | 1 | PASS round 1; README/README.de bring-list section, subject icons, emoji baseline note, CONFIG window rows, troubleshooting |
 
 ## Escalations
 

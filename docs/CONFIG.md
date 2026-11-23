@@ -65,8 +65,8 @@ shared secret for this tablet: treat the link like a password.
 | `calendars[].childId`   | string (child id)             | unset (event is for everyone)    | `"mia"`                         | Marks a one-calendar-per-child feed. Must reference an existing child.                               |
 | `calendars[].label`     | string                        | unset                            | `"Kinder"`                      | Optional human-readable name.                                                                        |
 | `bands.morningStart`    | `HH:mm`                       | `"06:00"`                        | `"06:30"`                       | Start of the morning. Together with the other two bands it picks the time-of-day icon on tiles (🌅 morning, 🌞 midday, 🌆 evening) and, for timed meals without a slot word, the meal slot. Bands are not shown as on-screen sections. Must be ascending. |
-| `bands.middayStart`     | `HH:mm`                       | `"11:00"`                        | `"11:30"`                       | Start of midday. Timed meals before it are breakfast, from it until `eveningStart` lunch.            |
-| `bands.eveningStart`    | `HH:mm`                       | `"17:00"`                        | `"17:30"`                       | Start of the evening. Timed meals from here on are dinner.                                           |
+| `bands.middayStart`     | `HH:mm`                       | `"11:00"`                        | `"11:30"`                       | Start of midday. Timed meals before it are breakfast, from it until `eveningStart` lunch. Also ends the 🎒 bring area for all-day events: their icons show from `eveningStart` the day before until this time on the day itself (timed events: until they start). |
+| `bands.eveningStart`    | `HH:mm`                       | `"17:00"`                        | `"17:30"`                       | Start of the evening. Timed meals from here on are dinner. Also the moment the 🎒 bring area starts: from here until midnight today's card lists what to pack for tomorrow ([README](../README.md#bring-list)). |
 | `nightMode.enabled`     | boolean                       | `true`                           | `false`                         | Switch to the dark night theme (colours only, the screen stays on).                                       |
 | `nightMode.start`       | `HH:mm`                       | `"19:30"`                        | `"20:00"`                       | When night mode starts.                                                                              |
 | `nightMode.end`         | `HH:mm`                       | `"06:30"`                        | `"07:00"`                       | When night mode ends (may be on the next day).                                                       |
@@ -82,7 +82,12 @@ names must be unique (case-insensitive); `refreshMinutes` is 1-1440; `autoReturn
 10-3600; bands must be strictly ascending; `nightMode.start` and `end` must differ.
 
 Notes: calendar `mia` and child `mia` are separate namespaces, so the same slug may be used
-for both. The final schema is defined in T-06 (`packages/shared`); if this document and the
+for both. The 🎒 bring area (`Bring:` / `Mitbringen:` line in the event description) has no setting of
+its own: it follows `timeZone` and the two bands above. The description's other text is
+never sent to the tablet. If bring icons do not show: the line must be on its own, start
+with `Bring:` or `Mitbringen:` including the colon, contain at least one emoji and sit in
+the description (not the title); feed and cache delay changes by up to
+`KIDBOARD_CACHE_TTL`. The final schema is defined in T-06 (`packages/shared`); if this document and the
 schema ever disagree, the schema wins and this page must be fixed.
 
 ## API behavior
@@ -133,6 +138,17 @@ avatar = Emoji des Kindes; Farbe und Emoji färben die Kacheln des Kindes und bi
 (Termine mit diesen Icons bekommen den "Noch x Mal schlafen"-Countdown), `refreshMinutes`,
 `autoReturnSeconds` (Rückkehr von der Wochenansicht zur Übersicht nach Inaktivität). Die Tabelle oben nennt Typ,
 Standardwert und Beispiel jeder Option.
+
+**Mitbringen-Bereich (🎒).** `bands.eveningStart` startet auch den 🎒-Bereich: ab dann bis
+Mitternacht zeigt die heutige Karte, was für morgen einzupacken ist (Zeile `Mitbringen:` /
+`Bring:` in der Beschreibung des Termins, siehe [README.de.md](../README.de.md#mitbringen-liste));
+nach Mitternacht zeigt sie, was heute noch mitzubringen ist, bis der Termin beginnt.
+`bands.middayStart` beendet ihn für ganztägige Termine (ihre Icons stehen vom Vorabend
+`eveningStart` bis zu dieser Uhrzeit am Tag selbst). Es gibt keine eigene Einstellung; es
+gelten `timeZone` und die Bänder. Zeigt sich nichts: die Zeile muss für sich stehen, mit
+`Mitbringen:` oder `Bring:` samt Doppelpunkt beginnen, mindestens ein Emoji enthalten und in
+der Beschreibung (nicht im Titel) stehen; Feed- und Cache-Verzögerung bis zu
+`KIDBOARD_CACHE_TTL`.
 
 **API:** `/api/agenda?from=JJJJ-MM-TT&days=N` liefert 1-14 Tage (Standard 8 ab heute) innerhalb
 von gestern bis heute + 31 Tage. Kalender werden mit 10 s Timeout und 5 MB Limit geladen und pro
