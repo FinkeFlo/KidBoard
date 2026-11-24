@@ -1,10 +1,7 @@
-import {
-  type EditorEntryInput,
-  EditorEntryInputSchema,
-} from "@kidboard/shared";
 import { describe, expect, it } from "vitest";
 
-import { entryDateRange, isOccurrenceDate } from "./occurrences";
+import { type EditorEntryInput, EditorEntryInputSchema } from "./entry";
+import { entryDateRange, isOccurrenceDate } from "./items";
 
 function entry(fields: Record<string, unknown>): EditorEntryInput {
   return EditorEntryInputSchema.parse({

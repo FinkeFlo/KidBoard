@@ -1,7 +1,12 @@
 import { z } from "zod";
 
 import { CalendarSourceSchema, ChildSchema } from "./model";
-import { EmojiSchema, TimeOfDaySchema, TimeZoneSchema } from "./primitives";
+import {
+  EmojiSchema,
+  minutesOfTime,
+  TimeOfDaySchema,
+  TimeZoneSchema,
+} from "./primitives";
 import { TemperatureUnitSchema } from "./weather/schema";
 
 export const LocaleSchema = z.enum(["de", "en", "auto"]);
@@ -33,11 +38,6 @@ export const RESERVED_CALENDAR_IDS: readonly string[] = [
   APP_MEALS_SOURCE_ID,
 ];
 
-function toMinutes(time: string): number {
-  const [hours = "0", minutes = "0"] = time.split(":");
-  return Number(hours) * 60 + Number(minutes);
-}
-
 const DEFAULT_BANDS = {
   morningStart: "06:00",
   middayStart: "11:00",
@@ -52,8 +52,12 @@ const BandsSchema = z
   })
   .refine(
     (b) =>
-      toMinutes(b.morningStart) < toMinutes(b.middayStart) &&
-      toMinutes(b.middayStart) < toMinutes(b.eveningStart),
+      // A malformed time already has its own issue; refinements still run on it.
+      !Object.values(b).every(
+        (time) => TimeOfDaySchema.safeParse(time).success,
+      ) ||
+      (minutesOfTime(b.morningStart) < minutesOfTime(b.middayStart) &&
+        minutesOfTime(b.middayStart) < minutesOfTime(b.eveningStart)),
     {
       message:
         "Bands must be strictly ascending: morningStart < middayStart < eveningStart",
@@ -158,7 +162,11 @@ type AppConfigFields = Pick<
   "children" | "calendars"
 >;
 
-/** Cross-field rules (unique ids/names, secret names, known child ids). */
+/**
+ * Cross-field rules (unique ids/names, secret names, known child ids). Messages name the
+ * path and index only, never the value: they reach the logs, and names are children's
+ * personal data.
+ */
 function refineConfig(config: AppConfigFields, ctx: z.RefinementCtx): void {
   const childIds = new Set<string>();
   const childNames = new Set<string>();
@@ -167,7 +175,7 @@ function refineConfig(config: AppConfigFields, ctx: z.RefinementCtx): void {
       ctx.addIssue({
         code: "custom",
         path: ["children", i, "id"],
-        message: `Duplicate child id "${child.id}"`,
+        message: "Duplicate child id",
       });
     }
     childIds.add(child.id);
@@ -176,26 +184,26 @@ function refineConfig(config: AppConfigFields, ctx: z.RefinementCtx): void {
       ctx.addIssue({
         code: "custom",
         path: ["children", i, "name"],
-        message: `Duplicate child name "${child.name}" (names are compared case-insensitively)`,
+        message: "Duplicate child name (names are compared case-insensitively)",
       });
     }
     childNames.add(name);
   });
 
   const calendarIds = new Set<string>();
-  const secretNames = new Map<string, string>();
+  const secretNames = new Map<string, number>();
   config.calendars.forEach((calendar, i) => {
     if (RESERVED_CALENDAR_IDS.includes(calendar.id)) {
       ctx.addIssue({
         code: "custom",
         path: ["calendars", i, "id"],
-        message: `Calendar id "${calendar.id}" is reserved for entries made in the app`,
+        message: "Calendar id is reserved for entries made in the app",
       });
     } else if (calendarIds.has(calendar.id)) {
       ctx.addIssue({
         code: "custom",
         path: ["calendars", i, "id"],
-        message: `Duplicate calendar id "${calendar.id}"`,
+        message: "Duplicate calendar id",
       });
     } else {
       const secret = calendarSecretName(calendar.id);
@@ -204,17 +212,17 @@ function refineConfig(config: AppConfigFields, ctx: z.RefinementCtx): void {
         ctx.addIssue({
           code: "custom",
           path: ["calendars", i, "id"],
-          message: `Calendar id "${calendar.id}" maps to the same secret ${secret} as "${other}"`,
+          message: `Calendar id maps to the same secret as calendars[${String(other)}]`,
         });
       }
-      secretNames.set(secret, calendar.id);
+      secretNames.set(secret, i);
     }
     calendarIds.add(calendar.id);
     if (calendar.childId !== undefined && !childIds.has(calendar.childId)) {
       ctx.addIssue({
         code: "custom",
         path: ["calendars", i, "childId"],
-        message: `Unknown child id "${calendar.childId}"`,
+        message: "Unknown child id",
       });
     }
   });

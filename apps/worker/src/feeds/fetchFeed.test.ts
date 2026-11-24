@@ -1,11 +1,7 @@
+import { FEED_TIMEOUT_MS } from "@kidboard/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  FEED_MAX_BYTES,
-  FEED_TIMEOUT_MS,
-  FeedFetchError,
-  fetchFeed,
-} from "./fetchFeed";
+import { FEED_MAX_BYTES, FeedFetchError, fetchFeed } from "./fetchFeed";
 
 const FEED_URL = "https://feeds.kidboard.invalid/private-TESTONLY/basic.ics";
 

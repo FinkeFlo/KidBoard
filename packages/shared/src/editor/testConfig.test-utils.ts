@@ -9,11 +9,11 @@ export function editorTestConfig(
       locale: "de",
       timeZone: "Europe/Berlin",
       children: [
-        { id: "mia", name: "Mia", color: "red", avatar: "🦊" },
-        { id: "ben", name: "Ben", color: "blue", avatar: "🐻" },
-        { id: "juergen", name: "Jürgen", color: "green", avatar: "🐸" },
-        { id: "emile", name: "Émile", color: "teal", avatar: "🐧" },
-        { id: "anna", name: "Anna-Lena", color: "pink", avatar: "🦄" },
+        { id: "mia", name: "Mia", color: "#cc0000", avatar: "🦊" },
+        { id: "ben", name: "Ben", color: "#0000cc", avatar: "🐻" },
+        { id: "juergen", name: "Jürgen", color: "#008800", avatar: "🐸" },
+        { id: "emile", name: "Émile", color: "#008080", avatar: "🐧" },
+        { id: "anna", name: "Anna-Lena", color: "#ff69b4", avatar: "🦄" },
       ],
       calendars: [
         { id: "kinder", kind: "events" },

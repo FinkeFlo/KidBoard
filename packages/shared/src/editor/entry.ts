@@ -8,15 +8,15 @@ import {
   SlugSchema,
   TimeOfDaySchema,
 } from "../primitives";
+import { minutesOfTime } from "../primitives";
 import { BRING_MAX } from "../title/parseBringList";
-import { isoWeekday, minutesOfTime } from "./zonedTime";
+import { isoWeekday } from "./zonedTime";
 
 /**
  * The editor model (T-39, ADR-0012): one runtime-agnostic description of an entry that
- * the parent editor creates or changes. It is converted to and from Google Calendar
- * event fields by `toGoogleEvent` / `fromGoogleEvent` using the ADR-0005 / ADR-0010
- * title and description conventions, so entries written by the editor read exactly like
- * hand-written ones.
+ * the parent editor creates or changes. The worker stores it in D1 and renders it as
+ * iCalendar (ADR-0014) using the ADR-0005 / ADR-0010 title and description
+ * conventions, so entries written by the editor read exactly like hand-written ones.
  */
 
 /** Max length of an editor title (UTF-16 code units, after whitespace normalisation). */
@@ -117,126 +117,93 @@ interface RefinableEntry {
   bring: string[];
   countdown: boolean;
   slot?: string | undefined;
-  recurringEventId?: string | undefined;
 }
 
-/**
- * Structural rules shared by input and stored entries. `strictEnd`: input entries need
- * the end strictly after the start; entries read from Google may be zero-length.
- */
-function refineEntry(strictEnd: boolean) {
-  return (entry: RefinableEntry, ctx: z.RefinementCtx): void => {
-    // Field checks (formats) do not abort the object; skip cross-field rules on
-    // malformed dates/times, their own issues are already reported.
-    const dates = [entry.date, entry.endDate];
-    if (entry.repeat !== "none") {
-      dates.push(entry.repeat.weekly.until);
+/** Structural rules of an input entry; the end must be strictly after the start. */
+function refineEntry(entry: RefinableEntry, ctx: z.RefinementCtx): void {
+  // Field checks (formats) do not abort the object; skip cross-field rules on
+  // malformed dates/times, their own issues are already reported.
+  const dates = [entry.date, entry.endDate];
+  if (entry.repeat !== "none") {
+    dates.push(entry.repeat.weekly.until);
+  }
+  if (
+    dates.some((date) => date !== undefined && !isDateKey(date)) ||
+    [entry.startTime, entry.endTime].some(
+      (time) => time !== undefined && !TIME_RE.test(time),
+    )
+  ) {
+    return;
+  }
+  const issue = (path: string, message: string): void => {
+    ctx.addIssue({ code: "custom", path: [path], message });
+  };
+  if (new Set(entry.childIds).size !== entry.childIds.length) {
+    issue("childIds", "Child ids must be unique");
+  }
+  if (entry.kind === "meal") {
+    if (entry.slot === undefined) {
+      issue("slot", "Meals need a slot");
+    }
+    if (entry.childIds.length > 0) {
+      issue("childIds", "Meals have no children");
+    }
+    if (entry.bring.length > 0) {
+      issue("bring", "Meals have no bring list");
+    }
+    if (entry.countdown) {
+      issue("countdown", "Meals have no countdown");
+    }
+  } else if (entry.slot !== undefined) {
+    issue("slot", "Only meals have a slot");
+  }
+
+  if (entry.allDay) {
+    if (entry.startTime !== undefined || entry.endTime !== undefined) {
+      issue("startTime", "All-day entries have no times");
     }
     if (
-      dates.some((date) => date !== undefined && !isDateKey(date)) ||
-      [entry.startTime, entry.endTime].some(
-        (time) => time !== undefined && !TIME_RE.test(time),
-      )
+      entry.endDate !== undefined &&
+      calendarDaysBetween(entry.date, entry.endDate) < 1
     ) {
-      return;
+      issue("endDate", "endDate (exclusive) must be after date");
     }
-    const issue = (path: string, message: string): void => {
-      ctx.addIssue({ code: "custom", path: [path], message });
-    };
-    if (new Set(entry.childIds).size !== entry.childIds.length) {
-      issue("childIds", "Child ids must be unique");
+  } else if (entry.startTime === undefined) {
+    issue("startTime", "Timed entries need a startTime");
+  } else {
+    const endDay =
+      entry.endDate === undefined
+        ? 0
+        : calendarDaysBetween(entry.date, entry.endDate);
+    if (entry.endDate !== undefined && entry.endTime === undefined) {
+      issue("endTime", "endDate needs an endTime");
     }
-    if (entry.kind === "meal") {
-      if (entry.slot === undefined) {
-        issue("slot", "Meals need a slot");
+    if (endDay < 0) {
+      issue("endDate", "endDate must not be before date");
+    } else if (entry.endTime !== undefined) {
+      const start = minutesOfTime(entry.startTime);
+      const end = endDay * 1440 + minutesOfTime(entry.endTime);
+      if (end <= start) {
+        issue("endTime", "End must be after start");
       }
-      if (entry.childIds.length > 0) {
-        issue("childIds", "Meals have no children");
-      }
-      if (entry.bring.length > 0) {
-        issue("bring", "Meals have no bring list");
-      }
-      if (entry.countdown) {
-        issue("countdown", "Meals have no countdown");
-      }
-    } else if (entry.slot !== undefined) {
-      issue("slot", "Only meals have a slot");
     }
+  }
 
-    if (entry.allDay) {
-      if (entry.startTime !== undefined || entry.endTime !== undefined) {
-        issue("startTime", "All-day entries have no times");
-      }
-      if (
-        entry.endDate !== undefined &&
-        calendarDaysBetween(entry.date, entry.endDate) < 1
-      ) {
-        issue("endDate", "endDate (exclusive) must be after date");
-      }
-    } else if (entry.startTime === undefined) {
-      issue("startTime", "Timed entries need a startTime");
-    } else {
-      const endDay =
-        entry.endDate === undefined
-          ? 0
-          : calendarDaysBetween(entry.date, entry.endDate);
-      if (entry.endDate !== undefined && entry.endTime === undefined) {
-        issue("endTime", "endDate needs an endTime");
-      }
-      if (endDay < 0) {
-        issue("endDate", "endDate must not be before date");
-      } else if (entry.endTime !== undefined) {
-        const start = minutesOfTime(entry.startTime);
-        const end = endDay * 1440 + minutesOfTime(entry.endTime);
-        if (strictEnd ? end <= start : end < start) {
-          issue("endTime", "End must be after start");
-        }
-      }
+  if (entry.repeat !== "none") {
+    const { weekdays, until } = entry.repeat.weekly;
+    if (!weekdays.includes(isoWeekday(entry.date))) {
+      issue("repeat", "The first date must be one of the weekdays");
     }
-
-    // An instance shows its series' rule; the rule belongs to the master's start date.
-    if (entry.repeat !== "none" && entry.recurringEventId === undefined) {
-      const { weekdays, until } = entry.repeat.weekly;
-      if (!weekdays.includes(isoWeekday(entry.date))) {
-        issue("repeat", "The first date must be one of the weekdays");
-      }
-      if (until !== undefined && calendarDaysBetween(entry.date, until) < 0) {
-        issue("repeat", "until must not be before date");
-      }
+    if (until !== undefined && calendarDaysBetween(entry.date, until) < 0) {
+      issue("repeat", "until must not be before date");
     }
-  };
+  }
 }
 
 /** What the editor sends to create or change an entry (validated at the API boundary). */
 export const EditorEntryInputSchema = z
   .strictObject({ ...baseShape, title: EditorTitleSchema })
-  .superRefine(refineEntry(true));
+  .superRefine(refineEntry);
 export type EditorEntryInput = z.output<typeof EditorEntryInputSchema>;
 /** Input as sent by a client (defaults optional). */
 export type EditorEntryInputRaw = z.input<typeof EditorEntryInputSchema>;
-
-/**
- * An existing entry as read from Google (`fromGoogleEvent`). The title is whatever is
- * left after `parseTitle` (may be empty or longer than {@link EDITOR_TITLE_MAX}; saving
- * goes through {@link EditorEntryInputSchema} again).
- */
-export const EditorEntrySchema = z
-  .strictObject({
-    ...baseShape,
-    title: z.string(),
-    /** Google event id (of the instance for instances of a series). */
-    id: z.string().min(1),
-    /** Google ETag for conditional writes (`If-Match`), when known. */
-    etag: z.string().min(1).optional(),
-    /** Configured calendar id the event lives in. */
-    sourceId: SlugSchema,
-    /** Set for an instance of a series: the master's Google event id. */
-    recurringEventId: z.string().min(1).optional(),
-    /**
-     * False when the series rule is not one the editor can express (or an instance's
-     * master is unknown): `repeat` is then `none` and must not be written back.
-     */
-    repeatEditable: z.boolean(),
-  })
-  .superRefine(refineEntry(false));
-export type EditorEntry = z.output<typeof EditorEntrySchema>;

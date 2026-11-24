@@ -5,9 +5,9 @@ import { findFallbackIcon } from "./fallbackIcons";
 import { parseTitle } from "./parseTitle";
 
 const children: Child[] = [
-  { id: "mia", name: "Mia", color: "red", avatar: "🦊" },
-  { id: "ben", name: "Ben", color: "blue", avatar: "🐻" },
-  { id: "juergen", name: "Jürgen", color: "green", avatar: "🐸" },
+  { id: "mia", name: "Mia", color: "#cc0000", avatar: "🦊" },
+  { id: "ben", name: "Ben", color: "#0000cc", avatar: "🐻" },
+  { id: "juergen", name: "Jürgen", color: "#008800", avatar: "🐸" },
 ];
 const countdownEmojis = ["🎂", "🎉", "🎁", "🎄", "🐣", "✈️", "🏖️"];
 

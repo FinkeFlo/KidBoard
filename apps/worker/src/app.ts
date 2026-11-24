@@ -4,12 +4,10 @@ import { secureHeaders } from "hono/secure-headers";
 import { validator } from "hono/validator";
 
 import {
-  badRequest,
   createBoard,
   parseRangeQuery,
   rangeMessage,
   requestRange,
-  serverMisconfigured,
 } from "./agenda/board";
 import { buildAgenda } from "./agenda/buildAgenda";
 import { loadConfig } from "./config/loadConfig";
@@ -17,6 +15,7 @@ import type { AppEnv } from "./env";
 import { registerFeedRoute } from "./feed/routes";
 import { accessToken } from "./http/auth";
 import { apiCors } from "./http/cors";
+import { badRequest, notFound, serverMisconfigured } from "./http/errors";
 import { logError } from "./log";
 import { editorEnabled } from "./parent/pin";
 import { PARENT_BASE_PATH, parentRoutes } from "./parent/routes";
@@ -28,9 +27,6 @@ export {
   DEFAULT_DAYS,
   effectiveTtlSeconds,
   KV_WRITES_PER_DAY_BUDGET,
-  MAX_DAYS,
-  WINDOW_DAYS_AFTER,
-  WINDOW_DAYS_BEFORE,
 } from "./agenda/board";
 
 export interface AppOptions {
@@ -132,9 +128,7 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
   // Phone feed of the app entries (ADR-0014), guarded by its own secret token.
   registerFeedRoute(app, { board });
 
-  app.notFound((c) =>
-    c.json({ error: "not_found", message: "Not found" }, 404),
-  );
+  app.notFound(notFound);
 
   app.onError((error, c) => {
     // Log the error type only: messages of runtime errors may quote URLs or feed text.

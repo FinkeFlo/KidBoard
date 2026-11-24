@@ -23,11 +23,12 @@ Set locally in `.dev.vars` in the repository root, next to `wrangler.jsonc` (cop
 
 | Name                      | Required | Default            | Description                                                                                                                                      |
 | ------------------------- | -------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CAL_<ID>_URL`            | one per calendar in `calendars` | -     | Secret iCal address of the calendar with id `<ID>` (upper case), e.g. `CAL_KINDER_URL`. Google Calendar: Settings > calendar > "Secret address in iCal format". `https://`, `http://` or `webcal://` (fetched as `https://`). Never commit it. A missing or invalid value marks only that calendar as `error`. |
-| `KIDBOARD_ACCESS_TOKEN`   | no       | unset (no check)   | If set (non-empty), API requests must present this token as `Authorization: Bearer <token>` or `?key=<token>`, else `401`. Prefer the header: `?key=` ends up in browser history (Workers Logs drop query strings, `redact_query_string`). A value that still contains `REPLACE_ME` (the template) is refused: every protected path answers `500 server_misconfigured`. `/api/health` stays public (it only returns `{ "ok": true }`). |
+| `CAL_<ID>_URL`            | one per calendar in `calendars` | -     | Secret iCal address of the calendar with id `<ID>` (upper case), e.g. `CAL_KINDER_URL`. Google Calendar: Settings > calendar > "Secret address in iCal format". `https://` or `webcal://` (fetched as `https://`); plain `http://` and other schemes are refused. Use your own secondary calendars (e.g. "Kinder", "Essen") instead of the main calendar: a main calendar also lists invitations you have not accepted. Never commit it. A missing or invalid value marks only that calendar as `error`. |
+| `KIDBOARD_ACCESS_TOKEN`   | yes (see `KIDBOARD_PUBLIC`) | unset (API refuses, `500 server_misconfigured`) | API requests must present this token as `Authorization: Bearer <token>` or `?key=<token>`, else `401`. 32 to 256 characters of `A-Z a-z 0-9 _ -`, e.g. the output of `openssl rand -hex 32`. Unset, empty, shorter, other characters or still containing `REPLACE_ME` (the template): every protected path answers `500 server_misconfigured` and the log says why (the board fails closed, it never serves data without a valid token). Prefer the header: `?key=` ends up in browser history (Workers Logs drop query strings, `redact_query_string`). `/api/health` stays public (it only returns `{ "ok": true }`). |
+| `KIDBOARD_PUBLIC`         | no       | unset              | Explicit opt-in for a public read-only board: with the value `1` **and no** `KIDBOARD_ACCESS_TOKEN`, the board is served without any check (anyone with the link sees your family's calendar; the editor stays off). If a token is set, it is enforced regardless of this variable. |
 | `KIDBOARD_ALLOWED_ORIGINS`| no       | same origin only   | Comma-separated list of allowed CORS origins, e.g. `http://localhost:5173`.                                                                      |
 | `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh (integer 60-86400; other values fall back to 3600 with a log warning). With the KV cache at least `ceil(calendars × 86400 / 500)` (KV Free plan write quota; 2 calendars → 346; with the parent editor on, its two app sources count as calendars).                                    |
-| `KIDBOARD_PARENT_PIN`     | no       | unset (editor off) | 6 to 12 digits that unlock the parent editor. The editor also needs `KIDBOARD_ACCESS_TOKEN` and the D1 binding `KIDBOARD_DATA`. Unset, invalid or still `REPLACE_ME` = editor off. |
+| `KIDBOARD_PARENT_PIN`     | no       | unset (editor off) | 6 to 12 digits that unlock the parent editor. Not accepted (editor stays off, the log says why): unset, shorter or longer, non-digits, still `REPLACE_ME`, one repeated digit (`111111`) or a run of rising or falling digits (`123456`, `654321`). Choose something not guessable: no birthdays or dates. After 5 wrong PINs in 15 minutes the editor locks for 15 minutes; every further lockout while failures continue doubles the time (up to 2 hours); a right PIN resets this. The editor also needs a valid `KIDBOARD_ACCESS_TOKEN` and the D1 binding `KIDBOARD_DATA`. |
 | `KIDBOARD_FEED_TOKEN`     | no       | unset (no feed)    | Secret token of the phone feed `/api/feed.ics?token=…` with the editor's entries; 32-256 characters `A-Z a-z 0-9 _ -`. Changing it ends every subscription. |
 | `KIDBOARD_CONFIG`         | yes      | -                  | The JSON document described below (single line). Missing or invalid: the API answers `500` and the log lists the validation errors.             |
 
@@ -35,7 +36,8 @@ The root `.env.example` only lists tooling variables (e.g. `PLAYWRIGHT_CHROMIUM_
 
 ## Access token: the tablet link
 
-If `KIDBOARD_ACCESS_TOKEN` is set, the board needs the token to load data:
+The board needs the token to load data (without a valid `KIDBOARD_ACCESS_TOKEN` the API refuses
+everything except `/api/health`, unless you opt in to a public board with `KIDBOARD_PUBLIC="1"`):
 
 1. Open the board **once** on the tablet as `https://<your-worker>.workers.dev/?key=<token>`
    (for example as the Fully Kiosk start URL or in the installed app).
@@ -48,7 +50,7 @@ If `KIDBOARD_ACCESS_TOKEN` is set, the board needs the token to load data:
    "This tablet needs a new access link" (error code `KB-401`): open the tablet link with the current
    `?key=<token>` once more.
 
-Without a configured token nothing of this is needed. The token is not a user login, only a
+With the public opt-in (`KIDBOARD_PUBLIC="1"`, no token) nothing of this is needed. The token is not a user login, only a
 shared secret for this tablet: treat the link like a password.
 
 ## `KIDBOARD_CONFIG` options
@@ -60,7 +62,7 @@ shared secret for this tablet: treat the link like a password.
 | `children`              | array of child                | `[]`                             | see below                       | Children shown on the board. Ids must be unique.                                                     |
 | `children[].id`         | string (slug)                 | required                         | `"mia"`                         | Stable identifier.                                                                                   |
 | `children[].name`       | string                        | required                         | `"Mia"`                         | Display name; also the title prefix `Mia: ...`.                                                      |
-| `children[].color`      | CSS color or token name       | required                         | `"#E4572E"`                     | Child colour: tints the child's event tiles and rings the badge. A token name `child-1` ... `child-6` or any CSS colour (hex, `rgb()`, `hsl()`, `oklch()`, named); an unusable value falls back to neutral. Text stays readable on the tint in both themes. |
+| `children[].color`      | hex colour or token name      | required                         | `"#E4572E"`                     | Child colour: tints the child's event tiles and rings the badge. A token name `child-1` ... `child-6` or a hex colour (`#rgb`, `#rrggbb`); anything else (named colours, `rgb()`, `hsl()` ...) is refused when the configuration is validated, so change old values like `"red"` to `"#cc0000"`. Text stays readable on the tint in both themes. |
 | `children[].avatar`     | single emoji                  | required                         | `"🦊"`                          | The child's emoji (this is the field the schema calls `avatar`; there is no `emoji` key). Shown in the badge on the child's tiles and in the "who is who" legend. |
 | `calendars`             | array of calendar source      | `[]` (no Google feeds)           | see below                       | Optional Google Calendar feeds, added any time. Ids must be unique.                                  |
 | `calendars[].id`        | string                        | required                         | `"kinder"`                      | Maps to the secret `CAL_<ID>_URL`. `app-events` and `app-meals` are reserved (entries made in the app). |
@@ -163,7 +165,9 @@ used, which only works on a custom domain (not on `*.workers.dev`). With the par
 editor on (ADR-0014), `sources` also lists `app-events` and `app-meals`: the entries made
 in the app, read from D1 and cached the same way; a change in the app shows on the next
 refresh, and if D1 is unavailable they are `stale` (or `error`) while the Google calendars
-are unaffected. All API responses
+are unaffected. A feed that failed is not fetched again for 5 minutes (the last-good
+copy is served meanwhile). Per calendar at most 2000 events are read and titles are cut at
+120 characters (`truncated: true` marks it). All API responses
 carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and
 `Referrer-Policy: no-referrer`.
 
@@ -173,13 +177,18 @@ carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and
 lokal in `.dev.vars` im Repository-Root (Vorlage: `.dev.vars.example`, nie einchecken;
 Deployment: [DEPLOY.de.md](DEPLOY.de.md)). Pro Kalender in `calendars` gibt es
 `CAL_<ID>_URL` (ID in Großbuchstaben; fehlt sie, zeigt nur dieser Kalender einen Fehler).
-Optional: `KIDBOARD_ACCESS_TOKEN` (dann brauchen alle API-Aufrufe außer `/api/health` den
+Pflicht: `KIDBOARD_ACCESS_TOKEN` (32-256 Zeichen `A-Z a-z 0-9 _ -`, z. B. `openssl rand -hex 32`; alle API-Aufrufe außer `/api/health` brauchen den
 Token als `Authorization: Bearer <token>` oder `?key=<token>`; besser den Header, denn `?key=`
-landet im Browserverlauf; ein Wert, der noch `REPLACE_ME` enthält, wird abgelehnt (`500`); `/api/health` bleibt öffentlich und liefert nur `{ "ok": true }`),
-`KIDBOARD_PARENT_PIN` (6-12 Ziffern, schaltet den Eltern-Editor ein; braucht zusätzlich das Zugriffstoken), `KIDBOARD_FEED_TOKEN` (32-256 Zeichen, schaltet den Handy-Feed der Editor-Einträge ein), `KIDBOARD_ALLOWED_ORIGINS`, `KIDBOARD_CACHE_TTL` (Sekunden, 60-86400, Standard 3600; mit
+landet im Browserverlauf). Ohne gültiges Token (fehlt, leer, zu kurz, falsche Zeichen oder noch `REPLACE_ME`) verweigert die API alles mit `500` und das Log nennt den Grund: das Board schaltet nie ungeschützt. Ein bewusst öffentliches Board gibt es nur per Opt-in `KIDBOARD_PUBLIC="1"` ohne Token (jeder mit dem Link sieht den Familienkalender, der Editor bleibt aus). `/api/health` bleibt öffentlich und liefert nur `{ "ok": true }`.
+Optional: `KIDBOARD_PARENT_PIN` (6-12 Ziffern, schaltet den Eltern-Editor ein; braucht zusätzlich das Zugriffstoken. Abgelehnt werden (Editor bleibt aus, das Log nennt den Grund) zu kurze/lange oder nicht-numerische Werte, eine einzige wiederholte Ziffer (`111111`) und Zahlenreihen (`123456`, `654321`); bitte keine Geburtstage oder Datumsangaben. Nach 5 falschen PINs in 15 Minuten sperrt der Editor 15 Minuten; jede weitere Sperre verdoppelt die Zeit (höchstens 2 Stunden), eine richtige PIN setzt zurück), `KIDBOARD_FEED_TOKEN` (32-256 Zeichen, schaltet den Handy-Feed der Editor-Einträge ein), `KIDBOARD_ALLOWED_ORIGINS`, `KIDBOARD_CACHE_TTL` (Sekunden, 60-86400, Standard 3600; mit
 KV-Cache mindestens `Kalender × 86400 / 500`; bei eingeschaltetem Eltern-Editor zählen
 seine zwei App-Quellen mit). Die Kalender-IDs `app-events` und `app-meals` sind für die in
-der App angelegten Einträge reserviert.
+der App angelegten Einträge reserviert. Die Adresse `CAL_<ID>_URL` muss mit `https://` (oder
+`webcal://`) beginnen; `http://` und andere Schemata werden abgelehnt. Besser eigene
+Zweitkalender ("Kinder", "Essen") als den Hauptkalender verwenden: dessen Feed listet auch
+noch nicht angenommene Einladungen. Ein fehlgeschlagener Feed wird 5 Minuten nicht neu
+abgerufen (solange gilt die letzte gute Kopie); pro Kalender werden höchstens 2000 Termine
+gelesen und Titel nach 120 Zeichen gekürzt (`truncated: true`).
 
 **Zugriffstoken: der Tablet-Link.** Ist `KIDBOARD_ACCESS_TOKEN` gesetzt, das Board auf dem
 Tablet **einmal** als `https://<dein-worker>.workers.dev/?key=<token>` öffnen (z. B. als
@@ -188,12 +197,12 @@ Start-URL in Fully Kiosk). Die Seite speichert das Token im lokalen Speicher des
 `Authorization: Bearer` auf. Spätere Besuche brauchen kein `?key=`; ein neues `?key=` ersetzt
 das gespeicherte Token (nach einem Token-Wechsel). Nach einem **`401`** (Token ungültig oder
 widerrufen) **vergisst** das Tablet das Token und zeigt "Dieses Tablet braucht einen neuen Zugangslink" (Fehlercode
-`KB-401`): den Tablet-Link mit dem aktuellen `?key=<token>` noch einmal öffnen. Ohne
-konfiguriertes Token ist das alles nicht nötig.
+`KB-401`): den Tablet-Link mit dem aktuellen `?key=<token>` noch einmal öffnen. Mit
+öffentlichem Opt-in (`KIDBOARD_PUBLIC="1"`, kein Token) ist das alles nicht nötig.
 
 **Nicht geheime Einstellungen** stehen als JSON in `KIDBOARD_CONFIG` (Pflicht; Vorlage:
 `config.example.json`; fehlerhaft → API antwortet `500`, das Log nennt die Fehler). Alle Optionen haben Standardwerte; `calendars` (Google-Feeds) ist optional, ohne zeigt das Board die Einträge aus dem Eltern-Editor (ADR-0014): `locale`
-(`de`/`en`/`auto`; `auto` = Browsersprache, sonst `de`), `timeZone` (IANA, Standard `Europe/Berlin`), `children` (id, name, color,
+(`de`/`en`/`auto`; `auto` = Browsersprache, sonst `de`), `timeZone` (IANA, Standard `Europe/Berlin`), `children` (id, name, color (`child-1` bis `child-6` oder Hex `#rgb`/`#rrggbb`; benannte oder `rgb()`-Farben werden abgelehnt),
 avatar = Emoji des Kindes; Farbe und Emoji färben die Kacheln des Kindes und bilden das Abzeichen), `calendars` (id, kind `events`/`meals`, optional `childId`, `label`), `bands`
 (`morningStart`/`middayStart`/`eveningStart`, `HH:mm` aufsteigend: sie bestimmen das Tageszeit-Icon auf den Kacheln und den Mahlzeit-Slot für Mahlzeiten mit Uhrzeit, keine Abschnitte auf dem Bildschirm), `nightMode` (an/aus, Start, Ende), `countdown.emojis`
 (Termine mit diesen Icons bekommen den "Noch x Mal schlafen"-Countdown), `refreshMinutes`,

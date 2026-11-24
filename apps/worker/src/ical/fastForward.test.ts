@@ -1,8 +1,8 @@
+import { naiveUtcMs, type WallTime } from "@kidboard/shared";
 import ICAL from "ical.js";
 import { describe, expect, it } from "vitest";
 
 import { fastForwardStart } from "./fastForward";
-import { naiveUtcMs, type WallTime } from "./zonedTime";
 
 const wall = (
   year: number,

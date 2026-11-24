@@ -5,9 +5,9 @@ import {
   bandOf,
   type Bands,
   minuteOfDay,
+  minutesOfTime,
   msUntilNextMinute,
   startOfMinute,
-  timeOfDayMinutes,
 } from "./clock";
 
 const at = (iso: string): number => Date.parse(iso);
@@ -71,11 +71,11 @@ describe("minuteOfDay", () => {
   });
 });
 
-describe("timeOfDayMinutes", () => {
+describe("minutesOfTime", () => {
   it("parses HH:mm", () => {
-    expect(timeOfDayMinutes("00:00")).toBe(0);
-    expect(timeOfDayMinutes("06:30")).toBe(390);
-    expect(timeOfDayMinutes("23:59")).toBe(1439);
+    expect(minutesOfTime("00:00")).toBe(0);
+    expect(minutesOfTime("06:30")).toBe(390);
+    expect(minutesOfTime("23:59")).toBe(1439);
   });
 });
 

@@ -1,6 +1,7 @@
 import {
   type AppConfig,
   DateTimeStringSchema,
+  FLIGHT_MARGIN_MS,
   todayInZone,
   type WeatherResponse,
   WeatherResponseSchema,
@@ -8,15 +9,21 @@ import {
 import { z } from "zod";
 
 import { type BoardRequest, defer } from "../agenda/board";
-import { FLIGHT_MARGIN_MS, withDeadline } from "../agenda/loadSource";
 import { sha256Hex } from "../config/loadConfig";
 import type { Env } from "../env";
 import { FeedFetchError } from "../feeds/fetchFeed";
 import {
+  DeadlineError,
+  FlightPausedError,
+  SingleFlight,
+} from "../feeds/flight";
+import {
   cacheBackend,
   kvBackend,
+  SourceStore,
   type StoreBackend,
 } from "../feeds/sourceStore";
+import { errorName } from "../http/errors";
 import { logWarn } from "../log";
 import {
   WEATHER_FRESH_SECONDS,
@@ -98,16 +105,6 @@ class PlaceUnknownError extends Error {
   }
 }
 
-interface Flight {
-  promise: Promise<WeatherResponse>;
-  startedAtMs: number;
-}
-
-interface MemoryItem {
-  json: unknown;
-  expiresAtMs: number;
-}
-
 /** Memory entries per isolate (one forecast and one place per config, a few configs). */
 const MEMORY_LIMIT = 8;
 
@@ -125,8 +122,11 @@ function describeFailure(error: unknown): string {
   if (error instanceof WeatherResponseError) {
     return error.reason;
   }
+  if (error instanceof DeadlineError) {
+    return "timeout";
+  }
   // Unexpected error: its type only (messages may quote upstream URLs).
-  return `internal ${error instanceof Error ? error.name : typeof error}`;
+  return `internal ${errorName(error)}`;
 }
 
 function fetchedAtMs(entry: ForecastEntry): number {
@@ -153,57 +153,15 @@ export function createWeather(options: WeatherOptions): WeatherService {
     env.KIDBOARD_CACHE === undefined
       ? fallbackBackend
       : kvBackend(env.KIDBOARD_CACHE);
-  const memory = new Map<string, MemoryItem>();
-  const inflight = new Map<string, Flight>();
-  /**
-   * Per forecast key: no upstream attempt before this time (epoch ms) after a failure.
-   * Memory only, per isolate; a success clears it.
-   */
-  const retryAfter = new Map<string, number>();
-
-  function remember(key: string, json: unknown, expiresAtMs: number): void {
-    memory.delete(key);
-    if (memory.size >= MEMORY_LIMIT) {
-      const oldest = memory.keys().next();
-      if (oldest.done !== true) {
-        memory.delete(oldest.value);
-      }
-    }
-    memory.set(key, { json, expiresAtMs });
-  }
-
-  /** Validated entry under `key` (memory, then backend); `null` on miss or expiry. */
-  async function read<T>(
-    backend: StoreBackend,
-    key: string,
-    schema: z.ZodType<T>,
-    expiresAt: (entry: T) => number,
-    nowMs: number,
-  ): Promise<T | null> {
-    const item = memory.get(key);
-    if (item !== undefined) {
-      const parsed = schema.safeParse(item.json);
-      if (item.expiresAtMs > nowMs && parsed.success) {
-        return parsed.data;
-      }
-      memory.delete(key);
-    }
-    try {
-      const text = await backend.read(key);
-      if (text === null) {
-        return null;
-      }
-      const parsed = schema.safeParse(JSON.parse(text));
-      if (!parsed.success || expiresAt(parsed.data) <= nowMs) {
-        return null;
-      }
-      remember(key, parsed.data, expiresAt(parsed.data));
-      return parsed.data;
-    } catch {
-      // Unreadable entry or backend failure: a miss.
-      return null;
-    }
-  }
+  const store = new SourceStore(MEMORY_LIMIT);
+  // One upstream load per forecast key at a time; after a failure no new attempt for
+  // 5 minutes (a place the geocoder does not know is not a failure of the upstream).
+  const flights = new SingleFlight<WeatherResponse>({
+    now: options.now,
+    pauseAfterFailureMs: WEATHER_RETRY_AFTER_FAILURE_SECONDS * 1000,
+    pauseOn: (error) => !(error instanceof PlaceUnknownError),
+    memoryLimit: MEMORY_LIMIT,
+  });
 
   /** Remembers at once; the backend write runs past the response. One write per call. */
   function write(
@@ -214,10 +172,9 @@ export function createWeather(options: WeatherOptions): WeatherService {
     expiresAtMs: number,
     ttlSeconds: number,
   ): void {
-    remember(key, entry, expiresAtMs);
     defer(
       c,
-      backend.write(key, JSON.stringify(entry), ttlSeconds).catch(() => {
+      store.put(backend, key, entry, expiresAtMs, ttlSeconds).catch(() => {
         logWarn(`weather: ${backend.kind} cache write failed`);
       }),
     );
@@ -245,7 +202,7 @@ export function createWeather(options: WeatherOptions): WeatherService {
     ).slice(0, 32)}`;
     const placeExpiry = (entry: PlaceEntry): number =>
       Date.parse(entry.resolvedAt) + placeTtlSeconds(entry) * 1000;
-    const cached = await read(
+    const cached = await store.get(
       backend,
       key,
       PlaceEntrySchema,
@@ -268,19 +225,6 @@ export function createWeather(options: WeatherOptions): WeatherService {
       throw new PlaceUnknownError();
     }
     return { ...entry.found };
-  }
-
-  function backOff(key: string, failedAtMs: number): void {
-    retryAfter.delete(key);
-    for (const [other, until] of retryAfter) {
-      if (until <= failedAtMs || retryAfter.size >= MEMORY_LIMIT) {
-        retryAfter.delete(other);
-      }
-    }
-    retryAfter.set(
-      key,
-      failedAtMs + WEATHER_RETRY_AFTER_FAILURE_SECONDS * 1000,
-    );
   }
 
   return {
@@ -306,7 +250,7 @@ export function createWeather(options: WeatherOptions): WeatherService {
       ).slice(0, 32)}`;
       const lastGoodExpiry = (entry: ForecastEntry): number =>
         fetchedAtMs(entry) + WEATHER_LAST_GOOD_SECONDS * 1000;
-      const cached = await read(
+      const cached = await store.get(
         backend,
         key,
         ForecastEntrySchema,
@@ -332,73 +276,49 @@ export function createWeather(options: WeatherOptions): WeatherService {
         return serve(cached.forecast, false);
       }
 
-      // Failure backoff: after a failed upstream load, no new attempt for 5 minutes.
-      const blockedUntil = retryAfter.get(key);
-      if (blockedUntil !== undefined) {
-        if (nowMs < blockedUntil) {
-          return cached === null
-            ? { kind: "unavailable" }
-            : serve(cached.forecast, true);
-        }
-        retryAfter.delete(key);
-      }
-
-      // Single flight per isolate; a flight older than its deadline is dead (e.g. its
-      // request was cancelled before `waitUntil` took over) and is replaced.
-      let flight = inflight.get(key);
-      if (flight === undefined || nowMs - flight.startedAtMs > maxFlightMs) {
-        const promise = (async (): Promise<WeatherResponse> => {
-          const at = await coordinates(c, config, backend, nowMs);
-          const raw = await fetchForecast(
-            at,
-            config.timeZone,
-            weather.unit,
-            limits,
-          );
-          const forecast = condenseForecast(
-            raw,
-            config.timeZone,
-            weather.unit,
-            nowMs,
-          );
-          const entry: ForecastEntry = { v: ENTRY_VERSION, forecast };
-          write(
-            c,
-            backend,
-            key,
-            entry,
-            lastGoodExpiry(entry),
-            WEATHER_LAST_GOOD_SECONDS,
-          );
-          return forecast;
-        })();
-        const own: Flight = { promise, startedAtMs: nowMs };
-        const cleanup = (): void => {
-          if (inflight.get(key) === own) {
-            inflight.delete(key);
-          }
-        };
-        promise.then(cleanup, cleanup);
-        inflight.set(key, own);
-        defer(
-          c,
-          withDeadline(promise, maxFlightMs).catch(() => undefined),
-        );
-        flight = own;
-      }
-
       try {
-        const forecast = await withDeadline(flight.promise, maxFlightMs);
-        retryAfter.delete(key);
+        const forecast = await flights.run(key, {
+          nowMs,
+          maxMs: maxFlightMs,
+          defer: (work) => {
+            defer(c, work);
+          },
+          load: async () => {
+            const at = await coordinates(c, config, backend, nowMs);
+            const raw = await fetchForecast(
+              at,
+              config.timeZone,
+              weather.unit,
+              limits,
+            );
+            const fresh = condenseForecast(
+              raw,
+              config.timeZone,
+              weather.unit,
+              nowMs,
+            );
+            const entry: ForecastEntry = { v: ENTRY_VERSION, forecast: fresh };
+            write(
+              c,
+              backend,
+              key,
+              entry,
+              lastGoodExpiry(entry),
+              WEATHER_LAST_GOOD_SECONDS,
+            );
+            return fresh;
+          },
+        });
         return serve(forecast, false);
       } catch (error) {
         if (error instanceof PlaceUnknownError) {
           return { kind: "place-unknown" };
         }
-        backOff(key, options.now());
-        logWarn(
-          `weather: upstream failed (${describeFailure(error)}), ${cached === null ? "no last-good forecast" : "serving last-good forecast"}`,
-        );
+        if (!(error instanceof FlightPausedError)) {
+          logWarn(
+            `weather: upstream failed (${describeFailure(error)}), ${cached === null ? "no last-good forecast" : "serving last-good forecast"}`,
+          );
+        }
         return cached === null
           ? { kind: "unavailable" }
           : serve(cached.forecast, true);

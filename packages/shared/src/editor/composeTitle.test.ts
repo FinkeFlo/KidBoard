@@ -146,7 +146,7 @@ describe("composeTitle escapes titles that would be misparsed", () => {
     );
     expect(codeOf(() => compose(event("x"), "nope"))).toBe("unknown_source");
     const odd = editorTestConfig({
-      children: [{ id: "x", name: "Ann: B", color: "red", avatar: "🦊" }],
+      children: [{ id: "x", name: "Ann: B", color: "#cc0000", avatar: "🦊" }],
       calendars: [{ id: "kinder", kind: "events" }],
     });
     expect(

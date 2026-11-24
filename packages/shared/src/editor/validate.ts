@@ -17,7 +17,7 @@ export type EditorIssueCode =
   | "countdown_icon"
   /** The entry cannot be written so that the title reads back the same (see composeTitle). */
   | "title_not_expressible"
-  /** The children cannot be expressed in the given calendar (see pickTargetCalendar). */
+  /** The children cannot be expressed in the given calendar. */
   | "children_not_expressible"
   /**
    * The end is not after the start once both are resolved in the configured zone (a

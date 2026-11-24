@@ -5,7 +5,7 @@ import {
   parseCalendarDate,
   startOfDayMs,
   wallTimeToEpochMs,
-} from "./zonedTime";
+} from "./wallTime";
 
 const wall = (iso: string) => {
   const [date = "", time = ""] = iso.split("T");

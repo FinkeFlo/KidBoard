@@ -1,7 +1,7 @@
-import type { EditorGoogleItem, EditorListItem } from "@kidboard/shared";
 import { describe, expect, it } from "vitest";
 
-import { buildTemplates, compareItems } from "./editorItems";
+import type { EditorGoogleItem, EditorListItem } from "./api";
+import { buildTemplates, compareItems } from "./items";
 
 const ZONE = "Europe/Berlin";
 /** Monday 2026-03-09, 10:00 in Berlin. */

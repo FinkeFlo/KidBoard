@@ -36,6 +36,20 @@ export interface CalendarDate {
   day: number;
 }
 
+/** `date` shifted by `days` calendar days (pure calendar arithmetic, no zone). */
+export function shiftCalendarDate(
+  date: CalendarDate,
+  days: number,
+): CalendarDate {
+  const shifted = new Date(0);
+  shifted.setUTCFullYear(date.year, date.month - 1, date.day + days);
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+  };
+}
+
 function exactOffsetMinutes(timeZone: string, epochMs: number): number {
   const offset = tzOffset(timeZone, new Date(epochMs));
   if (Number.isNaN(offset)) {

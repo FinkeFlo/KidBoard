@@ -5,9 +5,9 @@ export {
   DAY_BANDS,
   type DayBand,
   minuteOfDay,
+  minutesOfTime,
   msUntilNextMinute,
   startOfMinute,
-  timeOfDayMinutes,
 } from "./clock";
 export { useNow, useToday } from "./hooks";
 export {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { formatInstant } from "../wallTime";
 import { resolveTimedRange, type TimedFields } from "./timeRange";
-import { formatZonedDateTime } from "./zonedTime";
 
 const BERLIN = "Europe/Berlin";
 const LA = "America/Los_Angeles";
@@ -97,8 +97,8 @@ describe("resolveTimedRange across spring-forward gaps", () => {
     ],
   ])("%s %j", (zone, fields, start, end, valid) => {
     const range = resolveTimedRange(fields, zone);
-    expect(formatZonedDateTime(range.startMs, zone)).toBe(start);
-    expect(formatZonedDateTime(range.endMs, zone)).toBe(end);
+    expect(formatInstant(range.startMs, zone)).toBe(start);
+    expect(formatInstant(range.endMs, zone)).toBe(end);
     expect(range.valid).toBe(valid);
     expect(range.explicitEnd).toBe(fields.endTime !== undefined);
   });

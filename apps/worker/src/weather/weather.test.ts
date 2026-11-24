@@ -32,7 +32,7 @@ import { FORECAST_ENDPOINT, GEOCODING_ENDPOINT } from "./openMeteo";
 /** Marker place (PLAN T-48): must never appear in a response, error or log line. */
 const PLACE = "TESTONLY-Weatherplace";
 const UPSTREAM_REASON = "TESTONLY-upstream-reason";
-const TOKEN = "test-token-4d1e9c";
+const TOKEN = "TESTONLY-access-token-not-a-secret-0123456789";
 /** Strings that must never leave the worker. */
 const NEVER_EXPOSED = [
   PLACE,
@@ -123,6 +123,7 @@ function harness(
     ...(options.backend === "kv"
       ? { KIDBOARD_CACHE: testEnv.KIDBOARD_CACHE }
       : {}),
+    KIDBOARD_PUBLIC: "1",
     ...overrides,
   });
   return {

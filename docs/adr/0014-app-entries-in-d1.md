@@ -76,8 +76,8 @@ then app entries live only in KidBoard.
 * New dependency `timezones-ical-library` (Apache-2.0, tzdb-based VTIMEZONE data) for the
   phone feed: RFC 5545 requires a VTIMEZONE per TZID and clients such as Outlook need it,
   ical.js ships no zone data, and UTC times would shift weekly series at DST switches.
-* The T-39 Google conversion helpers (`toGoogleEvent`/`fromGoogleEvent`,
-  `pickTargetCalendar`) remain for the optional sync.
+* The T-39 Google conversion helpers (event conversion, target calendar, recurrence parsing)
+  were removed as unused; the git history keeps them for an optional sync (ADR-0012).
 
 ## Note (2026-11-23, T-46b): app entries are the default source
 

@@ -25,7 +25,7 @@ KidBoard is pre-1.0. Only the latest release (and the `main` branch) receives se
 ## In scope / Im Geltungsbereich
 
 - Leakage of secret iCal URLs (client bundle, API responses, logs, error messages, caches)
-- Bypass of the optional access token or of the CORS allow-list
+- Bypass of the access token (or of the parent PIN lockout) or of the CORS allow-list
 - Cross-site scripting through calendar titles or descriptions
 - Server-side request forgery or resource exhaustion via feed fetching
 - Secrets or real calendar data committed to the repository

@@ -1,9 +1,15 @@
-import type { Context, Hono } from "hono";
+import type { Hono } from "hono";
 
-import { type Board, serverMisconfigured } from "../agenda/board";
+import type { Board } from "../agenda/board";
 import { EntryStore } from "../entries/entryStore";
 import type { AppEnv } from "../env";
 import { tokensEqual } from "../http/auth";
+import {
+  errorName,
+  notFound,
+  serverMisconfigured,
+  storageUnavailable,
+} from "../http/errors";
 import { logWarn } from "../log";
 import { editorEnabled } from "../parent/pin";
 import { FEED_PATH, FEED_TOKEN_PARAM } from "./path";
@@ -17,16 +23,6 @@ export interface FeedRouteOptions {
   board: Board;
 }
 
-function notFound(c: Context<AppEnv>): Response {
-  // The same body as any unknown path: nothing tells whether the feed exists.
-  return c.json({ error: "not_found", message: "Not found" }, 404);
-}
-
-function errorName(error: unknown): string {
-  // Type only: D1 messages may quote statements or stored text.
-  return error instanceof Error ? error.name : typeof error;
-}
-
 /**
  * The phone feed (ADR-0014 "Getting data out"):
  * `GET /api/feed.ics?token=<KIDBOARD_FEED_TOKEN>` → the app entries as one iCalendar (`renderAppFeed`), `Content-Type: text/calendar`,
@@ -34,7 +30,7 @@ function errorName(error: unknown): string {
  * (`isFeedRequest`), because calendar apps subscribe by URL only.
  *
  * * editor off (`editorEnabled`: no D1 binding, no valid PIN or no access token),
- *   token unset or invalid (see `feedTokenStatus`), missing or wrong `token` → 404
+ *   token unset or invalid (see `secretTokenStatus`), missing or wrong `token` → 404
  *   like any unknown path;
  * * the token is compared in constant time (`tokensEqual`);
  * * invalid `KIDBOARD_CONFIG` → 500 `server_misconfigured`; D1 unavailable → 503
@@ -76,10 +72,7 @@ export function registerFeedRoute(
       ics = renderAppFeed(entries, ctx.config);
     } catch (error) {
       logWarn(`phone feed: entries unavailable (${errorName(error)})`);
-      return c.json(
-        { error: "storage_unavailable", message: "Try again later" },
-        503,
-      );
+      return storageUnavailable(c);
     }
     c.header("Content-Type", FEED_CONTENT_TYPE);
     return c.body(ics, 200);

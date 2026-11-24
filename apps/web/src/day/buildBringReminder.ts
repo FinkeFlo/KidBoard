@@ -7,7 +7,7 @@ import {
   type PublicConfig,
 } from "@kidboard/shared";
 
-import { minuteOfDay, timeOfDayMinutes } from "../time";
+import { minuteOfDay, minutesOfTime } from "../time";
 
 /**
  * The evening-before 🎒 area (T-36, ADR-0010): what to pack for the next day, per child,
@@ -61,8 +61,7 @@ function counts(
     // again for its later days); on that day it counts until `middayStart`.
     if (event.start !== date) return false;
     return (
-      when === "tomorrow" ||
-      minutes < timeOfDayMinutes(config.bands.middayStart)
+      when === "tomorrow" || minutes < minutesOfTime(config.bands.middayStart)
     );
   }
   const startMs = Date.parse(event.start);
@@ -101,9 +100,7 @@ export function buildBringReminder(
   const today = dateKeyInZone(now, config.timeZone);
   const minutes = minuteOfDay(now, config.timeZone);
   const when: BringWhen =
-    minutes >= timeOfDayMinutes(config.bands.eveningStart)
-      ? "tomorrow"
-      : "today";
+    minutes >= minutesOfTime(config.bands.eveningStart) ? "tomorrow" : "today";
   const date = when === "tomorrow" ? addCalendarDays(today, 1) : today;
 
   const events = agenda.events

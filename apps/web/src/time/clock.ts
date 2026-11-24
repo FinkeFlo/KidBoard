@@ -1,5 +1,5 @@
 import { TZDate } from "@date-fns/tz";
-import type { PublicConfig } from "@kidboard/shared";
+import { minutesOfTime, type PublicConfig } from "@kidboard/shared";
 
 /**
  * Pure clock and band logic (no React, no timers), so it can be tested at exact
@@ -8,6 +8,8 @@ import type { PublicConfig } from "@kidboard/shared";
  */
 
 export const MINUTE_MS = 60_000;
+
+export { minutesOfTime };
 
 /** Start of the minute containing `epochMs` (epoch ms). */
 export function startOfMinute(epochMs: number): number {
@@ -45,12 +47,6 @@ export type BandId = "night" | "morning" | "midday" | "evening";
 export const DAY_BANDS = ["morning", "midday", "evening"] as const;
 export type DayBand = (typeof DAY_BANDS)[number];
 
-/** `HH:mm` → minutes since local midnight. */
-export function timeOfDayMinutes(time: string): number {
-  const [hours = "0", minutes = "0"] = time.split(":");
-  return Number(hours) * 60 + Number(minutes);
-}
-
 /**
  * Wall-clock minutes since local midnight of `instant` in `timeZone` (0-1439).
  * Reads the zone's wall clock: on a fall-back night 02:30 occurs twice and both
@@ -72,11 +68,11 @@ export function bandOf(
   timeZone: string,
 ): BandId {
   const minutes = minuteOfDay(instant, timeZone);
-  if (minutes < timeOfDayMinutes(bands.morningStart)) {
+  if (minutes < minutesOfTime(bands.morningStart)) {
     return "night";
   }
-  if (minutes < timeOfDayMinutes(bands.middayStart)) {
+  if (minutes < minutesOfTime(bands.middayStart)) {
     return "morning";
   }
-  return minutes < timeOfDayMinutes(bands.eveningStart) ? "midday" : "evening";
+  return minutes < minutesOfTime(bands.eveningStart) ? "midday" : "evening";
 }

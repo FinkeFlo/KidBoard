@@ -47,11 +47,14 @@ export function inlineScriptHashes(html: string): string[] {
   return hashes;
 }
 
+/** Origins allowed to embed the board in a frame (`frame-ancestors`). */
+export const FRAME_ANCESTORS: readonly string[] = ["'self'"];
+
 /**
  * Content-Security-Policy of the board: same-origin only, no eval, no inline code except
- * the hashed inline scripts. Framing is not restricted on purpose (a wall dashboard,
- * e.g. Home Assistant, may embed the board; the board has no state-changing actions to
- * click-jack).
+ * the hashed inline scripts. Only the board itself may frame it (`frame-ancestors`):
+ * the parent editor has actions to click-jack. A wall dashboard (e.g. Home Assistant)
+ * that embeds the board adds its origin to `FRAME_ANCESTORS` (docs/DEPLOY.md).
  */
 export function contentSecurityPolicy(scriptHashes: readonly string[]): string {
   const directives: Array<[string, string[]]> = [
@@ -66,6 +69,7 @@ export function contentSecurityPolicy(scriptHashes: readonly string[]): string {
     ["object-src", ["'none'"]],
     ["base-uri", ["'none'"]],
     ["form-action", ["'none'"]],
+    ["frame-ancestors", [...FRAME_ANCESTORS]],
   ];
   return directives
     .map(([name, sources]) => `${name} ${sources.join(" ")}`)

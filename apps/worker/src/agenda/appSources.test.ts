@@ -35,7 +35,7 @@ const KINDER_URL =
 const ESSEN_URL =
   "https://feeds.kidboard.invalid/calendar/ical/private-TESTONLY-essen-c3d4/basic.ics";
 const PIN = "246813";
-const ACCESS = "TESTONLY-access-not-a-secret";
+const ACCESS = "TESTONLY-access-token-not-a-secret-0123456789";
 const db = testEnv.KIDBOARD_DATA;
 
 const CONFIG_INPUT: AppConfigInput = {
@@ -69,6 +69,8 @@ function env(overrides: Partial<Env> = {}): Env {
     KIDBOARD_PARENT_PIN: PIN,
     // The editor (and with it the app sources) needs an access token (ADR-0013).
     KIDBOARD_ACCESS_TOKEN: ACCESS,
+    // Lets requests without an access token reach the (editor-off) behaviour under test.
+    KIDBOARD_PUBLIC: "1",
     ...overrides,
   };
 }
@@ -802,7 +804,7 @@ describe("D1 unavailable", () => {
     ]);
     expect(appEvents(slow.body)).toEqual(appEvents(good.body));
     expect(consoleOutput.join("\n")).toContain(
-      "app entries: D1 read failed (D1TimeoutError), serving last-good data",
+      "app entries: D1 read failed (DeadlineError), serving last-good data",
     );
 
     // Without last good data: error, the Google sources unaffected.

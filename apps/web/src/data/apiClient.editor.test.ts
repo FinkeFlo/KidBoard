@@ -1,3 +1,4 @@
+import { PARENT_SESSION_HEADER } from "@kidboard/shared";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,7 +15,6 @@ import {
   DEFAULT_EXPORT_FILE_NAME,
   EditorApiError,
   exportFileName,
-  PARENT_SESSION_HEADER,
 } from "./apiClient";
 import { createFakeFetch, TEST_TOKEN } from "./testing.test-utils";
 

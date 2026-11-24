@@ -13,7 +13,7 @@ import {
 } from "@kidboard/shared";
 
 import { ApiError } from "../data/apiClient";
-import { minuteOfDay, timeOfDayMinutes } from "../time";
+import { minuteOfDay, minutesOfTime } from "../time";
 
 /*
  * What the board shows of the weather (T-49, ADR-0015). Pure: every instant is read in
@@ -149,7 +149,7 @@ export function buildBoardWeather(
 
   const evening =
     minuteOfDay(now, config.timeZone) >=
-    timeOfDayMinutes(config.bands.eveningStart);
+    minutesOfTime(config.bands.eveningStart);
   const date = evening ? addCalendarDays(today, 1) : today;
   const forecast = response.days.find((day) => day.date === date);
   const items =

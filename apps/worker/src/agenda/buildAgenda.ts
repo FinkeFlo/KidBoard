@@ -1,6 +1,10 @@
-import type { AgendaResponse, CalendarEvent, Meal } from "@kidboard/shared";
+import {
+  type AgendaResponse,
+  type CalendarEvent,
+  type Meal,
+  startOfZonedDayMs,
+} from "@kidboard/shared";
 
-import { parseCalendarDate, startOfDayMs } from "../ical/zonedTime";
 import { compareEvents, compareMeals } from "../normalize/normalize";
 import type { SourceResult } from "./loadSource";
 
@@ -9,14 +13,6 @@ export interface AgendaRange {
   from: string;
   /** `YYYY-MM-DD`, exclusive. */
   to: string;
-}
-
-function dayStartMs(date: string, timeZone: string): number {
-  const parsed = parseCalendarDate(date);
-  if (parsed === null) {
-    throw new RangeError("date must be YYYY-MM-DD");
-  }
-  return startOfDayMs(parsed, timeZone);
 }
 
 /**
@@ -56,8 +52,8 @@ export function buildAgenda(
   timeZone: string,
   nowMs: number,
 ): { body: AgendaResponse; status: 200 | 502 } {
-  const fromMs = dayStartMs(range.from, timeZone);
-  const toMs = dayStartMs(range.to, timeZone);
+  const fromMs = startOfZonedDayMs(range.from, timeZone);
+  const toMs = startOfZonedDayMs(range.to, timeZone);
   const events: CalendarEvent[] = [];
   const meals: Meal[] = [];
   let oldestFetchMs = Number.POSITIVE_INFINITY;

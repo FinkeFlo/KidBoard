@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { formatInstant } from "../wallTime";
 import {
   addWallMinutes,
-  formatZonedDateTime,
   isoWeekday,
   wallTimeInZone,
   zonedWallTimeToEpochMs,
@@ -27,10 +27,10 @@ describe("zonedTime", () => {
 
   it("formats with the zone's offset and reads wall time back", () => {
     const ms = Date.parse("2026-03-30T06:00:00Z");
-    expect(formatZonedDateTime(ms, "Europe/Berlin")).toBe(
+    expect(formatInstant(ms, "Europe/Berlin")).toBe(
       "2026-03-30T08:00:00+02:00",
     );
-    expect(formatZonedDateTime(ms, "America/Los_Angeles")).toBe(
+    expect(formatInstant(ms, "America/Los_Angeles")).toBe(
       "2026-03-29T23:00:00-07:00",
     );
     expect(wallTimeInZone(ms, "Asia/Kolkata")).toEqual({

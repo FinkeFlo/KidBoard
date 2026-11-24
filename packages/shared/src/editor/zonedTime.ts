@@ -1,42 +1,24 @@
-import { tzOffset } from "@date-fns/tz";
-
-import { addCalendarDays, dateKeyInZone, isDateKey } from "../dates";
+import { addCalendarDays } from "../dates";
+import { minutesOfTime } from "../primitives";
+import {
+  formatCalendarDate,
+  naiveUtcMs,
+  parseCalendarDate,
+  startOfDayMs,
+  wallTimeAt,
+  wallTimeToEpochMs,
+} from "../wallTime";
 
 /**
- * Wall-clock time <-> instant conversion for the editor, always in an explicitly given
- * IANA zone (the configured `timeZone`, never the device zone). Offsets come from
- * `@date-fns/tz` `tzOffset` (the runtime's tz database). DST gaps and overlaps follow
- * RFC 5545 section 3.3.5, like the worker's feed expansion:
- *
- * - Non-existent local time (spring-forward gap): the offset in effect *before* the gap,
- *   e.g. 02:30 on the Europe/Berlin spring-forward day is 01:30Z (= 03:30+02:00).
- * - Ambiguous local time (fall-back overlap): the *first* occurrence, e.g. 02:30 on the
- *   Europe/Berlin fall-back day is 00:30Z (= 02:30+02:00).
+ * String-based (`YYYY-MM-DD`, `HH:mm`) adapters of `../wallTime.ts` for the editor.
+ * Wall-clock time <-> instant conversion is always in an explicitly given IANA zone
+ * (the configured `timeZone`, never the device zone); DST gaps and overlaps follow
+ * RFC 5545 section 3.3.5 (see `../wallTime.ts`), exactly like the worker's feed
+ * expansion, because it is the same code.
  */
 
-const MINUTE_MS = 60_000;
-const DAY_MS = 86_400_000;
-const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
-function offsetMinutes(timeZone: string, epochMs: number): number {
-  const offset = tzOffset(timeZone, new Date(epochMs));
-  if (Number.isNaN(offset)) {
-    throw new RangeError("Unknown time zone or invalid instant");
-  }
-  return Math.round(offset);
-}
-
-function pad(value: number, length = 2): string {
-  return String(Math.abs(value)).padStart(length, "0");
-}
-
-/** Minutes since midnight of an `HH:mm` string. Throws a `RangeError` if malformed. */
-export function minutesOfTime(time: string): number {
-  const match = TIME_RE.exec(time);
-  if (match === null) {
-    throw new RangeError("time must be HH:mm");
-  }
-  return Number(match[1]) * 60 + Number(match[2]);
+function pad(value: number): string {
+  return String(value).padStart(2, "0");
 }
 
 /** `HH:mm` of minutes since midnight (0-1439). */
@@ -44,26 +26,19 @@ export function timeOfMinutes(minutes: number): string {
   return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
 }
 
-/** The wall fields as if they were UTC. */
-function naiveUtcMs(date: string, minutes: number, seconds = 0): number {
-  if (!isDateKey(date)) {
+function parseDate(
+  date: string,
+): NonNullable<ReturnType<typeof parseCalendarDate>> {
+  const parsed = parseCalendarDate(date);
+  if (parsed === null) {
     throw new RangeError("date must be YYYY-MM-DD");
   }
-  const [year, month, day] = date.split("-").map(Number) as [
-    number,
-    number,
-    number,
-  ];
-  const at = new Date(0);
-  at.setUTCFullYear(year, month - 1, day);
-  at.setUTCHours(0, minutes, seconds, 0);
-  return at.getTime();
+  return parsed;
 }
 
 /**
  * Epoch ms of the wall-clock `date` + `time` (`HH:mm`, optional extra `seconds`) in
- * `timeZone`, DST resolved as documented above. Assumes at most one offset transition
- * within ±24 h (true for all current IANA zones).
+ * `timeZone`. Throws a `RangeError` for a malformed date or time.
  */
 export function zonedWallTimeToEpochMs(
   date: string,
@@ -71,23 +46,21 @@ export function zonedWallTimeToEpochMs(
   timeZone: string,
   seconds = 0,
 ): number {
-  const naive = naiveUtcMs(date, minutesOfTime(time), seconds);
-  const before = offsetMinutes(timeZone, naive - DAY_MS);
-  const after = offsetMinutes(timeZone, naive + DAY_MS);
-  const candidates = [before, after]
-    .map((offset) => naive - offset * MINUTE_MS)
-    .filter(
-      (epochMs, i) =>
-        offsetMinutes(timeZone, epochMs) === (i === 0 ? before : after),
-    );
-  return candidates.length > 0
-    ? Math.min(...candidates)
-    : naive - before * MINUTE_MS;
+  const minutes = minutesOfTime(time);
+  return wallTimeToEpochMs(
+    {
+      ...parseDate(date),
+      hour: Math.floor(minutes / 60),
+      minute: minutes % 60,
+      second: seconds,
+    },
+    timeZone,
+  );
 }
 
 /** Epoch ms of local midnight starting `date` in `timeZone`. */
 export function startOfZonedDayMs(date: string, timeZone: string): number {
-  return zonedWallTimeToEpochMs(date, "00:00", timeZone);
+  return startOfDayMs(parseDate(date), timeZone);
 }
 
 export interface ZonedWallTime {
@@ -104,23 +77,12 @@ export function wallTimeInZone(
   epochMs: number,
   timeZone: string,
 ): ZonedWallTime {
-  const shifted = new Date(
-    epochMs + offsetMinutes(timeZone, epochMs) * MINUTE_MS,
-  );
+  const wall = wallTimeAt(epochMs, timeZone);
   return {
-    date: dateKeyInZone(epochMs, timeZone),
-    time: `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`,
-    seconds: shifted.getUTCSeconds(),
+    date: formatCalendarDate(wall),
+    time: `${pad(wall.hour)}:${pad(wall.minute)}`,
+    seconds: wall.second,
   };
-}
-
-/** ISO 8601 with the offset of `timeZone`, e.g. `2026-03-30T08:00:00+02:00`. */
-export function formatZonedDateTime(epochMs: number, timeZone: string): string {
-  const offset = offsetMinutes(timeZone, epochMs);
-  const wall = wallTimeInZone(epochMs, timeZone);
-  const sign = offset < 0 ? "-" : "+";
-  const zone = `${sign}${pad(Math.trunc(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
-  return `${wall.date}T${wall.time}:${pad(wall.seconds)}${zone}`;
 }
 
 /** `date` + `time` shifted by `minutes` of wall-clock time (may roll over to other days). */
@@ -139,6 +101,8 @@ export function addWallMinutes(
 
 /** ISO weekday of a `YYYY-MM-DD` date: 1 = Monday … 7 = Sunday (pure calendar arithmetic). */
 export function isoWeekday(date: string): number {
-  const day = new Date(naiveUtcMs(date, 0)).getUTCDay();
+  const day = new Date(
+    naiveUtcMs({ ...parseDate(date), hour: 0, minute: 0, second: 0 }),
+  ).getUTCDay();
   return day === 0 ? 7 : day;
 }

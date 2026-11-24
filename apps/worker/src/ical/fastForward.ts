@@ -1,6 +1,5 @@
+import { naiveUtcMs, type WallTime } from "@kidboard/shared";
 import type ICAL from "ical.js";
-
-import { naiveUtcMs, type WallTime } from "./zonedTime";
 
 /**
  * Fast-forwarding of long-running recurrence rules (ADR-0003).

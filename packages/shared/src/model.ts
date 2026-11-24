@@ -9,11 +9,24 @@ import {
 } from "./primitives";
 import { BRING_MAX } from "./title/parseBringList";
 
-/** A configured child. Color is a design-token name or a CSS color. */
+/**
+ * Colour of a child: a design-token name (`child-1` ... `child-6`) or a hex colour
+ * (`#rgb`, `#rrggbb`). Anything else is a configuration error, reported with its path
+ * where the config is loaded, instead of silently falling back to grey on the board.
+ */
+export const ChildColorSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^(?:child-[1-6]|#[0-9a-fA-F]{3}|#[0-9a-fA-F]{6})$/,
+    "Expected child-1 ... child-6 or a hex colour (#rgb, #rrggbb)",
+  );
+
+/** A configured child. */
 export const ChildSchema = z.strictObject({
   id: SlugSchema,
   name: z.string().trim().min(1).max(40),
-  color: z.string().trim().min(1).max(40),
+  color: ChildColorSchema,
   avatar: EmojiSchema,
 });
 export type Child = z.infer<typeof ChildSchema>;

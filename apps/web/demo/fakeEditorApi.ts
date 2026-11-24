@@ -2,26 +2,33 @@ import {
   addCalendarDays,
   type AppEntryDto,
   BOARD_REFRESH_NOW,
+  buildTemplates,
   calendarDaysBetween,
   type CalendarEvent,
-  dateKeyInZone,
-  EDITOR_TEMPLATES_MAX,
+  compareItems,
+  EDITOR_TEMPLATE_DAYS_AFTER,
+  EDITOR_TEMPLATE_DAYS_BEFORE,
   type EditorAppItem,
   type EditorEntryInput,
   EditorEntryInputSchema,
   type EditorGoogleItem,
-  type EditorListItem,
   type EditorListResponse,
-  type EditorTemplate,
-  formatZonedDateTime,
+  entryDateRange,
+  formatInstant,
+  googleEventItem,
+  googleMealItem,
   ImportModeSchema,
-  isoWeekday,
+  isOccurrenceDate,
+  MAX_AGENDA_DAYS,
+  MAX_APP_ENTRIES,
   type Meal,
-  type MealSlot,
   parseEditorEntryInput,
   type PublicConfig,
   resolveTimedRange,
+  splitResolvable,
   todayInZone,
+  WINDOW_DAYS_AFTER,
+  WINDOW_DAYS_BEFORE,
 } from "@kidboard/shared";
 import { z } from "zod";
 
@@ -68,7 +75,7 @@ export interface FakeEditorOptions {
   now?: () => number;
   /** Read-only Google occurrences of a range (list and templates). */
   google?: (range: DateRange) => { events: CalendarEvent[]; meals: Meal[] };
-  /** Entry limit (worker: 1 000). */
+  /** Entry limit (default: the worker's `MAX_APP_ENTRIES`). */
   maxEntries?: number;
   /** Relative phone-feed URL `/api/parent/feed` answers with; none = the feed is off. */
   feedUrl?: string;
@@ -96,19 +103,6 @@ export interface FakeEditor {
   writes: { method: string; path: string; query: string; body: unknown }[];
 }
 
-/** ADR-0014: at most 1 000 entries. */
-const MAX_ENTRIES = 1000;
-/** Window of the list, like `/api/agenda`: `[today - 1, today + 32)`. */
-const WINDOW_BEFORE = 1;
-const WINDOW_AFTER = 32;
-const MAX_DAYS = 31;
-const SLOT_ORDER: readonly MealSlot[] = [
-  "breakfast",
-  "lunch",
-  "dinner",
-  "unspecified",
-];
-
 const ImportDocumentSchema = z.object({
   format: z.literal("kidboard-entries"),
   version: z.literal(1),
@@ -132,20 +126,6 @@ function error(
   extra: Record<string, unknown> = {},
 ): FakeResponse {
   return { status, json: { error: code, message: code, ...extra } };
-}
-
-function mondayOf(date: string): string {
-  return addCalendarDays(date, 1 - isoWeekday(date));
-}
-
-/** Whether `date` is an occurrence day of a weekly series (rule only). */
-function isRuleDay(data: EditorEntryInput, date: string): boolean {
-  if (data.repeat === "none") return date === data.date;
-  const { weekdays, interval, until } = data.repeat.weekly;
-  if (date < data.date || (until !== undefined && date > until)) return false;
-  if (!weekdays.includes(isoWeekday(date))) return false;
-  const weeks = calendarDaysBetween(mondayOf(data.date), mondayOf(date)) / 7;
-  return weeks % interval === 0;
 }
 
 /** The occurrence of a series on `date`: the rule's fields moved to that day. */
@@ -182,7 +162,7 @@ function occurrencesOf(entry: AppEntryDto, range: DateRange): Occurrence[] {
   );
   const end = addCalendarDays(range.to, 7);
   for (let date = start; date < end; date = addCalendarDays(date, 1)) {
-    if (!isRuleDay(data, date) || entry.exdates.includes(date)) continue;
+    if (!isOccurrenceDate(data, date) || entry.exdates.includes(date)) continue;
     const override = entry.overrides[date] ?? null;
     const shown = override ?? movedTo(data, date);
     if (shown.date >= range.from && shown.date < range.to) {
@@ -212,8 +192,8 @@ function timesOf(
     timeZone,
   );
   return {
-    start: formatZonedDateTime(range.startMs, timeZone),
-    end: formatZonedDateTime(range.endMs, timeZone),
+    start: formatInstant(range.startMs, timeZone),
+    end: formatInstant(range.endMs, timeZone),
   };
 }
 
@@ -247,60 +227,14 @@ function appItem(
   };
 }
 
-function googleItems(
-  google: { events: CalendarEvent[]; meals: Meal[] },
-  timeZone: string,
-): EditorGoogleItem[] {
+function googleItems(google: {
+  events: CalendarEvent[];
+  meals: Meal[];
+}): EditorGoogleItem[] {
   return [
-    ...google.events.map((event): EditorGoogleItem => ({
-      origin: "google",
-      id: event.id,
-      sourceId: event.sourceId,
-      iconIsFallback: event.iconIsFallback,
-      kind: "event",
-      icon: event.icon,
-      title: event.title,
-      childIds: [...event.childIds],
-      allDay: event.allDay,
-      start: event.start,
-      end: event.end,
-      date: event.allDay
-        ? event.start
-        : dateKeyInZone(Date.parse(event.start), timeZone),
-      bring: [...(event.bring ?? [])],
-      countdown: event.countdown,
-    })),
-    ...google.meals.map((meal): EditorGoogleItem => ({
-      origin: "google",
-      id: meal.id,
-      sourceId: meal.sourceId,
-      iconIsFallback: meal.iconIsFallback,
-      kind: "meal",
-      icon: meal.icon,
-      title: meal.title,
-      childIds: [],
-      allDay: true,
-      start: meal.date,
-      end: addCalendarDays(meal.date, 1),
-      date: meal.date,
-      slot: meal.slot,
-      bring: [],
-      countdown: false,
-    })),
+    ...google.events.map(googleEventItem),
+    ...google.meals.map(googleMealItem),
   ];
-}
-
-function compareItems(a: EditorListItem, b: EditorListItem): number {
-  return (
-    a.date.localeCompare(b.date) ||
-    Number(b.allDay) - Number(a.allDay) ||
-    Date.parse(a.allDay ? `${a.start}T00:00:00Z` : a.start) -
-      Date.parse(b.allDay ? `${b.start}T00:00:00Z` : b.start) ||
-    (a.kind === b.kind ? 0 : a.kind === "event" ? -1 : 1) ||
-    SLOT_ORDER.indexOf(a.slot ?? "unspecified") -
-      SLOT_ORDER.indexOf(b.slot ?? "unspecified") ||
-    a.title.localeCompare(b.title)
-  );
 }
 
 function parseQuery(search: string): URLSearchParams {
@@ -315,13 +249,9 @@ function parseJson(body: string | null): { ok: true; value: unknown } | null {
   }
 }
 
-function wallTime(iso: string): string {
-  return iso.slice(11, 16);
-}
-
 export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
   const now = options.now ?? Date.now;
-  const maxEntries = options.maxEntries ?? MAX_ENTRIES;
+  const maxEntries = options.maxEntries ?? MAX_APP_ENTRIES;
   const store = new Map<string, AppEntryDto>();
   const failures: { method: string; prefix: string; response: FakeResponse }[] =
     [];
@@ -332,8 +262,20 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
   const config = (): PublicConfig => options.config();
   const today = (): string => todayInZone(now(), config().timeZone);
   const stamp = (): string => new Date(now()).toISOString();
-  const resolvable = (entry: AppEntryDto): boolean =>
-    parseEditorEntryInput(entry.data, config()).ok;
+  /** Stored entries with a day in `range`, split like the worker's list does. */
+  const stored = (
+    range: DateRange,
+  ): ReturnType<typeof splitResolvable<AppEntryDto>> =>
+    splitResolvable(
+      [...store.values()].filter((entry) => {
+        const days = entryDateRange(entry.data, entry.overrides);
+        return (
+          days.first < range.to &&
+          (days.last === null || days.last >= range.from)
+        );
+      }),
+      config(),
+    );
 
   const validate = (
     value: unknown,
@@ -373,13 +315,11 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
 
   const appItems = (range: DateRange): EditorAppItem[] => {
     const timeZone = config().timeZone;
-    return [...store.values()]
-      .filter(resolvable)
-      .flatMap((entry) =>
-        occurrencesOf(entry, range).map((occurrence) =>
-          appItem(entry, occurrence, timeZone),
-        ),
-      );
+    return stored(range).resolvable.flatMap((entry) =>
+      occurrencesOf(entry, range).map((occurrence) =>
+        appItem(entry, occurrence, timeZone),
+      ),
+    );
   };
 
   const list = (query: URLSearchParams): FakeResponse => {
@@ -390,14 +330,14 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
       !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
       !Number.isInteger(days) ||
       days < 1 ||
-      days > MAX_DAYS
+      days > MAX_AGENDA_DAYS
     ) {
       return error(400, "bad_request");
     }
     const range = { from, to: addCalendarDays(from, days) };
     if (
-      range.from < addCalendarDays(day, -WINDOW_BEFORE) ||
-      range.to > addCalendarDays(day, WINDOW_AFTER)
+      range.from < addCalendarDays(day, -WINDOW_DAYS_BEFORE) ||
+      range.to > addCalendarDays(day, WINDOW_DAYS_AFTER)
     ) {
       return error(400, "bad_request");
     }
@@ -412,29 +352,9 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
       })),
       items: [
         ...(storageUnavailable ? [] : appItems(range)),
-        ...googleItems(google, timeZone),
-      ].sort(compareItems),
-      unresolved: storageUnavailable
-        ? []
-        : [...store.values()]
-            .filter(
-              (entry) =>
-                !resolvable(entry) &&
-                entry.data.date < range.to &&
-                (entry.data.repeat === "none"
-                  ? entry.data.date >= range.from
-                  : (entry.data.repeat.weekly.until ?? range.from) >=
-                    range.from),
-            )
-            .map((entry) => {
-              const result = parseEditorEntryInput(entry.data, config());
-              return {
-                entryId: entry.id,
-                revision: entry.revision,
-                entry: entry.data,
-                issues: result.ok ? [] : result.issues,
-              };
-            }),
+        ...googleItems(google),
+      ].sort((a, b) => compareItems(a, b, timeZone)),
+      unresolved: storageUnavailable ? [] : stored(range).unresolved,
       storageUnavailable,
     };
     return { status: 200, json: body };
@@ -442,64 +362,22 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
 
   const templates = (): FakeResponse => {
     const day = today();
-    const range = {
-      from: addCalendarDays(day, -1),
-      to: addCalendarDays(day, 28),
-    };
     const timeZone = config().timeZone;
+    const range = {
+      from: addCalendarDays(day, -EDITOR_TEMPLATE_DAYS_BEFORE),
+      to: addCalendarDays(day, EDITOR_TEMPLATE_DAYS_AFTER),
+    };
     const google = options.google?.(range) ?? { events: [], meals: [] };
-    const items = [...appItems(range), ...googleItems(google, timeZone)];
-    const groups = new Map<
-      string,
-      { template: EditorTemplate; distance: number }
-    >();
-    for (const item of items) {
-      if (item.origin === "google" && item.iconIsFallback) continue;
-      const title = item.title.trim();
-      if (title === "" || title.length > 60) continue;
-      const key = [
-        item.kind,
-        item.icon.replace(/️/gu, ""),
-        title,
-        item.childIds.join(","),
-      ].join("|");
-      const distance = Math.abs(calendarDaysBetween(day, item.date));
-      const found = groups.get(key);
-      const origin = item.origin;
-      if (found !== undefined) {
-        found.template.count += 1;
-        if (!found.template.origins.includes(origin)) {
-          found.template.origins.push(origin);
-        }
-        continue;
-      }
-      groups.set(key, {
-        distance,
-        template: {
-          kind: item.kind,
-          icon: item.icon,
-          title,
-          childIds: [...item.childIds],
-          allDay: item.allDay,
-          ...(item.allDay
-            ? {}
-            : { startTime: wallTime(item.start), endTime: wallTime(item.end) }),
-          ...(item.slot === undefined ? {} : { slot: item.slot }),
-          bring: [...item.bring],
-          countdown: item.countdown,
-          count: 1,
-          origins: [origin],
-        },
-      });
-    }
-    const sorted = [...groups.values()]
-      .sort(
-        (a, b) =>
-          b.template.count - a.template.count || a.distance - b.distance,
-      )
-      .slice(0, EDITOR_TEMPLATES_MAX)
-      .map((group) => group.template);
-    return { status: 200, json: { templates: sorted } };
+    return {
+      status: 200,
+      json: {
+        templates: buildTemplates(
+          [...appItems(range), ...googleItems(google)],
+          now(),
+          timeZone,
+        ),
+      },
+    };
   };
 
   const written = (entry: AppEntryDto | null, status = 200): FakeResponse => ({
@@ -535,7 +413,10 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
         updatedAt: stamp(),
       };
       if (scope === "one" && date !== null) {
-        if (!isRuleDay(entry.data, date) || entry.data.repeat === "none") {
+        if (
+          !isOccurrenceDate(entry.data, date) ||
+          entry.data.repeat === "none"
+        ) {
           return error(422, "invalid_entry", {
             issues: [
               { code: "invalid", path: "date", message: "No occurrence" },
@@ -546,10 +427,12 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
       } else {
         next.kind = valid.entry.kind;
         next.data = valid.entry;
-        next.exdates = entry.exdates.filter((d) => isRuleDay(valid.entry, d));
+        next.exdates = entry.exdates.filter((d) =>
+          isOccurrenceDate(valid.entry, d),
+        );
         next.overrides = Object.fromEntries(
           Object.entries(entry.overrides).filter(([d]) =>
-            isRuleDay(valid.entry, d),
+            isOccurrenceDate(valid.entry, d),
           ),
         );
       }

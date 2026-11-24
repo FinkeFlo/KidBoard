@@ -2,54 +2,39 @@ import {
   type AppConfig,
   calendarSecretName,
   type CalendarSource,
+  FEED_TIMEOUT_MS,
+  FLIGHT_MARGIN_MS,
 } from "@kidboard/shared";
 
 import { sha256Hex } from "../config/loadConfig";
 import type { Env } from "../env";
-import { FEED_TIMEOUT_MS, FeedFetchError, fetchFeed } from "../feeds/fetchFeed";
+import { FeedFetchError, fetchFeed } from "../feeds/fetchFeed";
 import {
+  DeadlineError,
+  FlightPausedError,
+  type SingleFlight,
+} from "../feeds/flight";
+import {
+  getSourceEntry,
+  putSourceEntry,
   SOURCE_ENTRY_VERSION,
   type SourceEntry,
   sourceKey,
   type SourceStore,
   type StoreBackend,
 } from "../feeds/sourceStore";
+import { errorName } from "../http/errors";
 import { FeedParseError } from "../ical/errors";
 import { expandCalendar, type ExpandWarning } from "../ical/expandCalendar";
 import { logError, logWarn } from "../log";
 import { normalize } from "../normalize/normalize";
 
+/** After a failed feed load the source is not fetched again for 5 minutes (per isolate). */
+export const FEED_RETRY_AFTER_FAILURE_MS = 5 * 60 * 1000;
+
 export type SourceResult =
   | { id: string; status: "ok" | "stale"; entry: SourceEntry }
   | { id: string; status: "error" };
-
-/** An upstream load shared by concurrent requests of one isolate. */
-export interface Flight {
-  promise: Promise<SourceEntry>;
-  /** Clock time (`LoadSourceContext.nowMs`) the load started. */
-  startedAtMs: number;
-}
-
-/** Slack on top of the fetch timeout for expansion and normalization of a flight. */
-export const FLIGHT_MARGIN_MS = 1000;
-
-/** `promise`, or a `timeout` FeedFetchError after `ms` (the timer is cleared). */
-export async function withDeadline<T>(
-  promise: Promise<T>,
-  ms: number,
-): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new FeedFetchError("timeout"));
-    }, ms);
-  });
-  try {
-    return await Promise.race([promise, deadline]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 export interface LoadSourceContext {
   env: Env;
@@ -61,8 +46,8 @@ export interface LoadSourceContext {
   freshTtlSeconds: number;
   store: SourceStore;
   backend: StoreBackend;
-  /** Upstream loads in progress in this isolate, by source key and window. */
-  inflight: Map<string, Flight>;
+  /** Upstream loads of this isolate by source key and window (single flight, failure pause). */
+  flights: SingleFlight<SourceEntry>;
   /** Keeps background work (cache writes) alive after the response. */
   defer: (work: Promise<unknown>) => void;
   fetchTimeoutMs?: number;
@@ -71,15 +56,14 @@ export interface LoadSourceContext {
 
 /**
  * Resolves the secret URL. `webcal://` (as offered by some calendar apps) is mapped to
- * `https://`. Returns null for anything that is not an http(s) URL.
+ * `https://`. Returns null for anything that is not an https URL: the address is the
+ * calendar's password and must not travel unencrypted.
  */
 function resolveFeedUrl(raw: string): string | null {
   const value = raw.trim().replace(/^webcal:\/\//i, "https://");
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:"
-      ? url.toString()
-      : null;
+    return url.protocol === "https:" ? url.toString() : null;
   } catch {
     return null;
   }
@@ -107,8 +91,14 @@ function describeFailure(error: unknown): string {
   if (error instanceof FeedParseError) {
     return `parse-${error.reason}`;
   }
+  if (error instanceof DeadlineError) {
+    return "timeout";
+  }
+  if (error instanceof FlightPausedError) {
+    return "paused after an earlier failure";
+  }
   // Unexpected error: log its type only (messages may quote feed content).
-  return `internal ${error instanceof Error ? error.name : typeof error}`;
+  return `internal ${errorName(error)}`;
 }
 
 function summarizeWarnings(warnings: readonly ExpandWarning[]): string {
@@ -140,7 +130,7 @@ async function fetchAndNormalize(
       `source "${source.id}": ${summarizeWarnings(expanded.warnings)}${expanded.truncated ? " (truncated)" : ""}`,
     );
   }
-  const { events, meals } = normalize(
+  const { events, meals, truncated } = normalize(
     expanded.occurrences,
     source,
     ctx.config,
@@ -154,7 +144,7 @@ async function fetchAndNormalize(
     sourceId: source.id,
     fetchedAt: new Date(ctx.nowMs).toISOString(),
     window: { ...ctx.window },
-    truncated: expanded.truncated,
+    truncated: expanded.truncated || truncated,
     events,
     meals,
   };
@@ -179,9 +169,7 @@ export async function loadSource(
   }
   const url = resolveFeedUrl(raw);
   if (url === null) {
-    logError(
-      `source "${source.id}": secret ${secretName} is not an http(s) URL`,
-    );
+    logError(`source "${source.id}": secret ${secretName} is not an https URL`);
     return { id: source.id, status: "error" };
   }
 
@@ -191,46 +179,30 @@ export async function loadSource(
     await sha256Hex(`${ctx.configHash}\n${source.id}\n${url}`)
   ).slice(0, 32);
   const key = sourceKey(source.id, hash);
-  const cached = await ctx.store.get(ctx.backend, key, ctx.nowMs);
+  const cached = await getSourceEntry(ctx.store, ctx.backend, key, ctx.nowMs);
   if (cached !== null && isFresh(cached, ctx)) {
     return { id: source.id, status: "ok", entry: cached };
   }
 
-  // Single flight per isolate: concurrent requests share one upstream load.
-  const flightKey = `${key}@${ctx.window.from}`;
-  const maxFlightMs =
-    (ctx.fetchTimeoutMs ?? FEED_TIMEOUT_MS) + FLIGHT_MARGIN_MS;
-  let flight = ctx.inflight.get(flightKey);
-  // A flight older than the fetch timeout plus margin is dead (e.g. its request was
-  // cancelled before `waitUntil` took over): never join it, start a new one.
-  if (flight === undefined || ctx.nowMs - flight.startedAtMs > maxFlightMs) {
-    const promise = fetchAndNormalize(source, url, ctx).then((entry) => {
-      ctx.defer(
-        ctx.store.put(ctx.backend, key, entry).catch(() => {
-          logWarn(
-            `source "${source.id}": ${ctx.backend.kind} cache write failed`,
-          );
-        }),
-      );
-      return entry;
-    });
-    const own: Flight = { promise, startedAtMs: ctx.nowMs };
-    const cleanup = (): void => {
-      if (ctx.inflight.get(flightKey) === own) {
-        ctx.inflight.delete(flightKey);
-      }
-    };
-    promise.then(cleanup, cleanup);
-    ctx.inflight.set(flightKey, own);
-    // The owner keeps the load alive even if its client disconnects (bounded, so a
-    // load that never settles cannot pin the request context either).
-    ctx.defer(withDeadline(promise, maxFlightMs).catch(() => undefined));
-    flight = own;
-  }
-
+  // Single flight per isolate: concurrent requests share one upstream load; after a
+  // failure the source is not asked again for FEED_RETRY_AFTER_FAILURE_MS.
   try {
-    // Every waiter (owner or follower) gives up after `maxFlightMs`.
-    const entry = await withDeadline(flight.promise, maxFlightMs);
+    const entry = await ctx.flights.run(`${key}@${ctx.window.from}`, {
+      nowMs: ctx.nowMs,
+      maxMs: (ctx.fetchTimeoutMs ?? FEED_TIMEOUT_MS) + FLIGHT_MARGIN_MS,
+      defer: ctx.defer,
+      load: async () => {
+        const fresh = await fetchAndNormalize(source, url, ctx);
+        ctx.defer(
+          putSourceEntry(ctx.store, ctx.backend, key, fresh).catch(() => {
+            logWarn(
+              `source "${source.id}": ${ctx.backend.kind} cache write failed`,
+            );
+          }),
+        );
+        return fresh;
+      },
+    });
     return { id: source.id, status: "ok", entry };
   } catch (error) {
     logWarn(

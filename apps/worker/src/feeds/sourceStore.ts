@@ -35,8 +35,8 @@ export type SourceEntry = z.infer<typeof SourceEntrySchema>;
 /** ADR-0006: an entry is kept (and usable as last-good) for 7 days. */
 export const LAST_GOOD_TTL_SECONDS = 7 * 24 * 60 * 60;
 
-/** Max entries in the per-isolate memory layer (one per source). */
-const MEMORY_LIMIT = 64;
+/** Default max entries in the per-isolate memory layer (one per source). */
+const DEFAULT_MEMORY_LIMIT = 64;
 
 /**
  * Logical key of a source's entry. One entry per source serves both roles: it is
@@ -106,29 +106,38 @@ export function cacheBackend(openCache: () => Promise<Cache>): StoreBackend {
 }
 
 interface MemoryItem {
-  entry: SourceEntry;
+  entry: unknown;
   expiresAtMs: number;
 }
 
 /**
- * Store for {@link SourceEntry}s: a small per-isolate memory map in front of a
- * persistent {@link StoreBackend} (KV when bound, else the Cache API; ADR-0006).
- * Entries are validated on read and expire after {@link LAST_GOOD_TTL_SECONDS},
- * enforced by the backend's TTL and by the entry's own `fetchedAt`.
+ * Cache of validated entries (feed sources, weather): a small per-isolate memory map in
+ * front of a persistent {@link StoreBackend} (KV when bound, else the Cache API;
+ * ADR-0006). Entries are checked against their zod schema on read and expire at the
+ * time `expiresAtMs` computes from them, additionally enforced by the backend's TTL.
+ * Keys must not be shared between schemas (they carry a type prefix such as
+ * `v1/source/...`).
  */
 export class SourceStore {
   readonly #memory = new Map<string, MemoryItem>();
+  readonly #memoryLimit: number;
 
-  /** Returns the entry under `key` if it is younger than 7 days at `nowMs`. */
-  async get(
+  constructor(memoryLimit = DEFAULT_MEMORY_LIMIT) {
+    this.#memoryLimit = memoryLimit;
+  }
+
+  /** The entry under `key` if it is valid and not expired at `nowMs`, else `null`. */
+  async get<T>(
     backend: StoreBackend,
     key: string,
+    schema: z.ZodType<T>,
+    expiresAtMs: (entry: T) => number,
     nowMs: number,
-  ): Promise<SourceEntry | null> {
+  ): Promise<T | null> {
     const item = this.#memory.get(key);
     if (item !== undefined) {
       if (item.expiresAtMs > nowMs) {
-        return item.entry;
+        return item.entry as T;
       }
       this.#memory.delete(key);
     }
@@ -137,11 +146,11 @@ export class SourceStore {
       if (text === null) {
         return null;
       }
-      const parsed = SourceEntrySchema.safeParse(JSON.parse(text));
+      const parsed = schema.safeParse(JSON.parse(text));
       if (!parsed.success || expiresAtMs(parsed.data) <= nowMs) {
         return null;
       }
-      this.#remember(key, parsed.data);
+      this.#remember(key, parsed.data, expiresAtMs(parsed.data));
       return parsed.data;
     } catch {
       // Unreadable entry or backend failure: treat as a miss.
@@ -149,14 +158,16 @@ export class SourceStore {
     }
   }
 
-  /** Stores `entry` in memory immediately and in the backend for 7 days. */
+  /** Stores `entry` in memory immediately and in the backend for `ttlSeconds`. */
   async put(
     backend: StoreBackend,
     key: string,
-    entry: SourceEntry,
+    entry: unknown,
+    expiresAtMs: number,
+    ttlSeconds: number,
   ): Promise<void> {
-    this.#remember(key, entry);
-    await backend.write(key, JSON.stringify(entry), LAST_GOOD_TTL_SECONDS);
+    this.#remember(key, entry, expiresAtMs);
+    await backend.write(key, JSON.stringify(entry), ttlSeconds);
   }
 
   /**
@@ -168,18 +179,44 @@ export class SourceStore {
     await backend.delete(key);
   }
 
-  #remember(key: string, entry: SourceEntry): void {
+  #remember(key: string, entry: unknown, expiresAtMs: number): void {
     this.#memory.delete(key);
-    if (this.#memory.size >= MEMORY_LIMIT) {
+    if (this.#memory.size >= this.#memoryLimit) {
       const oldest = this.#memory.keys().next();
       if (oldest.done !== true) {
         this.#memory.delete(oldest.value);
       }
     }
-    this.#memory.set(key, { entry, expiresAtMs: expiresAtMs(entry) });
+    this.#memory.set(key, { entry, expiresAtMs });
   }
 }
 
-function expiresAtMs(entry: SourceEntry): number {
+function sourceExpiresAtMs(entry: SourceEntry): number {
   return Date.parse(entry.fetchedAt) + LAST_GOOD_TTL_SECONDS * 1000;
+}
+
+/** The {@link SourceEntry} under `key` if younger than 7 days at `nowMs`. */
+export function getSourceEntry(
+  store: SourceStore,
+  backend: StoreBackend,
+  key: string,
+  nowMs: number,
+): Promise<SourceEntry | null> {
+  return store.get(backend, key, SourceEntrySchema, sourceExpiresAtMs, nowMs);
+}
+
+/** Stores a {@link SourceEntry} for 7 days (last-good, ADR-0006). */
+export function putSourceEntry(
+  store: SourceStore,
+  backend: StoreBackend,
+  key: string,
+  entry: SourceEntry,
+): Promise<void> {
+  return store.put(
+    backend,
+    key,
+    entry,
+    sourceExpiresAtMs(entry),
+    LAST_GOOD_TTL_SECONDS,
+  );
 }

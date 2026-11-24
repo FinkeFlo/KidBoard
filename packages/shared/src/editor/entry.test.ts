@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EditorEntryInputSchema, EditorEntrySchema } from "./entry";
+import { EditorEntryInputSchema } from "./entry";
 import { editorTestConfig } from "./testConfig.test-utils";
 import { parseEditorEntryInput } from "./validate";
 
@@ -155,28 +155,6 @@ describe("EditorEntryInputSchema", () => {
     ]) {
       expect(issuesOf(value), JSON.stringify(value)).toEqual([]);
     }
-  });
-
-  it("EditorEntrySchema allows zero-length and any title read from Google", () => {
-    const stored = {
-      ...event,
-      endTime: "17:00",
-      title: "",
-      childIds: [],
-      repeat: "none",
-      bring: [],
-      countdown: false,
-      id: "evt",
-      sourceId: "kinder",
-      repeatEditable: true,
-    };
-    expect(EditorEntrySchema.safeParse(stored).success).toBe(true);
-    expect(
-      EditorEntrySchema.safeParse({ ...stored, endTime: "16:00" }).success,
-    ).toBe(false);
-    expect(EditorEntrySchema.safeParse({ ...stored, id: "" }).success).toBe(
-      false,
-    );
   });
 });
 

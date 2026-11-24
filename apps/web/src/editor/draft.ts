@@ -8,7 +8,7 @@ import {
   type EditorGoogleItem,
   type EditorTemplate,
   EmojiSchema,
-  formatZonedDateTime,
+  formatInstant,
   isoWeekday,
   type MealSlot,
   minutesOfTime,
@@ -500,11 +500,8 @@ export function previewEvent(
   return {
     ...base,
     allDay: false,
-    start: formatZonedDateTime(range.startMs, timeZone),
-    end: formatZonedDateTime(
-      Math.max(range.endMs, range.startMs + 60_000),
-      timeZone,
-    ),
+    start: formatInstant(range.startMs, timeZone),
+    end: formatInstant(Math.max(range.endMs, range.startMs + 60_000), timeZone),
   };
 }
 

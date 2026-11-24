@@ -26,6 +26,7 @@ import eventsIcs from "../../../fixtures/ics/api-events.ics?raw";
 import mealsIcs from "../../../fixtures/ics/api-meals.ics?raw";
 import bringIcs from "../../../fixtures/ics/bring.ics?raw";
 import runawayIcs from "../../../fixtures/ics/runaway.ics?raw";
+import { FEED_RETRY_AFTER_FAILURE_MS } from "./agenda/loadSource";
 import { type AppOptions, createApp } from "./app";
 import type { Env } from "./env";
 import worker from "./index";
@@ -42,7 +43,7 @@ const SECRET_FRAGMENTS = [
   "private-TESTONLY-kinder-7f3a",
   "private-TESTONLY-essen-91bc",
 ];
-const TOKEN = "test-token-4d1e9c";
+const TOKEN = "TESTONLY-access-token-not-a-secret-0123456789";
 
 const CONFIG: AppConfigInput = {
   locale: "de",
@@ -66,6 +67,8 @@ function baseEnv(overrides: Partial<Env> = {}): Env {
     KIDBOARD_CONFIG: JSON.stringify(CONFIG),
     CAL_KINDER_URL: KINDER_URL,
     CAL_ESSEN_URL: ESSEN_URL,
+    // Board tests that do not exercise the access token run as a public board.
+    KIDBOARD_PUBLIC: "1",
     ...overrides,
   };
 }
@@ -656,8 +659,8 @@ describe("single flight", () => {
     }
   });
 
-  it("bounds waiting on a flight that never settles and replaces it once it is dead", async () => {
-    // fetchTimeoutMs 50 → a flight is dead after 50 + FLIGHT_MARGIN_MS (1000) ms.
+  it("bounds waiting on a flight that never settles, then pauses the source for 5 minutes", async () => {
+    // fetchTimeoutMs 50 → every waiter gives up after 50 + FLIGHT_MARGIN_MS (1000) ms.
     const h = harness({ fetchTimeoutMs: 50 });
     // Ignores the abort signal and never settles, like a load whose request was cancelled.
     serve(KINDER_URL, () => new Promise<Response>(() => undefined));
@@ -674,28 +677,50 @@ describe("single flight", () => {
     );
 
     serveIcs(KINDER_URL, eventsIcs);
-    // Still within the limit: joins the (dead) flight, but only waits until the deadline.
+    // Paused after the failure: no new fetch, the board answers without waiting.
     h.clock.now = NOW + 1000;
-    const joined = await agenda(h);
-    expect(joined.body.sources[0]?.status).toBe("error");
+    const paused = await agenda(h);
+    expect(paused.body.sources[0]?.status).toBe("error");
     expect(kinderFetches()).toBe(1);
 
-    // Past the limit: the dead flight is ignored and a new fetch starts.
-    h.clock.now = NOW + 1051;
+    // After the pause the source is fetched again.
+    h.clock.now = NOW + FEED_RETRY_AFTER_FAILURE_MS + 1;
     const fresh = await agenda(h);
     expect(fresh.body.sources[0]?.status).toBe("ok");
     expect(fresh.body.events).toHaveLength(4);
     expect(kinderFetches()).toBe(2);
   });
 
-  it("does not keep a failed flight around", async () => {
+  it("does not fetch a failing feed on every request, but pauses it for 5 minutes", async () => {
     fail(KINDER_URL);
     serveIcs(ESSEN_URL, mealsIcs);
     const h = harness();
     await agenda(h);
+    const kinderFetches = (): number =>
+      fetchedUrls().filter((u) => u === KINDER_URL).length;
+    expect(kinderFetches()).toBe(1);
     serveIcs(KINDER_URL, eventsIcs);
-    const { body } = await agenda(h);
-    expect(body.sources[0]?.status).toBe("ok");
+    h.clock.now = NOW + FEED_RETRY_AFTER_FAILURE_MS - 1000;
+    expect((await agenda(h)).body.sources[0]?.status).toBe("error");
+    expect(kinderFetches()).toBe(1);
+    h.clock.now = NOW + FEED_RETRY_AFTER_FAILURE_MS;
+    expect((await agenda(h)).body.sources[0]?.status).toBe("ok");
+    expect(kinderFetches()).toBe(2);
+  });
+
+  it("serves last-good data during the pause without asking the feed again", async () => {
+    const h = harness();
+    serveIcs(KINDER_URL, eventsIcs);
+    serveIcs(ESSEN_URL, mealsIcs);
+    await agenda(h);
+    h.clock.now = NOW + 2 * HOUR; // past the default TTL, within 7 days
+    fail(KINDER_URL, 500);
+    expect((await agenda(h)).body.sources[0]?.status).toBe("stale");
+    const fetched = fetchSpy.mock.calls.length;
+    h.clock.now += 60_000;
+    expect((await agenda(h)).body.sources[0]?.status).toBe("stale");
+    expect(fetchSpy.mock.calls.length).toBe(fetched); // nothing fetched at all
+    expect(fetchedUrls().filter((u) => u === KINDER_URL)).toHaveLength(2); // priming + the one failed refresh
   });
 });
 
@@ -906,23 +931,31 @@ describe("GET /api/agenda – secrets", () => {
     );
   });
 
-  it("rejects secrets that are not http(s) URLs without fetching", async () => {
-    const { status, body } = await agenda(
-      harness(),
-      "",
-      baseEnv({
-        CAL_KINDER_URL:
-          "ftp://feeds.kidboard.invalid/private-TESTONLY-kinder-7f3a",
-        CAL_ESSEN_URL: "private-TESTONLY-essen-91bc",
-      }),
-    );
-    expect(status).toBe(502);
-    expect(body.sources.map((s) => s.status)).toEqual(["error", "error"]);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(consoleOutput.join("\n")).toContain(
-      'source "kinder": secret CAL_KINDER_URL is not an http(s) URL',
-    );
-  });
+  it.each([
+    ["ftp", "ftp://feeds.kidboard.invalid/private-TESTONLY-kinder-7f3a"],
+    [
+      "plain http",
+      "http://feeds.kidboard.invalid/private-TESTONLY-kinder-7f3a",
+    ],
+  ])(
+    "rejects secrets that are not https URLs (%s) without fetching",
+    async (_, url) => {
+      const { status, body } = await agenda(
+        harness(),
+        "",
+        baseEnv({
+          CAL_KINDER_URL: url,
+          CAL_ESSEN_URL: "private-TESTONLY-essen-91bc",
+        }),
+      );
+      expect(status).toBe(502);
+      expect(body.sources.map((s) => s.status)).toEqual(["error", "error"]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(consoleOutput.join("\n")).toContain(
+        'source "kinder": secret CAL_KINDER_URL is not an https URL',
+      );
+    },
+  );
 });
 
 describe("invalid config", () => {
@@ -1239,6 +1272,8 @@ describe("access token", () => {
   it.each([
     ["the template value", "REPLACE_ME"],
     ["a value still containing the marker", "my-replace_me-token"],
+    ["a token shorter than 32 characters", "familie2026"],
+    ["a token with other characters", `${"a".repeat(40)} !`],
   ])(
     "fails closed with 500 for %s, even when the client sends it",
     async (_, placeholder) => {
@@ -1263,7 +1298,7 @@ describe("access token", () => {
       }
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(consoleOutput.join("\n")).toContain(
-        "KIDBOARD_ACCESS_TOKEN is still the template placeholder",
+        "KIDBOARD_ACCESS_TOKEN is not usable",
       );
       // The placeholder value itself is not logged.
       expect(consoleOutput.join("\n")).not.toContain(placeholder);
@@ -1277,13 +1312,59 @@ describe("access token", () => {
     },
   );
 
-  it("is disabled when the variable is empty", async () => {
-    const response = await harness().call(
-      "/api/config",
-      undefined,
-      baseEnv({ KIDBOARD_ACCESS_TOKEN: "" }),
+  it.each([
+    ["not set", undefined],
+    ["empty", ""],
+  ])("fails closed with 500 when the token is %s", async (_, value) => {
+    const h = harness();
+    const bare = baseEnv();
+    delete bare.KIDBOARD_PUBLIC;
+    const e =
+      value === undefined ? bare : { ...bare, KIDBOARD_ACCESS_TOKEN: value };
+    for (const path of ["/api/agenda", "/api/config", "/api/weather"]) {
+      const response = await h.call(path, undefined, e);
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        error: "server_misconfigured",
+        message: "Server configuration is invalid",
+      });
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(consoleOutput.join("\n")).toContain(
+      "KIDBOARD_ACCESS_TOKEN is not set",
     );
-    expect(response.status).toBe(200);
+    expect((await h.call("/api/health", undefined, e)).status).toBe(200);
+  });
+
+  it("serves a public read-only board only with the explicit KIDBOARD_PUBLIC=1 opt-in", async () => {
+    const h = harness();
+    for (const token of [undefined, ""]) {
+      const e = baseEnv({ KIDBOARD_PUBLIC: "1" });
+      if (token !== undefined) {
+        e.KIDBOARD_ACCESS_TOKEN = token;
+      }
+      expect((await h.call("/api/config", undefined, e)).status).toBe(200);
+    }
+    // Any other value is not an opt-in.
+    for (const value of ["", "0", "true", "yes"]) {
+      const e = baseEnv({ KIDBOARD_PUBLIC: value });
+      expect((await h.call("/api/config", undefined, e)).status).toBe(500);
+    }
+  });
+
+  it("still requires a valid token when KIDBOARD_PUBLIC=1 is set next to it", async () => {
+    const h = harness();
+    const e = baseEnv({ KIDBOARD_PUBLIC: "1", KIDBOARD_ACCESS_TOKEN: TOKEN });
+    expect((await h.call("/api/config", undefined, e)).status).toBe(401);
+    expect(
+      (await h.call(`/api/config?key=${TOKEN}`, undefined, e)).status,
+    ).toBe(200);
+    // A broken token is never rescued by the opt-in.
+    const broken = baseEnv({
+      KIDBOARD_PUBLIC: "1",
+      KIDBOARD_ACCESS_TOKEN: "x",
+    });
+    expect((await h.call("/api/config", undefined, broken)).status).toBe(500);
   });
 });
 

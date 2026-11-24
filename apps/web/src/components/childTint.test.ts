@@ -29,14 +29,13 @@ describe("resolveChildTint", () => {
     );
   });
 
-  it("mixes other CSS colours 20 % into the surface", () => {
+  it("mixes hex colours 20 % into the surface", () => {
     expect(resolveChildTint("#ff00aa")).toBe(
       "color-mix(in oklab, #ff00aa 20%, var(--color-surface))",
     );
-    expect(resolveChildTint({ color: "tomato" })).toBe(
-      "color-mix(in oklab, tomato 20%, var(--color-surface))",
+    expect(resolveChildTint({ color: "#e45" })).toBe(
+      "color-mix(in oklab, #e45 20%, var(--color-surface))",
     );
-    expect(resolveChildTint("rgb(10 20 30)")).toContain("rgb(10 20 30) 20%");
   });
 
   it("falls back to the neutral fill for unusable colours", () => {

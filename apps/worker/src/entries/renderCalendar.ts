@@ -16,6 +16,7 @@ import {
 } from "@kidboard/shared";
 import ICAL from "ical.js";
 
+import { errorName } from "../http/errors";
 import { logWarn } from "../log";
 import type { AppEntry } from "./entryStore";
 
@@ -135,7 +136,7 @@ function compositionCode(error: unknown): string {
     return error.code;
   }
   // Unexpected: log the type only (never entry text).
-  return `internal ${error instanceof Error ? error.name : typeof error}`;
+  return `internal ${errorName(error)}`;
 }
 
 /**

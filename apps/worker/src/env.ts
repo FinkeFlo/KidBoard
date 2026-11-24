@@ -9,8 +9,17 @@
 export interface Env {
   /** Non-secret settings as one JSON document (docs/CONFIG.md). Required. */
   KIDBOARD_CONFIG?: string;
-  /** If set (non-empty), `/api/*` except `/api/health` requires this token. */
+  /**
+   * Token that `/api/*` (except `/api/health` and the phone feed) requires: 32 to 256
+   * characters of `A-Z a-z 0-9 _ -`. Missing or unusable → the API answers 500
+   * `server_misconfigured` (fail closed), unless `KIDBOARD_PUBLIC` is `"1"`.
+   */
   KIDBOARD_ACCESS_TOKEN?: string;
+  /**
+   * `"1"` = deliberately public, read-only board without an access token. Only honoured
+   * while `KIDBOARD_ACCESS_TOKEN` is unset or empty; the editor still needs the token.
+   */
+  KIDBOARD_PUBLIC?: string;
   /** Comma-separated list of allowed CORS origins; default none. */
   KIDBOARD_ALLOWED_ORIGINS?: string;
   /** Seconds a fetched feed counts as fresh; default 3600. */

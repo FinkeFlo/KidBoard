@@ -112,4 +112,15 @@ export class SchemaGate {
   forget(db: D1Database): void {
     this.ready.delete(db);
   }
+
+  /** Ensures the schema, then runs `op`; a D1 error re-checks the schema next time. */
+  async run<T>(db: D1Database, op: () => Promise<T>): Promise<T> {
+    await this.ensure(db);
+    try {
+      return await op();
+    } catch (error) {
+      this.forget(db);
+      throw error;
+    }
+  }
 }

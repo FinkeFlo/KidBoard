@@ -1,19 +1,19 @@
-import { isValidTimeZone } from "@kidboard/shared";
-import ICAL from "ical.js";
-
-import { FeedParseError } from "./errors";
-import { fastForwardStart } from "./fastForward";
 import {
-  type CalendarDate,
   formatCalendarDate,
   formatInstant,
+  isValidTimeZone,
   naiveUtcMs,
   parseCalendarDate,
+  shiftCalendarDate,
   startOfDayMs,
   type WallTime,
   wallTimeAt,
   wallTimeToEpochMs,
-} from "./zonedTime";
+} from "@kidboard/shared";
+import ICAL from "ical.js";
+
+import { FeedParseError } from "./errors";
+import { fastForwardStart } from "./fastForward";
 
 /** One concrete occurrence of a VEVENT inside the requested window. */
 export interface Occurrence {
@@ -822,7 +822,7 @@ function emit(
     const startDate = formatCalendarDate(start);
     let endDate = formatCalendarDate(end);
     if (endDate <= startDate) {
-      endDate = formatCalendarDate(addDays(start, 1)); // Zero/negative length → 1 day.
+      endDate = formatCalendarDate(shiftCalendarDate(start, 1)); // Zero/negative length → 1 day.
     }
     if (startDate < window.to && endDate > window.from) {
       out.push({
@@ -966,16 +966,6 @@ function tzidParam(property: ICAL.Property | null): string | null {
 function textProp(component: ICAL.Component, name: string): string {
   const value: unknown = component.getFirstPropertyValue(name);
   return typeof value === "string" ? value : "";
-}
-
-function addDays(date: CalendarDate, days: number): CalendarDate {
-  const shifted = new Date(0);
-  shifted.setUTCFullYear(date.year, date.month - 1, date.day + days);
-  return {
-    year: shifted.getUTCFullYear(),
-    month: shifted.getUTCMonth() + 1,
-    day: shifted.getUTCDate(),
-  };
 }
 
 function compareBuilt(a: Built, b: Built): number {

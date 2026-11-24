@@ -1,6 +1,6 @@
 import type { PublicConfig } from "@kidboard/shared";
 
-import { minuteOfDay, timeOfDayMinutes } from "../time";
+import { minuteOfDay, minutesOfTime } from "../time";
 
 /** Night mode window of the config (`HH:mm`, `end` before `start` spans midnight). */
 export type NightMode = PublicConfig["nightMode"];
@@ -21,8 +21,8 @@ export function isNight(
     return false;
   }
   const minutes = minuteOfDay(instant, timeZone);
-  const start = timeOfDayMinutes(nightMode.start);
-  const end = timeOfDayMinutes(nightMode.end);
+  const start = minutesOfTime(nightMode.start);
+  const end = minutesOfTime(nightMode.end);
   return start < end
     ? minutes >= start && minutes < end
     : minutes >= start || minutes < end;

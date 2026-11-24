@@ -1,9 +1,10 @@
+import { PARENT_SESSION_HEADER } from "@kidboard/shared";
 import type { MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
 
 import { SchemaGate } from "../entries/schema";
 import type { Env } from "../env";
-import { PARENT_SESSION_HEADER } from "../http/cors";
+import { notFound } from "../http/errors";
 import { editorEnabled } from "./pin";
 
 /** ADR-0013: a parent session is valid for 15 minutes. */
@@ -181,14 +182,7 @@ export class SessionKeys {
   }
 
   private async load(db: D1Database, pin: string): Promise<CryptoKey> {
-    await this.gate.ensure(db);
-    let secret: Uint8Array;
-    try {
-      secret = await loadServerSecret(db);
-    } catch (error) {
-      this.gate.forget(db);
-      throw error;
-    }
+    const secret = await this.gate.run(db, () => loadServerSecret(db));
     return deriveSessionKey(secret, pin);
   }
 }
@@ -222,7 +216,7 @@ export function requireParentSession(
     const db = c.env.KIDBOARD_DATA;
     const pin = c.env.KIDBOARD_PARENT_PIN;
     if (!editorEnabled(c.env) || db === undefined || pin === undefined) {
-      return c.json({ error: "not_found", message: "Not found" }, 404);
+      return notFound(c);
     }
     const token = c.req.header(PARENT_SESSION_HEADER) ?? "";
     const exp =

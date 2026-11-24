@@ -14,26 +14,23 @@ import {
   type EditorWriteResponse,
   EditorWriteResponseSchema,
   type ImportModeValue,
+  PARENT_LOCKOUT_SECONDS,
+  PARENT_SESSION_HEADER,
   type ParentFeedResponse,
   ParentFeedResponseSchema,
   type PublicConfig,
   PublicConfigSchema,
   type WeatherResponse,
   WeatherResponseSchema,
+  WORKER_UPSTREAM_BUDGET_MS,
 } from "@kidboard/shared";
 import { z } from "zod";
 
 /**
- * Worst-case time the worker needs for `/api/agenda` before it answers with last-good
- * data or 502: the upstream feed timeout (10 s, `FEED_TIMEOUT_MS`) plus the flight
- * margin (1 s, `FLIGHT_MARGIN_MS`) in `apps/worker`. Sources load in parallel.
- */
-export const WORKER_UPSTREAM_BUDGET_MS = 11_000;
-/**
  * Client request timeout (headers and body). Must exceed the worker budget so a slow
  * upstream still lets stale data arrive; 4 s margin for KV I/O and weak Wi-Fi.
  */
-export const REQUEST_TIMEOUT_MS = 15_000;
+export const REQUEST_TIMEOUT_MS = WORKER_UPSTREAM_BUDGET_MS + 4000;
 
 /** Classification of failed API calls; drives retries and the connection status. */
 export type ApiErrorKind =
@@ -77,15 +74,9 @@ export class ApiError extends Error {
 /** Requested agenda range: `days` days starting at `from` (`YYYY-MM-DD`, config zone). */
 export interface AgendaRange {
   from: string;
-  /** 1-14 (worker limit). */
+  /** 1 to `MAX_AGENDA_DAYS` (worker limit). */
   days: number;
 }
-
-/** Header that carries the parent session token (ADR-0013). */
-export const PARENT_SESSION_HEADER = "X-KidBoard-Parent";
-
-/** Lockout length when neither `Retry-After` nor the body says (ADR-0013: 15 min). */
-export const DEFAULT_LOCKOUT_SECONDS = 15 * 60;
 
 /**
  * Answer of `POST /api/parent/unlock` for its three expected outcomes. Anything else
@@ -292,7 +283,7 @@ interface RawResponse {
 
 /**
  * Seconds until a lockout ends: the `Retry-After` header (delta seconds, ADR-0013), else
- * the body's `retryAfterSeconds`, else {@link DEFAULT_LOCKOUT_SECONDS}.
+ * the body's `retryAfterSeconds`, else {@link PARENT_LOCKOUT_SECONDS}.
  */
 function lockoutSeconds(response: RawResponse): number {
   const header = response.headers.get("Retry-After")?.trim() ?? "";
@@ -305,7 +296,7 @@ function lockoutSeconds(response: RawResponse): number {
   } catch {
     // Not JSON: fall back to the default.
   }
-  return DEFAULT_LOCKOUT_SECONDS;
+  return PARENT_LOCKOUT_SECONDS;
 }
 
 /**

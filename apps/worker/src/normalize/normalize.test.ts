@@ -9,14 +9,20 @@ import { describe, expect, it } from "vitest";
 
 import dstIcs from "../../../../fixtures/ics/dst.ics?raw";
 import { expandCalendar, type Occurrence } from "../ical/expandCalendar";
-import { normalize } from "./normalize";
+import {
+  limitTitle,
+  MAX_ITEMS_PER_SOURCE,
+  MAX_TITLE_GRAPHEMES,
+  normalize,
+  type NormalizeResult,
+} from "./normalize";
 
 function makeConfig(): AppConfig {
   const result = parseConfig({
     timeZone: "Europe/Berlin",
     children: [
-      { id: "mia", name: "Mia", color: "blue", avatar: "🦊" },
-      { id: "ben", name: "Ben", color: "green", avatar: "🐻" },
+      { id: "mia", name: "Mia", color: "#0000cc", avatar: "🦊" },
+      { id: "ben", name: "Ben", color: "#008800", avatar: "🐻" },
     ],
     calendars: [
       { id: "kinder", kind: "events" },
@@ -60,7 +66,7 @@ function allDay(
   return occ({ summary, start, end, allDay: true, uid });
 }
 
-function validate(result: ReturnType<typeof normalize>): void {
+function validate(result: Pick<NormalizeResult, "events" | "meals">): void {
   for (const e of result.events) {
     expect(CalendarEventSchema.safeParse(e).success).toBe(true);
   }
@@ -572,5 +578,82 @@ describe("normalize with expandCalendar output", () => {
       },
     );
     validate(asMeals);
+  });
+});
+
+describe("normalize limits", () => {
+  it("keeps titles up to the limit and cuts longer ones by graphemes", () => {
+    const exact = "a".repeat(MAX_TITLE_GRAPHEMES);
+    expect(limitTitle(exact)).toBe(exact);
+    const long = "b".repeat(5000);
+    const cut = limitTitle(long);
+    expect(Array.from(cut)).toHaveLength(MAX_TITLE_GRAPHEMES);
+    expect(cut.endsWith("…")).toBe(true);
+    // Emoji sequences count as one grapheme and are never split.
+    const family = "👨‍👩‍👧‍👦";
+    const emojis = family.repeat(MAX_TITLE_GRAPHEMES + 5);
+    expect(limitTitle(emojis)).toBe(
+      `${family.repeat(MAX_TITLE_GRAPHEMES - 1)}…`,
+    );
+    // Short in graphemes although long in UTF-16 units: untouched.
+    const few = family.repeat(20);
+    expect(limitTitle(few)).toBe(few);
+  });
+
+  it("limits the title of events and meals", () => {
+    const summary = `⚽ ${"x".repeat(1000)}`;
+    const events = normalize([occ({ summary })], family, config);
+    expect(Array.from(events.events[0]?.title ?? "")).toHaveLength(
+      MAX_TITLE_GRAPHEMES,
+    );
+    const meals = normalize([occ({ summary })], essen, config);
+    expect(Array.from(meals.meals[0]?.title ?? "")).toHaveLength(
+      MAX_TITLE_GRAPHEMES,
+    );
+  });
+
+  it("keeps at most MAX_ITEMS_PER_SOURCE items, earliest first, and says so", () => {
+    const many = (n: number): Occurrence[] =>
+      Array.from({ length: n }, (_, i) =>
+        occ({
+          summary: `⚽ T${String(i)}`,
+          uid: `u${String(i)}`,
+          start: new Date(
+            Date.UTC(2026, 2, 10, 12, 0, 0) + i * 60_000,
+          ).toISOString(),
+          end: new Date(
+            Date.UTC(2026, 2, 10, 12, 0, 30) + i * 60_000,
+          ).toISOString(),
+        }),
+      );
+    const within = normalize(many(MAX_ITEMS_PER_SOURCE), family, config);
+    expect(within.events).toHaveLength(MAX_ITEMS_PER_SOURCE);
+    expect(within.truncated).toBe(false);
+
+    const over = normalize(many(MAX_ITEMS_PER_SOURCE + 50), family, config);
+    expect(over.events).toHaveLength(MAX_ITEMS_PER_SOURCE);
+    expect(over.truncated).toBe(true);
+    expect(over.events[0]?.title).toBe("T0");
+    expect(over.events.at(-1)?.title).toBe(
+      `T${String(MAX_ITEMS_PER_SOURCE - 1)}`,
+    );
+  });
+
+  it("cuts chronologically: far-ahead all-day events do not push out today's timed one", () => {
+    const future = Array.from({ length: MAX_ITEMS_PER_SOURCE }, (_, i) =>
+      allDay(`🎈 F${String(i)}`, "2026-04-01", "2026-04-02", `f${String(i)}`),
+    );
+    const today = occ({
+      summary: "⚽ Heute",
+      uid: "today",
+      start: "2026-03-10T15:00:00+01:00",
+      end: "2026-03-10T16:00:00+01:00",
+    });
+    const result = normalize([...future, today], family, config);
+    expect(result.truncated).toBe(true);
+    expect(result.events).toHaveLength(MAX_ITEMS_PER_SOURCE);
+    expect(result.events.some((e) => e.title === "Heute")).toBe(true);
+    // Output order stays all-day first.
+    expect(result.events[0]?.allDay).toBe(true);
   });
 });

@@ -22,7 +22,7 @@ import { FEED_CONTENT_TYPE } from "./routes";
 import { resetFeedTokenWarning } from "./token";
 
 const PIN = "246813";
-const ACCESS = "TESTONLY-access-not-a-secret";
+const ACCESS = "TESTONLY-access-token-not-a-secret-0123456789";
 const FEED_TOKEN = "TESTONLY-feed-token-not-a-secret-0123456789";
 const FEED_PATH = `/api/feed.ics?token=${FEED_TOKEN}`;
 const db = testEnv.KIDBOARD_DATA;
@@ -78,6 +78,8 @@ function env(
     KIDBOARD_DATA: db,
     KIDBOARD_PARENT_PIN: PIN,
     KIDBOARD_ACCESS_TOKEN: ACCESS,
+    // Lets requests without an access token reach the (editor-off) behaviour under test.
+    KIDBOARD_PUBLIC: "1",
     KIDBOARD_FEED_TOKEN: FEED_TOKEN,
     ...overrides,
   };
@@ -297,7 +299,7 @@ describe("GET /api/feed.ics?token=", () => {
     expect(reply.status).toBe(503);
     expect(JSON.parse(reply.text)).toEqual({
       error: "storage_unavailable",
-      message: "Try again later",
+      message: "Entries are unavailable; try again",
     });
     expect(reply.headers.get("Cache-Control")).toBe("no-store");
     expect(consoleOutput.join("\n")).toContain(

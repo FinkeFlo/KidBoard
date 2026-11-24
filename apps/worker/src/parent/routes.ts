@@ -9,10 +9,11 @@ import type { AppEnv } from "../env";
 import { feedPath } from "../feed/path";
 import { configuredFeedToken } from "../feed/token";
 import { tokensEqual } from "../http/auth";
+import { errorName, notFound } from "../http/errors";
 import { parseJsonBody, payloadTooLarge } from "../http/jsonBody";
 import { logWarn } from "../log";
 import { IMPORT_ROUTE, registerEditorRoutes } from "./editorRoutes";
-import { UnlockLimiter } from "./lockout";
+import { clearFailures, recordFailure, reserveAttempt } from "./lockout";
 import { editorEnabled } from "./pin";
 import {
   type ParentEnv,
@@ -60,25 +61,25 @@ function isoSeconds(epochSeconds: number): string {
  *   `payload_too_large`;
  * * `POST /unlock` `{ pin }` → `{ token, expiresAt }` (15 min); wrong PIN → 403
  *   `wrong_pin` with `attemptsLeft`; the 5th wrong PIN within 15 min and every request
- *   during the following 15 min → 429 `parent_lockout` with `Retry-After`. Each attempt
- *   is reserved against the limit before the PIN is compared; the right PIN clears the
- *   wrong ones of the window (see `UnlockLimiter`);
+ *   during the following lockout (15 min, doubling per repeated lockout, at most 2 h)
+ *   → 429 `parent_lockout` with `Retry-After`. Each attempt is reserved against the
+ *   limit before the PIN is compared; the right PIN clears the wrong ones and the
+ *   escalation (see `lockout.ts`);
  * * `GET /session` (needs {@link requireParentSession}) → `{ expiresAt }`;
  * * `GET /feed` (session) → `{ feedUrl }`, the relative phone feed path, only while
  *   `KIDBOARD_FEED_TOKEN` is valid (`ParentFeedResponseSchema`);
  * * the editor API (`./editorRoutes.ts`, T-43), behind the same session guard.
  *
- * State (key cache, per-isolate failure counter) lives in the returned instance.
+ * The key cache lives in the returned instance; the attempt counters live in D1.
  */
 export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
   const keys = new SessionKeys();
-  const limiter = new UnlockLimiter();
   const requireSession = requireParentSession({ keys, now: options.now });
   const app = new Hono<AppEnv>();
 
   app.use("*", async (c, next) => {
     if (!editorEnabled(c.env)) {
-      return c.json({ error: "not_found", message: "Not found" }, 404);
+      return notFound(c);
     }
     await next();
   });
@@ -100,72 +101,56 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
     const expected = c.env.KIDBOARD_PARENT_PIN;
     if (db === undefined || expected === undefined) {
       // Unreachable behind the editor gate; keeps the types honest.
-      return c.json({ error: "not_found", message: "Not found" }, 404);
+      return notFound(c);
     }
     const nowSeconds = Math.floor(options.now() / 1000);
-    // Reserve the attempt before anything is awaited (ADR-0013): parallel requests in
-    // this isolate cannot all pass the check before one of them records a failure.
-    const local = limiter.reserveLocal(nowSeconds);
-    if (!local.ok) {
-      return lockout(c, local.retryAfterSeconds);
+    const body = await parseJsonBody(c, UnlockBodySchema);
+    if (!body.ok) {
+      return body.response;
     }
-    // Settled = counted as a wrong PIN (kept) or released after the right one; any
-    // other way out (bad body, refused by D1, a D1 error) drops the local reservation.
-    let settled = false;
+    await keys.ensureSchema(db);
+    // Reserve the attempt against the limit before the PIN is compared (ADR-0013): if
+    // D1 fails here, no PIN is compared at all.
+    const reserved = await reserveAttempt(db, nowSeconds);
+    if (!reserved.ok) {
+      return lockout(c, reserved.retryAfterSeconds);
+    }
+    if (!(await tokensEqual(body.value.pin, expected))) {
+      const outcome = await recordFailure(db, reserved, nowSeconds);
+      if (outcome.locked) {
+        return lockout(c, outcome.retryAfterSeconds);
+      }
+      // 403, not 401: 401 means "access token invalid" to the board client.
+      return c.json(
+        {
+          error: "wrong_pin",
+          message: "Wrong PIN",
+          attemptsLeft: outcome.attemptsLeft,
+        },
+        403,
+      );
+    }
     try {
-      const body = await parseJsonBody(c, UnlockBodySchema);
-      if (!body.ok) {
-        return body.response;
-      }
-      await keys.ensureSchema(db);
-      const reserved = await limiter.reserveRemote(db, local, nowSeconds);
-      if (!reserved.ok) {
-        return lockout(c, reserved.retryAfterSeconds);
-      }
-      if (!(await tokensEqual(body.value.pin, expected))) {
-        settled = true;
-        const outcome = await limiter.fail(db, reserved, nowSeconds);
-        if (outcome.locked) {
-          return lockout(c, outcome.retryAfterSeconds);
-        }
-        // 403, not 401: 401 means "access token invalid" to the board client.
-        return c.json(
-          {
-            error: "wrong_pin",
-            message: "Wrong PIN",
-            attemptsLeft: outcome.attemptsLeft,
-          },
-          403,
-        );
-      }
-      settled = true;
-      try {
-        await limiter.release(db, reserved);
-      } catch (error) {
-        // The PIN was right: go on with the session and retry the delete past the
-        // response, so the attempt does not stay counted against the lockout (the
-        // local copy is already gone). If the retry fails too, the row ages out with
-        // the 15-minute window.
-        logWarn(
-          `parent unlock: releasing the attempt failed (${errorName(error)}), retrying`,
-        );
-        defer(
-          c,
-          limiter.release(db, reserved).catch((retryError: unknown) => {
-            logWarn(
-              `parent unlock: releasing the attempt failed again (${errorName(retryError)})`,
-            );
-          }),
-        );
-      }
-      const expiresAt = nowSeconds + SESSION_TTL_SECONDS;
-      const token = await signSession(await keys.key(db, expected), expiresAt);
-      return c.json({ token, expiresAt: isoSeconds(expiresAt) });
-    } finally {
-      if (!settled) {
-        limiter.releaseLocal(local);
-      }
+      await clearFailures(db, reserved);
+    } catch (error) {
+      // The PIN was right: go on with the session and retry the delete past the
+      // response, so the attempt does not stay counted against the lockout. If the
+      // retry fails too, the row ages out with the 15-minute window.
+      logWarn(
+        `parent unlock: releasing the attempt failed (${errorName(error)}), retrying`,
+      );
+      defer(
+        c,
+        clearFailures(db, reserved).catch((retryError: unknown) => {
+          logWarn(
+            `parent unlock: releasing the attempt failed again (${errorName(retryError)})`,
+          );
+        }),
+      );
     }
+    const expiresAt = nowSeconds + SESSION_TTL_SECONDS;
+    const token = await signSession(await keys.key(db, expected), expiresAt);
+    return c.json({ token, expiresAt: isoSeconds(expiresAt) });
   });
 
   app.get("/session", requireSession, (c) =>
@@ -186,11 +171,6 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
   });
 
   return { app, requireSession };
-}
-
-function errorName(error: unknown): string {
-  // Type only: D1 messages may quote statements.
-  return error instanceof Error ? error.name : typeof error;
 }
 
 function lockout(c: Context<AppEnv>, retryAfterSeconds: number): Response {

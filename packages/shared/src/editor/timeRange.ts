@@ -32,7 +32,7 @@ export interface TimedRange {
  * - Explicit `endTime` (+ optional `endDate`): resolved as given; `valid` is false when
  *   the resolved end is not after the resolved start (e.g. Berlin 2026-03-29
  *   02:30-03:00: 03:30+02:00 to 03:00+02:00). Such entries are rejected by
- *   `parseEditorEntryInput` (`time_range_invalid`) and by `toGoogleEvent`, never clamped.
+ *   `parseEditorEntryInput` (`time_range_invalid`), never clamped.
  */
 export function resolveTimedRange(
   fields: TimedFields,

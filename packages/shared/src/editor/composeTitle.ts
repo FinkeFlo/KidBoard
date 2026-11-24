@@ -7,7 +7,7 @@ import {
 } from "../title/parseTitle";
 import type { EditorKind } from "./entry";
 
-/** Language of the words KidBoard writes into Google (`Alle:`/`All:`, `Mittag:`/`Lunch:`, `Mitbringen:`/`Bring:`). */
+/** Language of the words KidBoard writes into titles (`Alle:`/`All:`, `Mittag:`/`Lunch:`, `Mitbringen:`/`Bring:`). */
 export type WriteLocale = "de" | "en";
 
 /**
@@ -125,7 +125,7 @@ function findSource(
  * - Events: everyone -> no prefix; children -> `Mia, Ben:` (config order). In a child's
  *   calendar its child alone -> no prefix, everyone -> `Alle:`/`All:`, several -> all
  *   names. Children a calendar cannot express ({@link canExpressChildren}) throw
- *   `children_not_expressible` (`pickTargetCalendar` moves such entries first).
+ *   `children_not_expressible`.
  * - Meals: `Mittag: 🍝 Spaghetti` / `Lunch: …` (by locale), no prefix for `unspecified`.
  * - The icon always comes right before the text, so a text starting with an emoji keeps
  *   it as text. `parseTitle` consumes prefixes in any order until nothing changes; a

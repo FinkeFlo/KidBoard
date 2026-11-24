@@ -2,30 +2,57 @@ import {
   type AppConfig,
   type CalendarEvent,
   type CalendarSource,
+  formatCalendarDate,
   type Meal,
   type MealSlot,
+  minutesOfTime,
   parseBringList,
+  parseCalendarDate,
   type ParsedTitle,
   parseTitle,
+  shiftCalendarDate,
+  wallTimeAt,
 } from "@kidboard/shared";
 
 import type { Occurrence } from "../ical/expandCalendar";
-import {
-  type CalendarDate,
-  formatCalendarDate,
-  parseCalendarDate,
-  wallTimeAt,
-} from "../ical/zonedTime";
 
 export interface NormalizeResult {
   events: CalendarEvent[];
   meals: Meal[];
+  /** True when more than {@link MAX_ITEMS_PER_SOURCE} items were found; the rest is dropped. */
+  truncated: boolean;
 }
 
 export interface NormalizeOptions {
   /** Only emit meals for days in `[from, to)` (`YYYY-MM-DD`); bounds very long meal events. */
   from?: string;
   to?: string;
+}
+
+/**
+ * Titles come from calendars that other people can send invitations to: longer ones are
+ * cut to this many graphemes (a child cannot read more on a tile anyway).
+ */
+export const MAX_TITLE_GRAPHEMES = 120;
+
+/**
+ * Max events (or meals) of one source; later ones are dropped and `truncated` is set,
+ * so a huge feed cannot bloat the cache, every agenda response and the tablet's storage.
+ */
+export const MAX_ITEMS_PER_SOURCE = 2000;
+
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/** `title` cut to {@link MAX_TITLE_GRAPHEMES} graphemes, marked with an ellipsis. */
+export function limitTitle(title: string): string {
+  // UTF-16 units are never fewer than graphemes: short titles need no segmenting.
+  if (title.length <= MAX_TITLE_GRAPHEMES) {
+    return title;
+  }
+  const parts = Array.from(graphemes.segment(title), (part) => part.segment);
+  return parts.length <= MAX_TITLE_GRAPHEMES
+    ? title
+    : `${parts.slice(0, MAX_TITLE_GRAPHEMES - 1).join("")}…`;
 }
 
 /** Hard cap of days a single all-day meal event is spread over (guards unbounded spans). */
@@ -84,25 +111,13 @@ function mergeChildIds(parsed: ParsedTitle, source: CalendarSource): string[] {
   return ids;
 }
 
-function addDays(date: CalendarDate, days: number): CalendarDate {
-  const shifted = new Date(0);
-  shifted.setUTCFullYear(date.year, date.month - 1, date.day + days);
-  return {
-    year: shifted.getUTCFullYear(),
-    month: shifted.getUTCMonth() + 1,
-    day: shifted.getUTCDate(),
-  };
-}
-
 function bandSlot(minutes: number, config: AppConfig): MealSlot {
-  const toMinutes = (time: string): number => {
-    const [h = "0", m = "0"] = time.split(":");
-    return Number(h) * 60 + Number(m);
-  };
-  if (minutes < toMinutes(config.bands.middayStart)) {
+  if (minutes < minutesOfTime(config.bands.middayStart)) {
     return "breakfast";
   }
-  return minutes < toMinutes(config.bands.eveningStart) ? "lunch" : "dinner";
+  return minutes < minutesOfTime(config.bands.eveningStart)
+    ? "lunch"
+    : "dinner";
 }
 
 function mealsFor(
@@ -117,7 +132,7 @@ function mealsFor(
     sourceId: source.id,
     date,
     slot,
-    title: parsed.title,
+    title: limitTitle(parsed.title),
     icon: parsed.icon,
     iconIsFallback: parsed.iconIsFallback,
   });
@@ -157,7 +172,7 @@ function mealsFor(
     if (options.from === undefined || date >= options.from) {
       meals.push(make(date, prefixSlot));
     }
-    day = addDays(day, 1);
+    day = shiftCalendarDate(day, 1);
   }
   return meals;
 }
@@ -204,6 +219,8 @@ export function compareMeals(a: Meal, b: Meal): number {
  *   nothing a child could recognize and the placeholder icon would be noise.
  * - Events get `bring` from the description's `Mitbringen:` / `Bring:` lines (ADR-0010),
  *   omitted when empty; meals never do. Nothing else of the description is emitted.
+ * - Titles are cut to {@link MAX_TITLE_GRAPHEMES} graphemes and at most
+ *   {@link MAX_ITEMS_PER_SOURCE} items are kept (`truncated`).
  * - Ids are stable hashes of source, uid and recurrence id (plus the date for meals).
  * - Output order: events all-day first, then by start, title, id; meals by date, slot
  *   (breakfast, lunch, dinner, unspecified), title, id.
@@ -244,7 +261,7 @@ export function normalize(
       events.push({
         id: stableId(...occurrenceKey(source, o)),
         sourceId: source.id,
-        title: parsed.title,
+        title: limitTitle(parsed.title),
         icon: parsed.icon,
         iconIsFallback: parsed.iconIsFallback,
         childIds: mergeChildIds(parsed, source),
@@ -257,8 +274,19 @@ export function normalize(
     }
   }
 
-  return {
-    events: events.sort(compareEvents),
-    meals: meals.sort(compareMeals),
-  };
+  const truncated =
+    events.length > MAX_ITEMS_PER_SOURCE || meals.length > MAX_ITEMS_PER_SOURCE;
+  if (events.length > MAX_ITEMS_PER_SOURCE) {
+    // Keep the earliest ones: the cut must not drop today's timed events in favour of
+    // all-day events weeks ahead (the output order puts all-day first).
+    events.sort((a, b) => instantOf(a) - instantOf(b) || compareEvents(a, b));
+    events.length = MAX_ITEMS_PER_SOURCE;
+  }
+  if (meals.length > MAX_ITEMS_PER_SOURCE) {
+    meals.sort(compareMeals);
+    meals.length = MAX_ITEMS_PER_SOURCE;
+  }
+  events.sort(compareEvents);
+  meals.sort(compareMeals);
+  return { events, meals, truncated };
 }

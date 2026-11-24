@@ -126,6 +126,35 @@ describe("MealSchema / ChildSchema", () => {
       }).success,
     ).toBe(true);
   });
+
+  it.each(["child-1", "child-6", "#abc", "#E4572E", " child-2 "])(
+    "accepts the child colour %j",
+    (color) => {
+      const child = { id: "mia", name: "Mia", color, avatar: "🦊" };
+      expect(ChildSchema.safeParse(child).success).toBe(true);
+    },
+  );
+
+  it.each([
+    "red",
+    "child-0",
+    "child-7",
+    "#12",
+    "#abcd",
+    "#12345678",
+    "#ggg",
+    "rgb(1, 2, 3)",
+    "",
+  ])("rejects the child colour %j with a path", (color) => {
+    const result = ChildSchema.safeParse({
+      id: "mia",
+      name: "Mia",
+      color,
+      avatar: "🦊",
+    });
+    expect(result.success).toBe(false);
+    expect(!result.success && result.error.issues[0]?.path).toEqual(["color"]);
+  });
 });
 
 describe("AgendaResponseSchema", () => {

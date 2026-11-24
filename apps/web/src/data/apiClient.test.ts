@@ -1,13 +1,11 @@
+import {
+  PARENT_LOCKOUT_SECONDS,
+  PARENT_SESSION_HEADER,
+  WORKER_UPSTREAM_BUDGET_MS,
+} from "@kidboard/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  ApiError,
-  createApiClient,
-  DEFAULT_LOCKOUT_SECONDS,
-  PARENT_SESSION_HEADER,
-  REQUEST_TIMEOUT_MS,
-  WORKER_UPSTREAM_BUDGET_MS,
-} from "./apiClient";
+import { ApiError, createApiClient, REQUEST_TIMEOUT_MS } from "./apiClient";
 import {
   agendaFixture,
   allFailedAgenda,
@@ -340,7 +338,7 @@ describe("parent lock calls (ADR-0013)", () => {
     });
     await expect(api.unlockParent("000000")).resolves.toEqual({
       kind: "lockout",
-      retryAfterSeconds: DEFAULT_LOCKOUT_SECONDS,
+      retryAfterSeconds: PARENT_LOCKOUT_SECONDS,
     });
   });
 

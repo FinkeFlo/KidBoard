@@ -2,7 +2,11 @@ import {
   addCalendarDays,
   type AppConfig,
   DateStringSchema,
+  MAX_AGENDA_DAYS,
+  parseCalendarDate,
   todayInZone,
+  WINDOW_DAYS_AFTER,
+  WINDOW_DAYS_BEFORE,
 } from "@kidboard/shared";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -10,13 +14,14 @@ import { z } from "zod";
 import { loadConfig } from "../config/loadConfig";
 import { SchemaGate } from "../entries/schema";
 import type { AppEnv, Env } from "../env";
+import { SingleFlight } from "../feeds/flight";
 import {
   cacheBackend,
   kvBackend,
+  type SourceEntry,
   SourceStore,
   type StoreBackend,
 } from "../feeds/sourceStore";
-import { parseCalendarDate } from "../ical/zonedTime";
 import { logWarn } from "../log";
 import { editorEnabled } from "../parent/pin";
 import { WEATHER_KV_WRITES_PER_DAY } from "../weather/budget";
@@ -25,26 +30,14 @@ import {
   invalidateAppSources,
   loadAppSources,
 } from "./appSources";
-import { type Flight, loadSource, type SourceResult } from "./loadSource";
+import {
+  FEED_RETRY_AFTER_FAILURE_MS,
+  loadSource,
+  type SourceResult,
+} from "./loadSource";
 
 /** Default `days` of `/api/agenda`. */
 export const DEFAULT_DAYS = 8;
-/**
- * Maximum `days` of `/api/agenda`: 31 = today plus the 30 days the countdown looks
- * ahead (T-19), so day, week and countdown share one request. A 31-day range fits the
- * window for every `from` from `today - 1` to `today + 1` (a client clock up to a day
- * off around midnight still gets an answer); further out it is a 400.
- */
-export const MAX_DAYS = 31;
-/**
- * Cached window per source, relative to today in the config zone: `[today - 1,
- * today + 32)`. Expansion runs once per window and TTL; requests are served by
- * filtering it, so `[from, from + days)` must lie inside it (else 400).
- */
-export const WINDOW_DAYS_BEFORE = 1;
-/** 32 days ahead: T-19 looks for countdown events up to 30 days ahead. */
-export const WINDOW_DAYS_AFTER = 32;
-
 export const DEFAULT_CACHE_TTL_SECONDS = 3600;
 const MIN_CACHE_TTL_SECONDS = 60;
 const MAX_CACHE_TTL_SECONDS = 86_400;
@@ -58,7 +51,7 @@ export const KV_WRITES_PER_DAY_BUDGET = 500;
 
 const QUERY_MESSAGES: Record<string, string> = {
   from: "from must be a valid date YYYY-MM-DD",
-  days: `days must be an integer from 1 to ${String(MAX_DAYS)}`,
+  days: `days must be an integer from 1 to ${String(MAX_AGENDA_DAYS)}`,
 };
 
 const RangeQuerySchema = z.object({
@@ -71,25 +64,11 @@ const RangeQuerySchema = z.object({
     .string()
     .regex(/^\d{1,2}$/)
     .transform(Number)
-    .pipe(z.number().int().min(1).max(MAX_DAYS))
+    .pipe(z.number().int().min(1).max(MAX_AGENDA_DAYS))
     .optional(),
 });
 
 export type RangeQuery = z.output<typeof RangeQuerySchema>;
-
-export function badRequest(c: Context, message: string): Response {
-  return c.json({ error: "bad_request", message }, 400);
-}
-
-export function serverMisconfigured(c: Context): Response {
-  return c.json(
-    {
-      error: "server_misconfigured",
-      message: "Server configuration is invalid",
-    },
-    500,
-  );
-}
 
 /**
  * Parses `?from&days` of `/api/agenda` and `/api/parent/entries`; the message names
@@ -247,7 +226,7 @@ export interface Board {
   readonly gate: SchemaGate;
   /**
    * Config, window and cache backend of a request; `null` when the config is invalid
-   * (the caller answers {@link serverMisconfigured}).
+   * (the caller answers `serverMisconfigured`).
    */
   context(c: BoardRequest): Promise<BoardContext | null>;
   /** The configured calendars (cached, normalized; never descriptions). */
@@ -273,7 +252,10 @@ export function createBoard(options: BoardOptions): Board {
       ? fallbackBackend
       : kvBackend(env.KIDBOARD_CACHE);
   const gate = new SchemaGate();
-  const inflight = new Map<string, Flight>();
+  const flights = new SingleFlight<SourceEntry>({
+    now: options.now,
+    pauseAfterFailureMs: FEED_RETRY_AFTER_FAILURE_MS,
+  });
 
   return {
     gate,
@@ -321,7 +303,7 @@ export function createBoard(options: BoardOptions): Board {
             freshTtlSeconds: board.freshTtlSeconds,
             store,
             backend: board.backend,
-            inflight,
+            flights,
             defer: (work) => {
               defer(c, work);
             },

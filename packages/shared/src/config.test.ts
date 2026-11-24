@@ -69,7 +69,7 @@ describe("parseConfig valid", () => {
           { id: "mia", name: "Ben", color: "#2E86AB", avatar: "🐻" },
         ],
       }),
-    ).toEqual(['children[1].id: Duplicate child id "mia"']);
+    ).toEqual(["children[1].id: Duplicate child id"]);
   });
 
   it("allows partial bands/nightMode with per-field defaults", () => {
@@ -132,7 +132,7 @@ describe("parseConfig invalid", () => {
         { id: "a", kind: "meals" },
       ],
     });
-    expect(errors).toEqual(['calendars[1].id: Duplicate calendar id "a"']);
+    expect(errors).toEqual(["calendars[1].id: Duplicate calendar id"]);
   });
 
   it.each(["app-events", "app-meals"])(
@@ -145,7 +145,7 @@ describe("parseConfig invalid", () => {
         ],
       });
       expect(errors).toEqual([
-        `calendars[1].id: Calendar id "${id}" is reserved for entries made in the app`,
+        "calendars[1].id: Calendar id is reserved for entries made in the app",
       ]);
     },
   );
@@ -167,7 +167,9 @@ describe("parseConfig invalid", () => {
         { id: "a_b", kind: "events" },
       ],
     });
-    expect(errors[0]).toContain("CAL_A_B_URL");
+    expect(errors[0]).toBe(
+      "calendars[1].id: Calendar id maps to the same secret as calendars[0]",
+    );
   });
 
   it("rejects ids unusable in env var names", () => {
@@ -186,7 +188,7 @@ describe("parseConfig invalid", () => {
     const errors = errorsOf({
       calendars: [{ id: "x", kind: "events", childId: "nobody" }],
     });
-    expect(errors).toEqual(['calendars[0].childId: Unknown child id "nobody"']);
+    expect(errors).toEqual(["calendars[0].childId: Unknown child id"]);
   });
 
   it("rejects duplicate child ids and names", () => {
@@ -195,7 +197,7 @@ describe("parseConfig invalid", () => {
       ...minimal,
       children: [child, { ...child, id: "mia" }],
     });
-    expect(errors).toContain('children[1].id: Duplicate child id "mia"');
+    expect(errors).toContain("children[1].id: Duplicate child id");
     expect(
       errors.some((e) =>
         e.startsWith("children[1].name: Duplicate child name"),

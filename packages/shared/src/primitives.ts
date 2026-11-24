@@ -14,6 +14,14 @@ export const TimeOfDaySchema = z
   .string()
   .regex(HH_MM, 'Expected time as "HH:mm" (00:00-23:59)');
 
+/** Minutes since midnight of an `HH:mm` string. Throws a `RangeError` if malformed. */
+export function minutesOfTime(time: string): number {
+  if (!HH_MM.test(time)) {
+    throw new RangeError("time must be HH:mm");
+  }
+  return Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+}
+
 /** Slug used for child and calendar ids: lower case letters, digits, `_` and `-`. */
 export const SlugSchema = z
   .string()

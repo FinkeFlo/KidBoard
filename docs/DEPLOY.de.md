@@ -17,10 +17,15 @@ Du brauchst:
 
 1. Ein kostenloses **Cloudflare-Konto** (für Variante A zusätzlich ein GitHub- oder
    GitLab-Konto).
-2. Ein **Zugriffstoken**: eine lange Zufallszeichenkette, z. B. die Ausgabe von
-   `openssl rand -hex 32`. Ohne Token kann jeder, der deine `workers.dev`-Adresse findet,
-   die Kalenderdaten über die API lesen, und der Eltern-Editor bleibt aus; setze also eins.
-3. Eine **Eltern-PIN** mit 6 bis 12 Ziffern für den Editor.
+2. Ein **Zugriffstoken** (Pflicht): 32 bis 256 Zeichen (`A-Z a-z 0-9 _ -`), z. B. die
+   Ausgabe von `openssl rand -hex 32`. Ohne gültiges Token verweigert die API jede Anfrage
+   (`500 server_misconfigured`), dein Kalender ist also nie versehentlich öffentlich. Ein
+   bewusst öffentliches Board braucht das ausdrückliche Opt-in `KIDBOARD_PUBLIC="1"` (und
+   kein Token).
+3. Eine **Eltern-PIN** mit 6 bis 12 Ziffern für den Editor. Keine einzelne wiederholte Ziffer,
+   keine Reihe wie `123456` und keine Geburtstage: ist die PIN zu leicht zu erraten, bleibt der
+   Editor aus und das Log sagt warum. Fünf falsche PINs sperren den Editor, die Sperrzeit
+   verdoppelt sich mit jeder weiteren Sperre (15 Minuten bis 2 Stunden).
 4. Deine **Einstellungen** (`KIDBOARD_CONFIG`) als **eine Zeile JSON**: Kinder, Zeitzone,
    ... Das Deploy-Formular füllt ein Beispiel mit zwei Kindern und ohne Kalender vor. Alle
    Optionen in [CONFIG.md](CONFIG.md).
@@ -43,12 +48,13 @@ Der Worker liest genau diese Namen (`apps/worker/src/env.ts`):
 | Name                       | Art                  | Pflicht  | Hinweise                                                                                          |
 | -------------------------- | -------------------- | -------- | ------------------------------------------------------------------------------------------------- |
 | `CAL_<ID>_URL`             | Secret               | pro Kalender (optional) | Nur für Kalender aus `KIDBOARD_CONFIG`, z. B. `CAL_KINDER_URL`. Fehlt eins, zeigt nur dieser Kalender `error`. |
-| `KIDBOARD_ACCESS_TOKEN`    | Secret               | dringend empfohlen | Nötig für den Editor. Leer oder nicht gesetzt = keine Prüfung. Ein Wert, der noch `REPLACE_ME` enthält, wird abgelehnt (API antwortet `500`). |
+| `KIDBOARD_ACCESS_TOKEN`    | Secret               | ja       | 32 bis 256 Zeichen `A-Z a-z 0-9 _ -`. Nicht gesetzt, leer, zu kurz oder noch `REPLACE_ME`: die API antwortet `500` (fail closed). Nötig für den Editor. |
+| `KIDBOARD_PUBLIC`          | Variable             | nein     | `1` = öffentliches Nur-Lese-Board ohne Token (Opt-in; wirkungslos, wenn ein Token gesetzt ist). |
 | `KIDBOARD_CONFIG`          | Secret oder Variable | ja       | JSON in einer Zeile. Fehlt/ungültig: `/api/config` und `/api/agenda` antworten `500`.             |
 | `KIDBOARD_ALLOWED_ORIGINS` | Variable             | nein     | Nur für API-Zugriffe von anderen Origins; das Board selbst ist same-origin.                       |
 | `KIDBOARD_CACHE_TTL`       | Variable             | nein     | Sekunden, die ein Feed als frisch gilt, Standard 3600.                                            |
 | `KIDBOARD_CACHE`           | KV-Namespace-Binding | automatisch | Ohne ID in `wrangler.jsonc` deklariert; Wrangler legt ihn beim ersten Deploy an.               |
-| `KIDBOARD_PARENT_PIN`      | Secret               | nein     | 6 bis 12 Ziffern; schaltet den Eltern-Editor ein (mit `KIDBOARD_DATA` und gesetztem `KIDBOARD_ACCESS_TOKEN`). Nicht gesetzt, ungültig oder `REPLACE_ME`, oder kein Zugriffstoken = Editor aus. |
+| `KIDBOARD_PARENT_PIN`      | Secret               | nein     | 6 bis 12 Ziffern; schaltet den Eltern-Editor ein (mit `KIDBOARD_DATA` und gültigem `KIDBOARD_ACCESS_TOKEN`). Nicht gesetzt, ungültig, zu leicht (`111111`, `123456`) oder `REPLACE_ME`, oder kein gültiges Zugriffstoken = Editor aus. |
 | `KIDBOARD_DATA`            | D1-Datenbank-Binding | automatisch | Im Editor angelegte Einträge (ADR-0014). Ohne ID in `wrangler.jsonc` deklariert; Wrangler legt sie beim ersten Deploy an, der Worker seine Tabellen. |
 | `KIDBOARD_FEED_TOKEN`      | Secret               | nein     | Schaltet den Handy-Feed der Editor-Einträge ein (32 bis 256 Zeichen `A-Z a-z 0-9 _ -`); der Eltern-Bereich zeigt dann den Abo-Link. Nicht gesetzt = kein Feed. |
 
@@ -164,9 +170,9 @@ Workers Static Assets auf alle statischen Antworten anwendet:
 - `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` (das `?key=` des ersten
   Aufrufs wird nie als Referrer gesendet), `Permissions-Policy` ohne Kamera, Mikrofon,
   Standort, Bezahlung und USB (Wake Lock und Vollbild bleiben erlaubt).
-- Einbetten (Frames) ist nicht eingeschränkt, damit Dashboards (z. B. Home Assistant) das
-  Board anzeigen können. Zum Verbieten `frame-ancestors 'none'` in `staticHeaders.ts`
-  ergänzen.
+- Einbetten (Frames) ist auf die eigene Herkunft beschränkt (`frame-ancestors 'self'`),
+  andere Seiten können das Board nicht einbetten. Für ein Dashboard (z. B. Home Assistant)
+  dessen Adresse in `FRAME_ANCESTORS` in `apps/web/headers/staticHeaders.ts` ergänzen.
 
 `_headers` gilt nicht für `/api/*`: Diese Antworten erzeugt der Worker selbst, mit
 `Cache-Control: no-store`, `nosniff` und `Referrer-Policy: no-referrer`.
@@ -198,8 +204,9 @@ Workers Static Assets auf alle statischen Antworten anwendet:
 | Symptom | Ursache und Lösung |
 | --- | --- |
 | Board meldet "Dieses Tablet braucht einen neuen Zugangslink" | Falscher oder geänderter Token: `https://<url>/?key=<token>` erneut öffnen. |
-| `/api/config` antwortet `500 server_misconfigured` | `KIDBOARD_CONFIG` fehlt oder ist ungültig (Workers Logs nennen die Fehler), oder `KIDBOARD_ACCESS_TOKEN` enthält noch `REPLACE_ME`. |
+| `/api/config` antwortet `500 server_misconfigured` | `KIDBOARD_CONFIG` fehlt oder ist ungültig (Workers Logs nennen die Fehler), oder `KIDBOARD_ACCESS_TOKEN` fehlt, ist kürzer als 32 Zeichen, hat andere Zeichen oder enthält noch `REPLACE_ME` (das Log nennt den Grund). |
 | Ein Kalender fehlt, `sources[].status` ist `error` | Secret-Name passt nicht zur Kalender-ID (`CAL_<ID>_URL`, Großbuchstaben) oder die iCal-Adresse ist falsch. |
+| Editor lange gesperrt | Es wurden wiederholt falsche PINs eingegeben (die Sperre verdoppelt sich, bis 2 Stunden am Stück) und endet von selbst. Wer das Zugriffstoken hat, kann das wiederholen: `KIDBOARD_ACCESS_TOKEN` wechseln und den Tablet-Link neu öffnen. |
 | Build bricht mit pnpm-Fehler ab | Build-Variable `PNPM_VERSION=10.28.0` setzen (Worker > Settings > Build). |
 | `The directory specified by the "assets.directory" field ... does not exist` | Die Web-App wurde nicht gebaut: `pnpm deploy:cloudflare` bzw. Build-Befehl `pnpm run build` verwenden. |
 | Alte Version wird angezeigt | Das Tablet sucht stündlich nach einer neuen Version und lädt sich selbst neu; oder einmal neu laden. |

@@ -13,9 +13,9 @@ import {
   showsBring,
   TILE_CHIP_SIZE,
   TILE_HEIGHT_REM,
-  tileClasses,
   type TileSize,
 } from "./EventTile";
+import { tileClasses } from "./eventTileSizes";
 import { BEN, eventFixture, MIA } from "./fixtures.test-utils";
 
 const format: FormatContext = { locale: "en", timeZone: "Europe/Berlin" };

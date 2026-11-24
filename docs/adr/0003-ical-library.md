@@ -36,7 +36,7 @@ calendar to every event regardless of UID.
 * Floating times, and TZIDs that are neither IANA nor defined in the feed, are
   interpreted in the configured zone.
 * Wall time → instant uses the RFC 5545 §3.3.5 rules, implemented in
-  `apps/worker/src/ical/zonedTime.ts` (custom code, justified here): a non-existent
+  `packages/shared/src/wallTime.ts` (custom code, justified here; shared with the editor): a non-existent
   local time (spring-forward gap) uses the offset before the gap (02:30 → 03:30 local),
   an ambiguous one (fall-back) the first occurrence. `TZDate`'s wall-time constructor is
   not used because it resolves gaps/overlaps via the *system* zone's `Date`, and ical.js

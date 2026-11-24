@@ -13,7 +13,7 @@ import { SERVER_SECRET_KEY } from "./session";
 
 const PIN = "246813";
 const OTHER_PIN = "975310";
-const TOKEN = "TESTONLY-access-not-a-secret";
+const TOKEN = "TESTONLY-access-token-not-a-secret-0123456789";
 const ORIGIN = "https://dev.example.test";
 /** Monday 2026-03-09, 09:00 UTC. */
 const NOW = Date.parse("2026-03-09T09:00:00Z");
@@ -45,6 +45,8 @@ function env(overrides: Partial<Env> = {}): Env {
     KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
     KIDBOARD_PARENT_PIN: PIN,
     KIDBOARD_ACCESS_TOKEN: TOKEN,
+    // Lets requests without an access token reach the (editor-off) behaviour under test.
+    KIDBOARD_PUBLIC: "1",
     ...overrides,
   };
 }
@@ -67,7 +69,7 @@ interface Harness {
   unlock: (pin: unknown, e?: Env) => Promise<Response>;
 }
 
-/** A fresh app = a fresh isolate (own key cache and failure counter). */
+/** A fresh app = a fresh isolate (own key cache). */
 function harness(): Harness {
   const clock = { now: NOW };
   const app = createApp({ now: () => clock.now });
@@ -344,20 +346,49 @@ describe("lockout", () => {
     expect((await harness().unlock(PIN)).status).toBe(429);
   });
 
-  it("holds per isolate even if D1 lost the lockout", async () => {
+  it("doubles every further lockout up to 2 hours", async () => {
     const h = harness();
-    await failTimes(h, 5);
-    await testEnv.KIDBOARD_DATA.prepare("DELETE FROM kb_meta WHERE key != ?1")
-      .bind(SERVER_SECRET_KEY)
-      .run();
-    expect((await h.unlock(PIN)).status).toBe(429);
-    // Another isolate relies on D1 alone.
-    const other = harness();
-    other.clock.now = h.clock.now;
-    expect((await other.unlock(PIN)).status).toBe(200);
+    const retryAfter: string[] = [];
+    for (let round = 0; round < 10; round++) {
+      const last = (await failTimes(h, 5))[4];
+      expect(last?.status).toBe(429);
+      const seconds = Number(last?.headers.get("Retry-After"));
+      retryAfter.push(String(seconds));
+      // The lockout ends `seconds` after the 5th wrong PIN (one minute ago).
+      h.clock.now += seconds * 1000 - MINUTE;
+    }
+    expect(retryAfter).toEqual(
+      [900, 1800, 3600, 7200, 7200, 7200, 7200, 7200, 7200, 7200].map(String),
+    );
   });
 
-  it("touches D1 twice per failed attempt (reserve, settle) and not while locked", async () => {
+  it("a right PIN ends the escalation", async () => {
+    const h = harness();
+    const first = (await failTimes(h, 5))[4];
+    expect(first?.headers.get("Retry-After")).toBe("900");
+    h.clock.now += 900_000 - MINUTE;
+    const second = (await failTimes(h, 5))[4];
+    expect(second?.headers.get("Retry-After")).toBe("1800");
+    h.clock.now += 1_800_000 - MINUTE;
+    expect((await h.unlock(PIN)).status).toBe(200);
+    const again = (await failTimes(h, 5))[4];
+    expect(again?.headers.get("Retry-After")).toBe("900");
+  });
+
+  it("escalates only once for attempts that fail while the lockout runs", async () => {
+    const h = harness();
+    const last = (await failTimes(h, 5))[4];
+    expect(last?.headers.get("Retry-After")).toBe("900");
+    // Refused attempts during the lockout never raise the level.
+    for (let i = 0; i < 3; i++) {
+      expect((await h.unlock(OTHER_PIN)).status).toBe(429);
+    }
+    h.clock.now = NOW + 19 * MINUTE;
+    const next = (await failTimes(h, 5))[4];
+    expect(next?.headers.get("Retry-After")).toBe("1800");
+  });
+
+  it("touches D1 twice per failed attempt (reserve, settle) and once while locked", async () => {
     const h = harness();
     await unlockToken(h); // create the secret
     const spy = vi.spyOn(testEnv.KIDBOARD_DATA, "batch");
@@ -365,7 +396,7 @@ describe("lockout", () => {
     expect(spy).toHaveBeenCalledTimes(10);
     await h.unlock(OTHER_PIN);
     await h.unlock(PIN);
-    expect(spy).toHaveBeenCalledTimes(10);
+    expect(spy).toHaveBeenCalledTimes(12); // only the reservation, no PIN compare
   });
 
   /** Attempt rows (failures and reservations) in D1. */
@@ -450,19 +481,17 @@ describe("lockout", () => {
     expect(again[4]?.status).toBe(429);
   });
 
-  it("a right PIN in another isolate clears the D1 failures; the first isolate's own copy still fails closed", async () => {
+  it("a right PIN in another isolate clears the D1 failures for every isolate", async () => {
     const first = harness();
     await failTimes(first, 4);
     const second = harness();
     second.clock.now = first.clock.now;
     expect((await second.unlock(PIN)).status).toBe(200);
     expect(await attemptRows()).toBe(0);
-    // The first isolate still holds its 4 local failures (it never saw the success):
-    // one more wrong PIN there fails closed and locks that isolate.
     first.clock.now = second.clock.now;
-    expect((await first.unlock(OTHER_PIN)).status).toBe(429);
-    // An isolate that saw the success counts afresh.
-    expect((await second.unlock(OTHER_PIN)).status).toBe(403);
+    expect(await json(await first.unlock(OTHER_PIN))).toMatchObject({
+      attemptsLeft: 4,
+    });
   });
 
   it("a bad body does not use up an attempt", async () => {
@@ -538,10 +567,10 @@ describe("unlock reservations on failures", () => {
     return { status: response.status, body: await json(response) };
   }
 
-  it("drops the isolate's reservation when D1 fails before the compare", async () => {
+  it("compares no PIN and keeps no state when D1 fails before the compare", async () => {
     const h = harness();
     for (let i = 0; i < 6; i++) {
-      // Each one reserved locally first; a D1 error must not leave it counted.
+      // A D1 error before the compare must not count as an attempt.
       expect(
         (await h.unlock(PIN, env({ KIDBOARD_DATA: brokenDb() }))).status,
       ).toBe(500);
@@ -553,7 +582,7 @@ describe("unlock reservations on failures", () => {
     expect((await h.unlock(PIN)).status).toBe(200);
   });
 
-  it("drops the isolate's reservation on a bad body and keeps counting wrong PINs", async () => {
+  it("a bad body does not count as an attempt and wrong PINs keep counting", async () => {
     const h = harness();
     for (let i = 0; i < 6; i++) {
       expect((await h.unlock(123456)).status).toBe(400);

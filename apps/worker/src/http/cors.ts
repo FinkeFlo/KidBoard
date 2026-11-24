@@ -1,10 +1,8 @@
+import { PARENT_SESSION_HEADER } from "@kidboard/shared";
 import type { Context, MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 
 import type { AppEnv } from "../env";
-
-/** Header carrying the parent session token (ADR-0013). */
-export const PARENT_SESSION_HEADER = "X-KidBoard-Parent";
 
 function allowedOrigins(raw: string | undefined): string[] {
   return (raw ?? "")

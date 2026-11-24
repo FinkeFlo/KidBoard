@@ -11,8 +11,15 @@ describe("parentPinStatus", () => {
   it.each([
     [undefined, "unset"],
     ["", "unset"],
-    ["123456", "valid"],
-    ["000000000000", "valid"],
+    ["246813", "valid"],
+    ["000000000000", "trivial"], // one repeated digit
+    ["111111", "trivial"],
+    ["123456", "trivial"], // rising run
+    ["23456789", "trivial"],
+    ["987654", "trivial"], // falling run
+    ["543210", "trivial"],
+    ["123457", "valid"],
+    ["121212", "valid"],
     ["12345", "invalid"], // too short
     ["1234567890123", "invalid"], // too long
     ["12345a", "invalid"],
@@ -26,7 +33,7 @@ describe("parentPinStatus", () => {
   });
 });
 
-const ACCESS = "TESTONLY-access-not-a-secret";
+const ACCESS = "TESTONLY-access-token-not-a-secret-0123456789";
 
 describe("editorEnabled", () => {
   it("needs the D1 binding, a valid PIN and an access token", () => {
@@ -45,6 +52,7 @@ describe("editorEnabled", () => {
       false,
     );
     expect(editorEnabled({ ...on, KIDBOARD_PARENT_PIN: "1234" })).toBe(false);
+    expect(editorEnabled({ ...on, KIDBOARD_PARENT_PIN: "123456" })).toBe(false);
     expect(
       editorEnabled({
         KIDBOARD_PARENT_PIN: "246813",
@@ -57,6 +65,7 @@ describe("editorEnabled", () => {
     ["unset", undefined],
     ["empty", ""],
     ["the template value", "REPLACE_ME-with-a-long-random-token"],
+    ["too short", "TESTONLY-short"],
   ])("stays off (fail closed) with the access token %s", (_, token) => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const env = {
@@ -71,18 +80,20 @@ describe("editorEnabled", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     editorEnabled({ KIDBOARD_PARENT_PIN: "98765" });
     editorEnabled({ KIDBOARD_PARENT_PIN: "98765" });
+    editorEnabled({ KIDBOARD_PARENT_PIN: "654321" });
     editorEnabled({ KIDBOARD_PARENT_PIN: "975318642" });
     editorEnabled({
       KIDBOARD_PARENT_PIN: "975318642",
       KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
     });
     const lines = warn.mock.calls.map((args) => args.join(" "));
-    expect(lines).toHaveLength(3);
+    expect(lines).toHaveLength(4);
     expect(lines[0]).toContain("KIDBOARD_PARENT_PIN must be 6 to 12 digits");
-    expect(lines[1]).toContain("KIDBOARD_DATA is missing");
-    expect(lines[2]).toContain(
-      "KIDBOARD_ACCESS_TOKEN is not (or is the template value); the editor and the phone feed stay off",
+    expect(lines[1]).toContain("KIDBOARD_PARENT_PIN is too easy to guess");
+    expect(lines[2]).toContain("KIDBOARD_DATA is missing");
+    expect(lines[3]).toContain(
+      "KIDBOARD_ACCESS_TOKEN is not a valid token (32 to 256 characters",
     );
-    expect(lines.join("\n")).not.toMatch(/98765|975318642/);
+    expect(lines.join("\n")).not.toMatch(/98765|975318642|654321/);
   });
 });

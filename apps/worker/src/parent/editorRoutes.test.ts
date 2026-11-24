@@ -12,6 +12,7 @@ import {
   EditorTemplatesResponseSchema,
   type EditorWriteResponse,
   EditorWriteResponseSchema,
+  MAX_APP_ENTRIES,
 } from "@kidboard/shared";
 import {
   createExecutionContext,
@@ -22,18 +23,14 @@ import { env as testEnv } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../app";
-import {
-  ENTRY_EXPORT_FORMAT,
-  EntryStore,
-  MAX_ENTRIES,
-} from "../entries/entryStore";
+import { ENTRY_EXPORT_FORMAT, EntryStore } from "../entries/entryStore";
 import { STAMP_KEY } from "../entries/stamp";
 import type { Env } from "../env";
 import { MAX_IMPORT_BODY_BYTES, MAX_ISSUES } from "./editorRoutes";
 import { MAX_PARENT_BODY_BYTES } from "./routes";
 
 const PIN = "246813";
-const ACCESS = "TESTONLY-access-not-a-secret";
+const ACCESS = "TESTONLY-access-token-not-a-secret-0123456789";
 const PRIVATE_NOTE = "TESTONLY-private-note";
 // Synthetic secret URLs (reserved `.invalid` TLD).
 const KINDER_URL =
@@ -135,6 +132,8 @@ function env(overrides: Partial<Env> = {}): Env {
     KIDBOARD_DATA: db,
     KIDBOARD_PARENT_PIN: PIN,
     KIDBOARD_ACCESS_TOKEN: ACCESS,
+    // Lets requests without an access token reach the (editor-off) behaviour under test.
+    KIDBOARD_PUBLIC: "1",
     ...overrides,
   };
 }
@@ -447,7 +446,7 @@ describe("POST /api/parent/entries", () => {
 
   it("answers 422 limit_reached at 1 000 entries", async () => {
     const at = "2026-03-01T00:00:00.000Z";
-    const entries = Array.from({ length: MAX_ENTRIES }, (_, i) => ({
+    const entries = Array.from({ length: MAX_APP_ENTRIES }, (_, i) => ({
       id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
       revision: 1,
       kind: "event",

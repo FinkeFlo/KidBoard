@@ -118,6 +118,8 @@ describe("contentSecurityPolicy", () => {
     expect(directive(csp, "object-src")).toEqual(["'none'"]);
     expect(directive(csp, "base-uri")).toEqual(["'none'"]);
     expect(directive(csp, "form-action")).toEqual(["'none'"]);
+    // Only the board itself may frame the board (the parent editor can be click-jacked).
+    expect(directive(csp, "frame-ancestors")).toEqual(["'self'"]);
   });
 
   it("never allows inline code, eval or other origins", () => {

@@ -1,4 +1,8 @@
-import { type AppConfig, AppConfigSchema } from "@kidboard/shared";
+import {
+  type AppConfig,
+  AppConfigSchema,
+  MAX_APP_ENTRIES,
+} from "@kidboard/shared";
 import { reset } from "cloudflare:test";
 import { env as testEnv } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +12,6 @@ import {
   ENTRY_EXPORT_FORMAT,
   type EntryExport,
   EntryStore,
-  MAX_ENTRIES,
   MAX_ENTRY_BYTES,
   type StoreResult,
 } from "./entryStore";
@@ -479,7 +482,7 @@ describe("exceptions and overrides (only this day)", () => {
 });
 
 describe("limits", () => {
-  it(`refuses entry ${String(MAX_ENTRIES + 1)} with limit_reached`, async () => {
+  it(`refuses entry ${String(MAX_APP_ENTRIES + 1)} with limit_reached`, async () => {
     const s = store();
     const full: EntryExport = {
       format: ENTRY_EXPORT_FORMAT,
@@ -488,24 +491,24 @@ describe("limits", () => {
       entries: [],
     };
     const template = ok(await s.create(DENTIST));
-    full.entries = Array.from({ length: MAX_ENTRIES }, () => ({
+    full.entries = Array.from({ length: MAX_APP_ENTRIES }, () => ({
       ...template,
       id: crypto.randomUUID(),
     }));
     expect(ok(await s.importAll(full, "replace"))).toEqual({
       mode: "replace",
-      imported: MAX_ENTRIES,
-      created: MAX_ENTRIES,
+      imported: MAX_APP_ENTRIES,
+      created: MAX_APP_ENTRIES,
       updated: 0,
     });
-    expect(await rawRowCount()).toBe(MAX_ENTRIES);
+    expect(await rawRowCount()).toBe(MAX_APP_ENTRIES);
 
     expect(await s.create(DENTIST)).toEqual({
       ok: false,
       error: "limit_reached",
       limit: "entries",
     });
-    expect(await rawRowCount()).toBe(MAX_ENTRIES);
+    expect(await rawRowCount()).toBe(MAX_APP_ENTRIES);
 
     // Updates and removals still work at the limit; then there is room again.
     const first = full.entries[0];
@@ -515,7 +518,7 @@ describe("limits", () => {
     const stored = ok(await s.get(first.id));
     ok(await s.remove(first.id, stored.revision));
     ok(await s.create(DENTIST));
-    expect(await rawRowCount()).toBe(MAX_ENTRIES);
+    expect(await rawRowCount()).toBe(MAX_APP_ENTRIES);
   }, 30_000);
 
   it("refuses writes that make an entry larger than 8 KB", async () => {
@@ -784,7 +787,7 @@ describe("export / import", () => {
     const doc = await s.exportAll();
     const many: EntryExport = {
       ...doc,
-      entries: Array.from({ length: MAX_ENTRIES }, () => ({
+      entries: Array.from({ length: MAX_APP_ENTRIES }, () => ({
         ...template,
         id: crypto.randomUUID(),
       })),
@@ -836,7 +839,7 @@ describe("export / import", () => {
     const doc = await s.exportAll();
     const almostFull: EntryExport = {
       ...doc,
-      entries: Array.from({ length: MAX_ENTRIES - 1 }, () => ({
+      entries: Array.from({ length: MAX_APP_ENTRIES - 1 }, () => ({
         ...template,
         id: crypto.randomUUID(),
       })),

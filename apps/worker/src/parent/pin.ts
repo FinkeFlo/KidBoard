@@ -1,25 +1,43 @@
 import type { Env } from "../env";
-import { PLACEHOLDER_TOKEN_MARKER } from "../http/auth";
+import { secretTokenStatus } from "../http/secretToken";
 import { logWarn } from "../log";
 
 /** ADR-0013: the parent PIN is 6 to 12 ASCII digits. */
 const PIN_RE = /^[0-9]{6,12}$/;
 
-export type ParentPinStatus = "unset" | "invalid" | "valid";
+export type ParentPinStatus = "unset" | "invalid" | "trivial" | "valid";
+
+/**
+ * A PIN made of one repeated digit (`000000`) or a run that rises or falls by one per
+ * digit (`123456`, `987654`) is guessed first by anyone, so it is refused.
+ */
+function isTrivialPin(pin: string): boolean {
+  const step = pin.charCodeAt(1) - pin.charCodeAt(0);
+  if (Math.abs(step) > 1) {
+    return false;
+  }
+  for (let i = 2; i < pin.length; i += 1) {
+    if (pin.charCodeAt(i) - pin.charCodeAt(i - 1) !== step) {
+      return false;
+    }
+  }
+  return true;
+}
 
 /**
  * Classifies `KIDBOARD_PARENT_PIN` (ADR-0013). Unset or empty → `unset`; anything other
- * than 6-12 ASCII digits, including the `.dev.vars.example` template value, → `invalid`
- * (fail closed). The value is taken as is (no trimming), exactly as it will be compared.
+ * than 6-12 ASCII digits (so also the `.dev.vars.example` template value) → `invalid`;
+ * a repeated digit or a rising/falling run → `trivial` (both fail closed). The value is
+ * taken as is (no trimming), exactly as it will be compared.
  */
 export function parentPinStatus(raw: string | undefined): ParentPinStatus {
   if (raw === undefined || raw === "") {
     return "unset";
   }
-  if (raw.toUpperCase().includes(PLACEHOLDER_TOKEN_MARKER)) {
+  if (!PIN_RE.test(raw)) {
     return "invalid";
   }
-  return PIN_RE.test(raw) ? "valid" : "invalid";
+  return isTrivialPin(raw) ? "trivial" : "valid";
 }
 
 /** Last logged misconfiguration, so each one is logged once per isolate. */
@@ -33,21 +51,9 @@ function warnOnce(key: string, message: string): void {
 }
 
 /**
- * Whether the access token `KIDBOARD_ACCESS_TOKEN` protects the API: set, non-empty and
- * not the template value (the access middleware refuses that one with 500).
- */
-function accessTokenSet(raw: string | undefined): boolean {
-  return (
-    raw !== undefined &&
-    raw !== "" &&
-    !raw.toUpperCase().includes(PLACEHOLDER_TOKEN_MARKER)
-  );
-}
-
-/**
  * Whether the parent editor (and with it the app sources on the board and the phone
  * feed) is available (ADR-0013, ADR-0014): only with the D1 binding `KIDBOARD_DATA`, a
- * valid `KIDBOARD_PARENT_PIN` and an access token `KIDBOARD_ACCESS_TOKEN` (fail closed:
+ * valid `KIDBOARD_PARENT_PIN` and a valid access token `KIDBOARD_ACCESS_TOKEN` (fail closed:
  * without the token anyone who finds the URL could try PINs and the lockout would
  * lock the parents out). A set but unusable PIN, or a valid PIN without the binding or
  * the token, logs a configuration warning (never the PIN or the token). The read-only
@@ -67,6 +73,13 @@ export function editorEnabled(
     );
     return false;
   }
+  if (status === "trivial") {
+    warnOnce(
+      "trivial-pin",
+      "KIDBOARD_PARENT_PIN is too easy to guess (one repeated digit or a run like 123456); choose another PIN, the editor stays off",
+    );
+    return false;
+  }
   if (status === "unset") {
     return false;
   }
@@ -77,10 +90,10 @@ export function editorEnabled(
     );
     return false;
   }
-  if (!accessTokenSet(env.KIDBOARD_ACCESS_TOKEN)) {
+  if (secretTokenStatus(env.KIDBOARD_ACCESS_TOKEN) !== "valid") {
     warnOnce(
       "missing-access-token",
-      "KIDBOARD_PARENT_PIN is set but KIDBOARD_ACCESS_TOKEN is not (or is the template value); the editor and the phone feed stay off",
+      "KIDBOARD_PARENT_PIN is set but KIDBOARD_ACCESS_TOKEN is not a valid token (32 to 256 characters of A-Z, a-z, 0-9, _ or -); the editor and the phone feed stay off",
     );
     return false;
   }

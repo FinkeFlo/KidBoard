@@ -77,9 +77,11 @@ central service: every family runs its own copy.
 
 1. Click the button, log in to Cloudflare and connect GitHub or GitLab.
 2. Fill in three fields:
-   - `KIDBOARD_ACCESS_TOKEN`: a long random string (40 or more letters and digits). It
-     protects your data and is needed for the editor.
-   - `KIDBOARD_PARENT_PIN`: 6 to 12 digits; unlocks the editor.
+   - `KIDBOARD_ACCESS_TOKEN`: a random string of 32 to 256 letters and digits
+     (`_` and `-` allowed), e.g. from `openssl rand -hex 32`. It is required: without a valid
+     one the API refuses everything. It protects your data and is needed for the editor.
+   - `KIDBOARD_PARENT_PIN`: 6 to 12 digits; unlocks the editor. Not a repeated digit or a run like
+     `123456` (the editor stays off then), and no birthdays.
    - `KIDBOARD_CONFIG`: your children (name, colour, emoji) and time zone as one line of
      JSON. Change the example names. Replace every `REPLACE_ME`.
 
@@ -91,8 +93,28 @@ central service: every family runs its own copy.
 **Your copy does not update by itself.** The button creates a separate copy of KidBoard in
 your GitHub/GitLab account; Cloudflare rebuilds it whenever that copy changes, but changes
 to this repository do not reach it automatically. To hear about new versions, watch this
-repository's releases on GitHub (Watch > Custom > Releases). Your entries and settings stay
-when you redeploy.
+repository's releases on GitHub (Watch > Custom > Releases). Your entries stay when you
+redeploy, but a new version can tighten the rules for settings and secrets: read the
+checklist below before you update.
+
+**Upgrading from an earlier version.** Check these five points before or right after the
+update; otherwise the board may answer with an error (`KB-500`) or the editor stays off:
+
+1. **Access token required.** Without a valid `KIDBOARD_ACCESS_TOKEN` (32 to 256 characters
+   `A-Z a-z 0-9 _ -`) the API now refuses everything. A shorter token, or one with `+`, `/`
+   or `=` (for example from `openssl rand -base64`), no longer works: create a new one
+   (`openssl rand -hex 32`), set the secret and open the tablet link with the new
+   `?key=<token>` once. A public board needs `KIDBOARD_PUBLIC="1"` and no token.
+2. **Child colours.** In `KIDBOARD_CONFIG` only `child-1` ... `child-6` or hex (`#rgb`,
+   `#rrggbb`) are valid; a name like `"red"` or `rgb(...)` makes the whole configuration
+   invalid. Change them, e.g. `"red"` to `"#cc0000"`.
+3. **PIN.** A PIN with one repeated digit or a run like `123456` switches the editor off
+   (the log says why). Choose another PIN.
+4. **Embedding.** Other sites can no longer embed the board in a frame (for example a Home
+   Assistant dashboard). Add the dashboard's address to `FRAME_ANCESTORS` in
+   `apps/web/headers/staticHeaders.ts`, see [docs/DEPLOY.md](docs/DEPLOY.md).
+5. **Calendar addresses.** Feed URLs must start with `https://` (or `webcal://`); an
+   `http://` address is now refused. Copy the secret iCal address again from Google Calendar.
 
 Step by step, the local command-line way, custom domain and logs:
 [docs/DEPLOY.md](docs/DEPLOY.md). All settings: [docs/CONFIG.md](docs/CONFIG.md).
@@ -106,7 +128,8 @@ Step by step, the local command-line way, custom domain and logs:
 - **Change or delete:** tap "Change". For a weekly entry you choose "only on <day>" or
   "whole series".
 - **Locks itself** after 3 minutes without input, when you tap "Done" and when the screen
-  turns off. After 5 wrong PINs it locks for 15 minutes.
+  turns off. After 5 wrong PINs it locks for 15 minutes; each further lockout doubles the
+  time (up to 2 hours), and the right PIN resets it.
 - **Calendar on your phone:** set the optional secret `KIDBOARD_FEED_TOKEN` (32 or more
   letters and digits). The "Backup & phone" section then shows a link to subscribe to; keep
   it private, anyone with the link can read the entries.
@@ -133,6 +156,12 @@ If your family already plans in Google Calendar, KidBoard can show those calenda
    `{ "id": "kids", "kind": "events" }` or `{ "id": "meals", "kind": "meals" }`.
 3. Add a secret `CAL_<ID>_URL` with the address (id in upper case: `kids` ->
    `CAL_KIDS_URL`) in Cloudflare: your Worker > Settings > Variables and Secrets.
+
+Use your own secondary calendars (for example "Kids" and "Meals") instead of your main
+calendar: the main calendar's feed also lists invitations you have not accepted yet. Only
+`https://` (or `webcal://`) addresses are accepted. A calendar that failed is not fetched
+again for 5 minutes; per calendar at most 2000 events are read and titles are cut at 120
+characters.
 
 Google updates the feed with a delay and KidBoard caches it (default one hour), so new
 Google events take a while to appear. Entries made in the app show up at once.
@@ -206,34 +235,34 @@ into the description (see above).
 
 ## Troubleshooting
 
-| What you see                                                 | What to do                                                                                                                                |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| "This tablet needs a new access link" (**KB-401**)           | The access token is missing, wrong or was changed. Open the tablet link with `?key=<token>` once more.                                    |
-| No pencil in the side bar                                    | The editor is off: `KIDBOARD_PARENT_PIN` must be 6 to 12 digits and `KIDBOARD_ACCESS_TOKEN` must be set.                                  |
-| "The editor is switched off."                                | Same as above; after changing a secret, reload the board.                                                                                 |
-| "Offline · as of ..." (**KB-OFF** if there is no saved plan) | No internet. The last good plan stays visible; the board reloads by itself when the network is back.                                      |
-| "Can't update · as of ..."                                   | The tablet cannot reach the server; the last good plan stays. Check Wi-Fi; it retries by itself.                                          |
-| "Maybe not current · as of ..."                              | The server could not reach a Google calendar and shows the last good copy (up to 7 days). Check that calendar's secret address.           |
-| Wrong day, or times shifted by hours                         | Set `timeZone` in `KIDBOARD_CONFIG` (e.g. `Europe/Berlin`). The tablet's own time zone is ignored on purpose.                             |
-| A Google calendar is empty or missing                        | Is `CAL_<ID>_URL` set and does `<ID>` match the calendar `id`? Is it the secret iCal address? New Google events can take an hour or more. |
-| "Back in a moment" with an error code                        | A reload usually fixes it ("Reload now"). The code tells a helper what happened, see below.                                               |
+| What you see                                                 | What to do                                                                                                                                                     |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "This tablet needs a new access link" (**KB-401**)           | The access token is missing, wrong or was changed. Open the tablet link with `?key=<token>` once more.                                                         |
+| No pencil in the side bar                                    | The editor is off: `KIDBOARD_PARENT_PIN` must be 6 to 12 digits and not easy to guess (`111111`, `123456`), and `KIDBOARD_ACCESS_TOKEN` must be a valid token. |
+| "The editor is switched off."                                | Same as above; after changing a secret, reload the board.                                                                                                      |
+| "Offline · as of ..." (**KB-OFF** if there is no saved plan) | No internet. The last good plan stays visible; the board reloads by itself when the network is back.                                                           |
+| "Can't update · as of ..."                                   | The tablet cannot reach the server; the last good plan stays. Check Wi-Fi; it retries by itself.                                                               |
+| "Maybe not current · as of ..."                              | The server could not reach a Google calendar and shows the last good copy (up to 7 days). Check that calendar's secret address.                                |
+| Wrong day, or times shifted by hours                         | Set `timeZone` in `KIDBOARD_CONFIG` (e.g. `Europe/Berlin`). The tablet's own time zone is ignored on purpose.                                                  |
+| A Google calendar is empty or missing                        | Is `CAL_<ID>_URL` set and does `<ID>` match the calendar `id`? Is it the secret iCal address? New Google events can take an hour or more.                      |
+| "Back in a moment" with an error code                        | A reload usually fixes it ("Reload now"). The code tells a helper what happened, see below.                                                                    |
 
 <details>
 <summary><b>Error codes</b> ("Error code for parents" on the error card)</summary>
 
-| Code      | Meaning                                                                                     |
-| --------- | ------------------------------------------------------------------------------------------- |
-| `KB-NET`  | The tablet cannot reach the server (Wi-Fi, DNS, server down).                               |
-| `KB-TIME` | The server took too long to answer.                                                         |
-| `KB-401`  | Access token missing or wrong. Open the tablet link with `?key=` again.                     |
-| `KB-400`  | The server rejected the request (for example an outdated app version). Reload the page.     |
-| `KB-502`  | No calendar could be loaded and there is no saved copy. Check the Google calendar links.    |
-| `KB-500`  | Server problem, usually missing or invalid `KIDBOARD_CONFIG` or a token still `REPLACE_ME`. |
-| `KB-HTTP` | Another unexpected HTTP answer. Check the deployment and its logs.                          |
-| `KB-DATA` | The answer had an unexpected format (app and worker versions differ). Redeploy, reload.     |
-| `KB-OFF`  | Offline and no plan saved yet.                                                              |
-| `KB-UI`   | The display itself failed; KidBoard restarts it on its own.                                 |
-| `KB-LOAD` | Loading failed for an unknown reason.                                                       |
+| Code      | Meaning                                                                                                        |
+| --------- | -------------------------------------------------------------------------------------------------------------- |
+| `KB-NET`  | The tablet cannot reach the server (Wi-Fi, DNS, server down).                                                  |
+| `KB-TIME` | The server took too long to answer.                                                                            |
+| `KB-401`  | Access token missing or wrong. Open the tablet link with `?key=` again.                                        |
+| `KB-400`  | The server rejected the request (for example an outdated app version). Reload the page.                        |
+| `KB-502`  | No calendar could be loaded and there is no saved copy. Check the Google calendar links.                       |
+| `KB-500`  | Server problem, usually missing or invalid `KIDBOARD_CONFIG` or a missing, short or `REPLACE_ME` access token. |
+| `KB-HTTP` | Another unexpected HTTP answer. Check the deployment and its logs.                                             |
+| `KB-DATA` | The answer had an unexpected format (app and worker versions differ). Redeploy, reload.                        |
+| `KB-OFF`  | Offline and no plan saved yet.                                                                                 |
+| `KB-UI`   | The display itself failed; KidBoard restarts it on its own.                                                    |
+| `KB-LOAD` | Loading failed for an unknown reason.                                                                          |
 
 Server-side problems: [docs/DEPLOY.md](docs/DEPLOY.md#9-troubleshooting).
 
@@ -246,8 +275,9 @@ entries you make in the app are stored in a database in **your own** Cloudflare 
 PIN and the access token are secrets in that account; the tablet keeps only the token and
 the last plan (for offline use). If you add Google calendars, their secret addresses
 stay on the server, and of an event's description only the emoji of a `Bring:` line reach
-the tablet. With weather on, the server sends your place to Open-Meteo, nothing else. Use
-the access token: without it anyone who finds your Worker address could read the plan.
+the tablet. With weather on, the server sends your place to Open-Meteo, nothing else. The
+access token is required: without a valid one the server refuses every request, so the plan is
+never public by accident (a public board needs the explicit `KIDBOARD_PUBLIC="1"`).
 
 ## Development
 
@@ -263,6 +293,10 @@ pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+`pnpm dev` needs a `.dev.vars` file (copy `.dev.vars.example`): the worker refuses requests
+without a valid `KIDBOARD_ACCESS_TOKEN`; for a quick local look without a token set
+`KIDBOARD_PUBLIC="1"` instead. `pnpm dev:demo` needs neither.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and the [architecture](docs/ARCHITECTURE.md).
 

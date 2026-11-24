@@ -1,3 +1,5 @@
+import { FEED_TIMEOUT_MS } from "@kidboard/shared";
+
 /** Why a feed could not be downloaded. */
 export type FeedFetchErrorReason =
   "http-status" | "timeout" | "too-large" | "network";
@@ -27,8 +29,6 @@ export class FeedFetchError extends Error {
   }
 }
 
-/** ADR-0006 / PLAN T-10: upstream timeout. */
-export const FEED_TIMEOUT_MS = 10_000;
 /** ADR-0006 / PLAN T-10: maximum feed size in bytes. */
 export const FEED_MAX_BYTES = 5 * 1024 * 1024;
 

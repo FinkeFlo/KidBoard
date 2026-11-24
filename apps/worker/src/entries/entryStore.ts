@@ -6,18 +6,18 @@ import {
   EditorEntryInputSchema,
   type EditorIssue,
   EditorKindSchema,
+  entryDateRange,
   isDateKey,
+  isOccurrenceDate,
+  MAX_APP_ENTRIES,
   parseEditorEntryInput,
 } from "@kidboard/shared";
 import { z } from "zod";
 
 import { logWarn } from "../log";
-import { entryDateRange, isOccurrenceDate } from "./occurrences";
 import { SchemaGate } from "./schema";
 import { bumpStamp } from "./stamp";
 
-/** ADR-0014: at most 1 000 app entries per deployment. */
-export const MAX_ENTRIES = 1000;
 /** ADR-0014: at most 8 KB (UTF-8) per entry: data, exceptions and overrides together. */
 export const MAX_ENTRY_BYTES = 8 * 1024;
 
@@ -75,7 +75,7 @@ export const EntryExportSchema = z.strictObject({
   format: z.literal(ENTRY_EXPORT_FORMAT),
   version: z.literal(ENTRY_EXPORT_VERSION),
   exportedAt: DateTimeStringSchema,
-  entries: z.array(ExportedEntrySchema).max(MAX_ENTRIES),
+  entries: z.array(ExportedEntrySchema).max(MAX_APP_ENTRIES),
 });
 
 export interface EntryExport {
@@ -342,7 +342,7 @@ export class EntryStore {
             range.last,
             at,
             at,
-            MAX_ENTRIES,
+            MAX_APP_ENTRIES,
           ),
         bumpStamp(this.db),
       ]);
@@ -541,7 +541,7 @@ export class EntryStore {
           ? rows.length
           : existingIds.size +
             rows.filter((row) => !existingIds.has(row.id)).length;
-      if (newCount() > MAX_ENTRIES) {
+      if (newCount() > MAX_APP_ENTRIES) {
         return TOO_MANY;
       }
       const at = this.timestamp();
@@ -589,7 +589,7 @@ export class EntryStore {
           .prepare(
             "INSERT INTO kb_guard (ok) SELECT 0 WHERE (SELECT COUNT(*) FROM app_entries) > ?",
           )
-          .bind(MAX_ENTRIES),
+          .bind(MAX_APP_ENTRIES),
         this.db.prepare(`DELETE FROM kb_meta WHERE key = '${IMPORT_BASE_KEY}'`),
         bumpStamp(this.db),
       );
@@ -605,7 +605,7 @@ export class EntryStore {
         for (const row of after) {
           existingIds.add(row.id);
         }
-        if (newCount() > MAX_ENTRIES) {
+        if (newCount() > MAX_APP_ENTRIES) {
           return TOO_MANY;
         }
         throw error;
@@ -827,14 +827,7 @@ export class EntryStore {
     return new Date(this.now()).toISOString();
   }
 
-  /** Ensures the schema, runs `op`; a D1 error re-checks the schema next time. */
-  private async run<T>(op: () => Promise<T>): Promise<T> {
-    await this.gate.ensure(this.db);
-    try {
-      return await op();
-    } catch (error) {
-      this.gate.forget(this.db);
-      throw error;
-    }
+  private run<T>(op: () => Promise<T>): Promise<T> {
+    return this.gate.run(this.db, op);
   }
 }

@@ -11,13 +11,17 @@ import { type AppEntry, EntryStore } from "../entries/entryStore";
 import { renderAppCalendar } from "../entries/renderCalendar";
 import type { SchemaGate } from "../entries/schema";
 import { STAMP_KEY } from "../entries/stamp";
+import { withDeadline } from "../feeds/flight";
 import {
+  getSourceEntry,
+  putSourceEntry,
   SOURCE_ENTRY_VERSION,
   type SourceEntry,
   sourceKey,
   type SourceStore,
   type StoreBackend,
 } from "../feeds/sourceStore";
+import { errorName } from "../http/errors";
 import { expandCalendar } from "../ical/expandCalendar";
 import { logWarn } from "../log";
 import { normalize } from "../normalize/normalize";
@@ -72,20 +76,6 @@ async function appSourceKey(
   return sourceKey(sourceId, hash);
 }
 
-/** Runs `op` on the schema-checked database; a D1 error re-checks the schema next time. */
-async function withSchema<T>(
-  ctx: AppSourceCacheContext,
-  op: () => Promise<T>,
-): Promise<T> {
-  await ctx.gate.ensure(ctx.db);
-  try {
-    return await op();
-  } catch (error) {
-    ctx.gate.forget(ctx.db);
-    throw error;
-  }
-}
-
 /**
  * The current change stamp of the app entries ("" before the first write). It is a
  * random value the entry store replaces in the same D1 batch as every write
@@ -94,7 +84,7 @@ async function withSchema<T>(
  * deletes are not).
  */
 async function readStamp(ctx: AppSourceCacheContext): Promise<string> {
-  return withSchema(ctx, async () => {
+  return ctx.gate.run(ctx.db, async () => {
     const value = await ctx.db
       .prepare("SELECT value FROM kb_meta WHERE key = ?")
       .bind(STAMP_KEY)
@@ -117,31 +107,6 @@ function isFresh(
   );
 }
 
-/** Rejection of {@link withTimeout}; its name is what the log shows. */
-class D1TimeoutError extends Error {
-  override name = "D1TimeoutError";
-}
-
-/** `promise`, or a {@link D1TimeoutError} after `ms` (the timer is cleared). */
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new D1TimeoutError("D1 read timed out"));
-    }, ms);
-  });
-  try {
-    return await Promise.race([promise, deadline]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function errorName(error: unknown): string {
-  // Log the type only: messages may quote stored text.
-  return error instanceof Error ? error.name : typeof error;
-}
-
 function build(
   source: (typeof APP_SOURCES)[number],
   entries: readonly AppEntry[],
@@ -159,7 +124,7 @@ function build(
       `source "${source.id}": ${String(expanded.warnings.length)} expansion warnings${expanded.truncated ? " (truncated)" : ""}`,
     );
   }
-  const { events, meals } = normalize(
+  const { events, meals, truncated } = normalize(
     expanded.occurrences,
     source,
     ctx.config,
@@ -170,7 +135,7 @@ function build(
     sourceId: source.id,
     fetchedAt: new Date(ctx.nowMs).toISOString(),
     window: { ...ctx.window },
-    truncated: expanded.truncated,
+    truncated: expanded.truncated || truncated,
     stamp,
     events,
     meals,
@@ -194,7 +159,7 @@ export async function loadAppSources(
     APP_SOURCES.map((source) => appSourceKey(source.id, ctx.configHash)),
   );
   const cached = await Promise.all(
-    keys.map((key) => ctx.store.get(ctx.backend, key, ctx.nowMs)),
+    keys.map((key) => getSourceEntry(ctx.store, ctx.backend, key, ctx.nowMs)),
   );
   const fallback = (index: number): SourceResult => {
     const id = APP_SOURCES[index]?.id ?? "";
@@ -221,7 +186,7 @@ export async function loadAppSources(
       return [current, listed];
     };
     // One deadline for both reads; a late result is dropped (nothing is written).
-    [stamp, entries] = await withTimeout(read(), ctx.d1TimeoutMs);
+    [stamp, entries] = await withDeadline(read(), ctx.d1TimeoutMs);
   } catch (error) {
     logWarn(
       `app entries: D1 read failed (${errorName(error)}), ${cached.some((e) => e !== null) ? "serving last-good data" : "no last-good data"}`,
@@ -246,7 +211,7 @@ export async function loadAppSources(
     const key = keys[index];
     if (key !== undefined) {
       ctx.defer(
-        ctx.store.put(ctx.backend, key, entry).catch(() => {
+        putSourceEntry(ctx.store, ctx.backend, key, entry).catch(() => {
           logWarn(
             `source "${source.id}": ${ctx.backend.kind} cache write failed`,
           );

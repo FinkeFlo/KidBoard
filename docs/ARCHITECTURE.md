@@ -6,10 +6,11 @@
 
 ## Overview
 
-KidBoard is a read-only, icon-first family calendar and meal plan for a wall-mounted
-tablet. Parents keep everything in Google Calendar; KidBoard reads the calendars'
-**secret iCal addresses** on the server side, normalizes them, and serves a small JSON
-API to a kiosk-friendly PWA.
+KidBoard is an icon-first family calendar and meal plan for a wall-mounted tablet.
+Parents keep entries in Google Calendar (KidBoard reads the calendars' **secret iCal
+addresses** on the server side, read-only) and/or in the parent editor of the app (entries
+stored in D1, ADR-0014). The worker normalizes both and serves a small JSON API to a
+kiosk-friendly PWA.
 
 ```mermaid
 flowchart LR
@@ -204,101 +205,53 @@ Order of operations on the raw `SUMMARY`:
 * All-day events use date-only strings with exclusive end, multi-day events appear on
   every covered day.
 
-## Editor (T-39, ADR-0012)
+## Editor (T-39, ADR-0014)
 
-The parent editor writes the *same* conventions a parent would type in Google Calendar,
-so the board keeps reading only the iCal feeds. The model lives in
-`packages/shared/src/editor/` (pure, runtime-agnostic, exported from `@kidboard/shared`);
-the worker (T-40–T-42) only adds Google auth and REST calls.
+The parent editor stores its entries in the worker's D1 database (ADR-0014); Google
+Calendar stays read-only (the Google write path of ADR-0012 was never taken up and its code
+is removed, see the git history). The model lives in `packages/shared/src/editor/` (pure,
+runtime-agnostic, exported from `@kidboard/shared`) and is used by the web app, the worker
+and the offline demo backend alike.
 
 **Model.** `EditorEntryInputSchema` (zod, strict) is what the editor sends: `kind`
 (`event`/`meal`), `childIds` (`[]` = everyone, always `[]` for meals), `icon` (one emoji),
-`title` (trimmed, whitespace collapsed like `parseTitle`, 1–60 characters, one line),
+`title` (trimmed, whitespace collapsed like `parseTitle`, 1-60 characters, one line),
 `allDay`, `date`, `startTime`/`endTime` (`HH:mm`, end after start, default one hour later
 on the wall clock, `endDate` for timed entries that end on a later day) or all-day
-`endDate` (exclusive), `repeat` (`none` | `{ weekly: { weekdays 1–7, interval 1|2,
-until? } }`, the first date must be a rule weekday), `bring` (≤ 8 unique emoji, events),
-`countdown` (events), `slot` (meals). `EditorEntrySchema` adds the Google `id`, `etag`,
-`sourceId`, `recurringEventId` (instances) and `repeatEditable`; it allows what Google may
-hold (empty or long titles, zero-length events). `parseEditorEntryInput(value, config,
-{ sourceId })` adds the config checks (known children, a countdown icon implies
-`countdown: true`, title writable) and returns issue codes for the UI.
+`endDate` (exclusive), `repeat` (`none` | `{ weekly: { weekdays 1-7, interval 1|2,
+until? } }`, the first date must be a rule weekday), `bring` (up to 8 unique emoji,
+events), `countdown` (events), `slot` (meals). `parseEditorEntryInput(value, config)` adds
+the config checks (known children, a countdown icon implies `countdown: true`) and returns
+issue codes for the UI.
 
-**Conventions written** (`WriteLocale` = explicit editor locale, else `config.locale`,
-`auto` → German):
+**Titles and descriptions.** App entries are rendered to iCal and read back by the same
+normalizer as the Google feeds, so they follow the same conventions: `composeTitle` writes
+`[children: ][meal slot: ]icon text` (`Mia: 🏊 Schwimmen`, `Mittag: 🍝 Spaghetti`,
+`Alle: ...`) and `composeDescription` writes the `Mitbringen:` / `Bring:` line and the
+`#countdown` marker. `parseTitle` takes prefixes in any order until nothing changes, so a
+text that itself starts with a child prefix gets an explicit child part; every result is
+re-parsed, and anything that would not read back with the same children, icon, title and
+slot throws `EditorCompositionError`. A generated round-trip table covers umlaut names,
+child/meal-word/colon titles and ZWJ/VS16/skin-tone/flag/keycap icons.
 
-| Entry | Calendar | Title |
-|---|---|---|
-| Mia, 🏊 Schwimmen | shared | `Mia: 🏊 Schwimmen` |
-| Mia + Ben, 🛁 Baden | shared | `Mia, Ben: 🛁 Baden` (config order) |
-| everyone, 🏫 Kita | shared | `🏫 Kita` |
-| Ben, ⚽ Fußball | Ben's | `⚽ Fußball` |
-| everyone, 🚌 Ausflug | Ben's | `Alle: 🚌 Ausflug` / `All: …` |
-| lunch, 🍝 Spaghetti | meals | `Mittag: 🍝 Spaghetti` / `Lunch: …` |
-| unspecified, 🥣 Müsli | meals | `🥣 Müsli` |
+**Times and recurrence.** All conversions take `config.timeZone` explicitly, never the
+device zone. The single implementation of wall-clock to instant conversion (RFC 5545
+gap/overlap rules) is `packages/shared/src/wallTime.ts` on `@date-fns/tz`; `editor/zonedTime.ts`
+only adapts it to the editor's string forms. `resolveTimedRange` resolves start and end
+together: without `endTime` the end is one hour later on the wall clock, or 60 real minutes
+when the start lies in a spring-forward gap (Berlin 02:30 to 03:30-04:30); an explicit end
+that is not after the resolved start is rejected (`time_range_invalid`), never clamped.
+Shared tests run with the process zone set to `Pacific/Kiritimati` (vitest `env.TZ`) so any
+use of the device zone fails. `buildRecurrenceRule` returns the rule value
+`FREQ=WEEKLY;BYDAY=...[;INTERVAL=2][;UNTIL=...]` for ical.js when app entries are rendered;
+`UNTIL` is a DATE for all-day series and, for timed series, UTC at the last second of the
+last local day (computed with that day's offset).
 
-* `composeTitle` always writes `[children: ][meal slot: ]icon text`. `parseTitle` takes
-  prefixes in any order until nothing changes, so a text that itself starts with a child
-  prefix (`Mia: Geheimnis`, `Alle: …`) gets an explicit child part (`Alle:` for everyone,
-  the child's name in its own calendar), which stops the search; a text starting with an
-  emoji keeps it as text because the icon comes first; meal words are plain text in
-  event calendars and after a slot prefix. Every result is re-parsed; anything that would
-  not read back with the same children, icon, title and slot throws
-  `EditorCompositionError` (e.g. an `unspecified` meal whose text starts with `Mittag:`,
-  child names containing `:`/`,`). A generated round-trip table covers umlaut names,
-  child/meal-word/colon titles and ZWJ/VS16/skin-tone/flag/keycap icons.
-* `composeDescription` changes only bring lines and the `#countdown` marker and keeps
-  every other line and its HTML byte for byte: unchanged bring icons and marker state →
-  the description as is; the first bring line is replaced in place (its tags kept),
-  further ones removed with their line break (`<p>` emptied by the removal goes too);
-  without one, `Mitbringen: 👟 🩱` / `Bring: …` is appended (`<br>` in HTML, `\n`
-  otherwise; first line if it would fall outside the 8 KB scan window). Free text on a
-  replaced or removed bring line (words, a `#countdown` on it) is dropped with the old
-  icons. Bring-like lines inside `<script>`/`<style>` are not touched (the reader ignores
-  them). `parseBringList(result)` equals `bring`.
-* Countdown: an icon from `config.countdown.emojis` is a countdown by itself, so the
-  marker is written only for other icons with `countdown: true`; for countdown icons an
-  existing marker keeps its state (re-appended as its own line if it sat on a rewritten
-  bring line). `countdown: false` removes every marker, including markers inside
-  `<script>`/`<style>` (the reader's `#countdown` check sees the raw description).
-  Marker presence is decided on the rewritten text.
-* Meals keep their description untouched (no bring list, no countdown).
-
-**Times and recurrence.** All conversions take `config.timeZone` explicitly (shared
-`zonedTime` helpers on `@date-fns/tz` `tzOffset`, RFC 5545 gap/overlap rules as in the
-worker), never the device zone. Timed events are written as RFC 3339 with that zone's
-offset *and* `timeZone: config.timeZone` on start and end, so Google expands series in
-the configured zone and DST keeps the wall-clock time; all-day events use `date` with an
-exclusive end. `resolveTimedRange` resolves start and end together: without `endTime`
-the end is one hour later on the wall clock, or 60 real minutes when the start lies in
-a spring-forward gap (Berlin 02:30 → 03:30–04:30); an explicit end that is not after the
-resolved start (Berlin 2026-03-29 02:30–03:00) is rejected (`time_range_invalid` in
-`parseEditorEntryInput`, `RangeError` in `toGoogleEvent`), never clamped. Shared tests
-run with the process zone set to `Pacific/Kiritimati` (vitest `env.TZ`) so any use of
-the device zone fails. `buildRecurrenceRule` returns the rule value
-`FREQ=WEEKLY;BYDAY=…[;INTERVAL=2][;UNTIL=…]` (for ical.js `ICAL.Recur.fromString` when
-app entries are rendered, ADR-0014); `buildRecurrence` wraps it as one `RRULE:` line; `UNTIL` is a DATE for all-day series
-and, for timed series, UTC at the last second of the last local day (computed with that
-day's offset). `parseRecurrence` returns the editor form only for exactly that shape
-(missing `BYDAY` = start weekday, `WKST` only where it changes nothing, UTC/DATE/floating
-`UNTIL` mapped to the last local day it covers) and `null` (→ `repeatEditable: false`,
-recurrence never written back) for `COUNT`, other `BY…` parts or frequencies, `RDATE`,
-`EXRULE` or several `RRULE`s. On master edits `EXDATE` lines are kept byte for byte, or
-rebased to the new start time when the series' time of day changes; instances never
-carry a recurrence. `toGoogleEvent` / `fromGoogleEvent` convert between the model and
-the zod-typed Google `Event` subset (`id`, `etag`, `status`, `summary`, `description`,
-`start`/`end`, `recurrence`, `recurringEventId`, `originalStartTime`; unknown fields
-stripped); cancelled or unreadable events → `null`.
-
-**Target calendar** (`pickTargetCalendar(entry, writableSources, config)`, "first" =
-config order): new events go to the single selected child's calendar if writable, else
-the first writable `events` calendar without `childId`; new meals to the first writable
-`meals` calendar. Existing entries stay in their calendar while it can express them; a
-child's calendar always implies its child, so it can hold "everyone" (`Alle:`) or sets
-containing its child but not others. Otherwise the result is `move: true` with
-`fromSourceId` (the worker uses `events.move`, then patches); an instance cannot move on
-its own (`instance_cannot_move`), an unknown or read-only current calendar is
-`source_not_writable`, no fitting calendar is `no_writable_calendar`.
+**Shared item logic.** `editor/items.ts` holds what the editor list needs beyond the
+model: `isOccurrenceDate`, `entryDateRange`, `splitResolvable`, the field-by-field items of
+Google events and meals, `compareItems` and `buildTemplates`. The worker and the demo
+backend (`apps/web/demo/fakeEditorApi.ts`) both use it, so list order and templates cannot
+drift apart.
 
 ### Entry store (T-40, ADR-0014)
 
@@ -325,9 +278,9 @@ change stamp `kb_meta.entries_stamp` (a random UUID, `entries/stamp.ts`) in the 
 new stamp (a refused one may bump it too, which only costs a cache rebuild). `/api/config`
 reports `editor: true` only with the binding, a valid `KIDBOARD_PARENT_PIN` and an access
 token `KIDBOARD_ACCESS_TOKEN` (`editorEnabled` in `apps/worker/src/parent/pin.ts`; fail
-closed: a PIN or the binding without the token logs a configuration warning and keeps the
-editor, the app sources on the board and the phone feed off, while the read-only board
-works as before); the key is omitted when false (older web bundles parse the config strictly) and `PublicConfigSchema` defaults it to `false` and strips
+closed: a missing, trivial or template PIN, or the binding without a valid token, logs a
+configuration warning and keeps the editor, the app sources on the board and the phone feed
+off); the key is omitted when false (older web bundles parse the config strictly) and `PublicConfigSchema` defaults it to `false` and strips
 unknown top-level keys.
 
 ### App entries on the board (T-41, ADR-0014)
@@ -373,20 +326,18 @@ random 32-byte server secret (`kb_meta` key `parent_session_secret`, created wit
 `INSERT OR IGNORE` + read in one batch, then cached per isolate) with the PIN in `info`:
 a new PIN or a new database ends every session. Wrong PIN → `403 wrong_pin` with
 `attemptsLeft` (401 stays the access token's). Each attempt is reserved before the
-compare (`parent/lockout.ts`): synchronously per isolate, then by one D1 batch whose
+compare (`parent/lockout.ts`, D1 only) by one D1 batch whose
 conditional insert of a `kb_meta` row `parent_fail:<uuid>` → epoch s succeeds only
 without an active `parent_lock_until` and with fewer than 5 rows in the last 15 min (older
 rows are dropped); not reserved → `429 parent_lockout` with `Retry-After`, no compare. A
 wrong PIN renames the row to `parent_fail:s:<uuid>` (a settled failure; still counted)
-and, as the 5th in 15 min, writes `parent_lock_until` (now + 15 min, also answered with
-429); a right PIN deletes its own row and every settled failure (here and in the isolate's
-copy), so earlier typos of the parent no longer count. Reservations of parallel attempts
+and, as the 5th in 15 min, writes `parent_lock_until` and raises `parent_lock_level` (the
+lock lasts 15 min x 2^(level-1), capped at 2 h, also answered with 429); a right PIN deletes
+its own row, every settled failure and the level, so earlier typos of the parent no longer
+count. Reservations of parallel attempts
 still being compared are kept, so at most 5 PINs are compared at once, and without the
-right PIN at most 5 per window. Any other way out of `/unlock` (bad
-body, refused by D1, a D1 error) drops the isolate's reservation (`try`/`finally`). If
-deleting the rows after a right PIN fails, the session is still issued and the delete is
+right PIN at most 5 per window. If deleting the rows after a right PIN fails, the session is still issued and the delete is
 retried once past the response (`waitUntil`); rows left behind age out with the window.
-Another isolate keeps its own copy of earlier failures until they age out (fail closed).
 The lock condition counts all attempts in the window, including parallel ones still being
 compared, not only settled failures: deliberately conservative; it differs only for
 parallel attempts, which one tablet does not produce.
@@ -1028,8 +979,11 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
   cache; the URL itself never appears in a key, log or response. Backend: Workers KV
   (`KIDBOARD_CACHE`, auto-provisioned) when bound, else the Cache API (synthetic key
   `https://cache.kidboard.invalid/<key>`; only functional on custom domains). A
-  per-isolate memory map (≤ 64 entries) sits in front, and concurrent misses in an
-  isolate share one upstream fetch (single flight).
+  per-isolate memory map (≤ 64 entries) sits in front (`feeds/sourceStore.ts`, shared with
+  the weather), and concurrent misses in an isolate share one upstream fetch with one
+  deadline (`feeds/flight.ts`: `SingleFlight` and `withDeadline`). After a failed load the
+  isolate does not fetch that feed again for 5 minutes (last-good as `stale` meanwhile).
+  Only `https://` feed addresses are fetched.
 - **KV write budget:** one write per source per refresh. With KV the fresh TTL is at
   least `ceil(sources × 86 400 / 500)` s (half of the Free plan's 1 000 writes/day; e.g.
   2 sources → 346 s); a lower `KIDBOARD_CACHE_TTL` is raised with a log warning. While
@@ -1082,12 +1036,12 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
   07:00–19:00. Days with a missing date, code, high, low or daytime feels-like are skipped.
 - **Cache:** place coordinates 30 days (`v1/weather/place/<hash>`), forecast fresh 30 min
   and last good 24 h (`v1/weather/forecast/<hash>`, hash of the weather block, zone and
-  geocoding language) in KV or the Cache API, memory map and single flight per isolate as
-  for the feeds. At most 48 forecast writes/day. A geocoding miss is cached for 1 hour
+  geocoding language) in KV or the Cache API, the same `SourceStore` and `SingleFlight` helpers
+  as the feeds. At most 48 forecast writes/day. A geocoding miss is cached for 1 hour
   (memory + KV/Cache API; ≤ 24 writes/day, and then no forecast is written); it is logged
   once per lookup, not for requests served from the cached miss. After a
-  failed upstream load the isolate does not ask Open-Meteo again for 5 minutes (memory
-  only; meanwhile last good as `stale` or `503`).
+  failed upstream load the isolate does not ask Open-Meteo again for 5 minutes (the
+  flight's pause; meanwhile last good as `stale` or `503`).
 - **Errors:** weather off → `404 weather_off`; no geocoding match →
   `503 weather_place_unknown`; upstream failure without last good →
   `503 weather_unavailable` (with last good → `200`, `stale: true`). Place, coordinates

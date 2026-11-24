@@ -1,15 +1,23 @@
 import {
   addCalendarDays,
   BOARD_REFRESH_NOW,
+  buildTemplates,
+  compareItems,
   DateStringSchema,
+  EDITOR_TEMPLATE_DAYS_AFTER,
+  EDITOR_TEMPLATE_DAYS_BEFORE,
   type EditorImportResponse,
   type EditorIssue,
   type EditorListItem,
   type EditorListResponse,
   type EditorTemplatesResponse,
   type EditorWriteResponse,
+  googleEventItem,
+  googleMealItem,
   ImportModeSchema,
   isDateKey,
+  MAX_APP_ENTRIES,
+  splitResolvable,
 } from "@kidboard/shared";
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -17,33 +25,30 @@ import { validator } from "hono/validator";
 import { z } from "zod";
 
 import {
-  badRequest,
   type Board,
   type BoardContext,
   parseRangeQuery,
   rangeMessage,
   requestRange,
-  serverMisconfigured,
 } from "../agenda/board";
 import { buildAgenda } from "../agenda/buildAgenda";
 import {
   type AppEntry,
   EntryStore,
-  MAX_ENTRIES,
   MAX_ENTRY_BYTES,
   type StoreFailure,
 } from "../entries/entryStore";
 import type { AppEnv } from "../env";
+import {
+  badRequest,
+  errorName,
+  notFound,
+  serverMisconfigured,
+  storageUnavailable,
+} from "../http/errors";
 import { parseJsonBody, payloadTooLarge } from "../http/jsonBody";
 import { logWarn } from "../log";
-import {
-  appItems,
-  buildTemplates,
-  compareItems,
-  googleEventItem,
-  googleMealItem,
-  splitResolvable,
-} from "./editorItems";
+import { appItems } from "./editorItems";
 import type { ParentEnv } from "./session";
 
 /** Path of the import route below `/api/parent`. */
@@ -57,14 +62,10 @@ export const IMPORT_ROUTE = "/import";
  * only an unlocked parent can make the worker read that much.
  */
 export const MAX_IMPORT_BODY_BYTES =
-  MAX_ENTRIES * (MAX_ENTRY_BYTES + 512) + 4096;
+  MAX_APP_ENTRIES * (MAX_ENTRY_BYTES + 512) + 4096;
 
 /** At most this many field issues are returned (an import may have thousands). */
 export const MAX_ISSUES = 50;
-
-/** Template window: the last 8 weeks and the next 4 (configured zone). */
-export const TEMPLATE_DAYS_BEFORE = 8 * 7;
-export const TEMPLATE_DAYS_AFTER = 4 * 7;
 
 const ScopeQuerySchema = z
   .object({
@@ -138,7 +139,7 @@ function failureResponse(c: Context, failure: StoreFailure): Response {
           error: "limit_reached",
           message:
             failure.limit === "entries"
-              ? `At most ${String(MAX_ENTRIES)} entries`
+              ? `At most ${String(MAX_APP_ENTRIES)} entries`
               : `At most ${String(MAX_ENTRY_BYTES)} bytes per entry`,
           limit: failure.limit,
         },
@@ -151,20 +152,7 @@ function failureResponse(c: Context, failure: StoreFailure): Response {
 
 function logStorageError(error: unknown): void {
   // Type only: D1 messages may quote statements or stored text.
-  logWarn(
-    `editor: D1 unavailable (${error instanceof Error ? error.name : typeof error})`,
-  );
-}
-
-function storageUnavailable(c: Context, error: unknown): Response {
-  logStorageError(error);
-  return c.json(
-    {
-      error: "storage_unavailable",
-      message: "Entries are unavailable; try again",
-    },
-    503,
-  );
+  logWarn(`editor: D1 unavailable (${errorName(error)})`);
 }
 
 function toDto(entry: AppEntry): AppEntry {
@@ -218,7 +206,7 @@ export function registerEditorRoutes(
       // Unreachable behind the editor gate; keeps the types honest.
       return {
         ok: false,
-        response: c.json({ error: "not_found", message: "Not found" }, 404),
+        response: notFound(c),
       };
     }
     return {
@@ -240,7 +228,8 @@ export function registerEditorRoutes(
     try {
       return await op();
     } catch (error) {
-      return storageUnavailable(c, error);
+      logStorageError(error);
+      return storageUnavailable(c);
     }
   };
 
@@ -334,8 +323,8 @@ export function registerEditorRoutes(
     }
     const { ctx } = r;
     const appRange = {
-      from: addCalendarDays(ctx.today, -TEMPLATE_DAYS_BEFORE),
-      to: addCalendarDays(ctx.today, TEMPLATE_DAYS_AFTER),
+      from: addCalendarDays(ctx.today, -EDITOR_TEMPLATE_DAYS_BEFORE),
+      to: addCalendarDays(ctx.today, EDITOR_TEMPLATE_DAYS_AFTER),
     };
     // Google data comes from the board's cached window only (from today - 1): looking
     // further back would mean another fetch and expansion outside the CPU budget

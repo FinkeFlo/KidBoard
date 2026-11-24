@@ -1,8 +1,8 @@
 import type { Hono } from "hono";
 
-import { serverMisconfigured } from "../agenda/board";
 import { loadConfig } from "../config/loadConfig";
 import type { AppEnv } from "../env";
+import { serverMisconfigured } from "../http/errors";
 import { createWeather, type WeatherOptions } from "./weather";
 
 /** Path of the weather API. */

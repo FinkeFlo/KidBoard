@@ -1,7 +1,7 @@
 // Test harness for the whole editor (not part of the app bundle): the real ApiClient
 // against the in-memory fake editor API of the demo server, inside the data layer and a
 // fake parent gate. All data is synthetic.
-import type { PublicConfig } from "@kidboard/shared";
+import { PARENT_SESSION_HEADER, type PublicConfig } from "@kidboard/shared";
 import type { QueryClient } from "@tanstack/react-query";
 import { render, type RenderResult } from "@testing-library/react";
 import { type Mock, vi } from "vitest";
@@ -11,7 +11,7 @@ import {
   type FakeEditor,
   type FakeEditorOptions,
 } from "../../demo/fakeEditorApi";
-import { createApiClient, PARENT_SESSION_HEADER } from "../data/apiClient";
+import { createApiClient } from "../data/apiClient";
 import { createQueryClient } from "../data/queryClient";
 import {
   agendaFixture,
