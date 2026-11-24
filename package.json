@@ -28,7 +28,7 @@
         "description": "Required: 32 to 256 random letters and digits (no spaces or symbols), e.g. 40 characters; without a valid one the board refuses every request. The editor needs it. Open the board once with `?key=<token>` at the end of its address."
       },
       "KIDBOARD_PARENT_PIN": {
-        "description": "A PIN of 6 to 12 digits that unlocks the editor for parents (not 111111 or 123456). Without it the board stays read-only."
+        "description": "A PIN of 6 to 12 digits that unlocks the editor for parents (no repeated digit like 111111 and no run like 123456 or 987654). Without it the board stays read-only."
       },
       "KIDBOARD_CONFIG": {
         "description": "Your children and settings as one line of JSON: change the example names, colours and emojis. Google calendars can be added later ([docs/CONFIG.md](https://github.com/FinkeFlo/kidboard/blob/main/docs/CONFIG.md))."
