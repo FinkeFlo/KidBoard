@@ -17,8 +17,8 @@ KIDBOARD_ACCESS_TOKEN="REPLACE_ME"
 # Parent PIN for the editor (ADR-0013): 6 to 12 digits of your choice, not guessable: no
 # birthdays, no single repeated digit (111111), no run (123456, 654321). Unset, shorter,
 # non-digit, too easy or still REPLACE_ME = the editor stays off (the log says why) and
-# KidBoard is the read-only board. Five wrong PINs lock the editor for 15 minutes; further
-# lockouts double the time (up to 2 hours).
+# KidBoard is the read-only board. Wrong PINs add up until the next right PIN; every fifth
+# locks the editor for 15 minutes, further lockouts double the time (up to 2 hours).
 # The editor also needs the access token above and the D1 database KIDBOARD_DATA, which
 # Wrangler creates on deploy.
 KIDBOARD_PARENT_PIN="REPLACE_ME"
