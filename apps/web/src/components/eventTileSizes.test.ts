@@ -29,6 +29,7 @@ describe("tileClasses", () => {
   });
 
   it("returns the plain classes for sizes without a prominent variant", () => {
-    expect(tileClasses("week", true)).toEqual(tileClasses("week", false));
+    // The same object, resolved once at module load.
+    expect(tileClasses("week", true)).toBe(tileClasses("week", false));
   });
 });
