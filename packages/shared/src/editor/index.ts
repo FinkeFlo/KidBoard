@@ -2,6 +2,7 @@ export * from "./api";
 export * from "./composeDescription";
 export * from "./composeTitle";
 export * from "./entry";
+export * from "./entryRules";
 export * from "./items";
 export * from "./recurrence";
 export * from "./timeRange";

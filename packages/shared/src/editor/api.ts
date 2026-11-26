@@ -24,6 +24,11 @@ import {
 /** What every successful write answers: the board should refetch the agenda now. */
 export const BOARD_REFRESH_NOW = "now";
 
+/** `format` of the editor's backup document (`GET /export`, `POST /import`; ADR-0014). */
+export const ENTRY_EXPORT_FORMAT = "kidboard-entries";
+/** `version` of the editor's backup document. */
+export const ENTRY_EXPORT_VERSION = 1;
+
 /** An app entry as stored by the worker (ADR-0014). */
 export const AppEntrySchema = z.object({
   /** Random UUID. */

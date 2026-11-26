@@ -1,16 +1,26 @@
 import {
+  addExceptionParts,
   type AppConfig,
+  type AppEntryDto,
+  dateKeyProblem,
   DateStringSchema,
   DateTimeStringSchema,
   type EditorEntryInput,
   EditorEntryInputSchema,
   type EditorIssue,
   EditorKindSchema,
+  ENTRY_EXPORT_FORMAT,
+  ENTRY_EXPORT_VERSION,
   entryDateRange,
+  type EntryParts,
+  type EntryRuleResult,
+  importEntryParts,
   isDateKey,
-  isOccurrenceDate,
   MAX_APP_ENTRIES,
   parseEditorEntryInput,
+  setOverrideParts,
+  singleDayProblem,
+  updateEntryParts,
 } from "@kidboard/shared";
 import { z } from "zod";
 
@@ -21,8 +31,7 @@ import { bumpStamp } from "./stamp";
 /** ADR-0014: at most 8 KB (UTF-8) per entry: data, exceptions and overrides together. */
 export const MAX_ENTRY_BYTES = 8 * 1024;
 
-export const ENTRY_EXPORT_FORMAT = "kidboard-entries";
-export const ENTRY_EXPORT_VERSION = 1;
+export { ENTRY_EXPORT_FORMAT, ENTRY_EXPORT_VERSION };
 
 /** Entry ids are `crypto.randomUUID()` values (lower-case UUID text). */
 export const EntryIdSchema = z
@@ -31,25 +40,13 @@ export const EntryIdSchema = z
 
 const DateKeySchema = DateStringSchema.refine(isDateKey);
 
-/** An app entry as stored (ADR-0014). */
-export interface AppEntry {
-  id: string;
-  /** Starts at 1, +1 on every write; updates must name the revision they edited. */
-  revision: number;
-  kind: EditorEntryInput["kind"];
-  data: EditorEntryInput;
-  /** Days of a series removed "only this day" (iCal `EXDATE`), sorted. */
-  exdates: string[];
-  /**
-   * "Only this day" changes of a series, keyed by the original occurrence date (iCal
-   * `RECURRENCE-ID`); the value is the single (`repeat: "none"`) replacement, which may
-   * lie on another day. Keys sorted.
-   */
-  overrides: Record<string, EditorEntryInput>;
-  /** ISO 8601 UTC timestamps. */
-  createdAt: string;
-  updatedAt: string;
-}
+/**
+ * An app entry as stored (ADR-0014), the shared DTO the editor API answers with:
+ * `revision` starts at 1 and grows by 1 on every write (updates name the revision they
+ * edited); `exdates` and `overrides` as in the shared `EntryParts`; timestamps ISO 8601
+ * UTC.
+ */
+export type AppEntry = AppEntryDto;
 
 export type StoreFailure =
   | { ok: false; error: "not_found" }
@@ -106,13 +103,6 @@ export interface EntryStoreOptions {
   gate?: SchemaGate;
 }
 
-/** Stored parts of an entry besides the bookkeeping columns. */
-interface EntryParts {
-  data: EditorEntryInput;
-  exdates: string[];
-  overrides: Record<string, EditorEntryInput>;
-}
-
 /** `kb_meta` key of the import base revision (a constant, not user input). */
 const IMPORT_BASE_KEY = "import_base_revision";
 
@@ -167,12 +157,6 @@ function serialize(parts: EntryParts): SerializedParts {
   };
 }
 
-function sortedRecord<T>(record: Record<string, T>): Record<string, T> {
-  return Object.fromEntries(
-    Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
-  );
-}
-
 function issue(path: string, message: string): EditorIssue {
   return { code: "invalid", path, message };
 }
@@ -195,25 +179,9 @@ const TOO_MANY: StoreFailure = {
   limit: "entries",
 };
 
-function withPrefix(prefix: string, issues: EditorIssue[]): EditorIssue[] {
-  return issues.map((i) => ({
-    ...i,
-    path: i.path === "" ? prefix : `${prefix}.${i.path}`,
-  }));
-}
-
-/** Shape-only validation (no config): what an import and a stored row must satisfy. */
-function validateShape(
-  input: unknown,
-): { ok: true; value: EditorEntryInput } | InvalidFailure {
-  const result = EditorEntryInputSchema.safeParse(input);
-  return result.success
-    ? { ok: true, value: result.data }
-    : invalid(
-        result.error.issues.map((i) =>
-          issue(i.path.map(String).join("."), i.message),
-        ),
-      );
+/** A shared entry rule's outcome as a store result. */
+function fromRule<T>(result: EntryRuleResult<T>): StoreResult<T> {
+  return result.ok ? result : invalid(result.issues);
 }
 
 /**
@@ -377,26 +345,10 @@ export class EntryStore {
       return parsed;
     }
     const data = parsed.value;
-    return this.modify(id, revision, (current) => {
-      if (data.repeat === "none") {
-        return { ok: true, value: { data, exdates: [], overrides: {} } };
-      }
-      return {
-        ok: true,
-        value: {
-          data,
-          exdates: current.exdates.filter((date) =>
-            isOccurrenceDate(data, date),
-          ),
-          overrides: Object.fromEntries(
-            Object.entries(current.overrides).filter(
-              ([date, override]) =>
-                isOccurrenceDate(data, date) && override.kind === data.kind,
-            ),
-          ),
-        },
-      };
-    });
+    return this.modify(id, revision, (current) => ({
+      ok: true,
+      value: updateEntryParts(current, data),
+    }));
   }
 
   async remove(id: string, revision: number): Promise<StoreResult<null>> {
@@ -429,26 +381,13 @@ export class EntryStore {
     revision: number,
     date: string,
   ): Promise<StoreResult<AppEntry>> {
-    if (!isDateKey(date)) {
-      return invalid([issue("date", "date must be YYYY-MM-DD")]);
+    const badDate = dateKeyProblem(date);
+    if (badDate !== null) {
+      return invalid([badDate]);
     }
-    return this.modify(id, revision, (current) => {
-      const problem = this.occurrenceProblem(current.data, date);
-      if (problem !== null) {
-        return invalid([problem]);
-      }
-      const overrides = Object.fromEntries(
-        Object.entries(current.overrides).filter(([day]) => day !== date),
-      );
-      return {
-        ok: true,
-        value: {
-          data: current.data,
-          exdates: [...new Set([...current.exdates, date])].sort(),
-          overrides,
-        },
-      };
-    });
+    return this.modify(id, revision, (current) =>
+      fromRule(addExceptionParts(current, date)),
+    );
   }
 
   /**
@@ -461,34 +400,23 @@ export class EntryStore {
     date: string,
     input: unknown,
   ): Promise<StoreResult<AppEntry>> {
-    if (!isDateKey(date)) {
-      return invalid([issue("date", "date must be YYYY-MM-DD")]);
+    // Checks that need no stored entry come first (before not_found and conflict).
+    const badDate = dateKeyProblem(date);
+    if (badDate !== null) {
+      return invalid([badDate]);
     }
     const parsed = this.validate(input);
     if (!parsed.ok) {
       return parsed;
     }
     const override = parsed.value;
-    if (override.repeat !== "none") {
-      return invalid([issue("repeat", "A single day cannot repeat")]);
+    const repeats = singleDayProblem(override);
+    if (repeats !== null) {
+      return invalid([repeats]);
     }
-    return this.modify(id, revision, (current) => {
-      const problem = this.occurrenceProblem(current.data, date);
-      if (problem !== null) {
-        return invalid([problem]);
-      }
-      if (override.kind !== current.data.kind) {
-        return invalid([issue("kind", "A single day keeps the series' kind")]);
-      }
-      return {
-        ok: true,
-        value: {
-          data: current.data,
-          exdates: current.exdates.filter((d) => d !== date),
-          overrides: sortedRecord({ ...current.overrides, [date]: override }),
-        },
-      };
-    });
+    return this.modify(id, revision, (current) =>
+      fromRule(setOverrideParts(current, date, override)),
+    );
   }
 
   /** All readable entries as a backup document (corrupt rows are skipped). */
@@ -627,71 +555,27 @@ export class EntryStore {
   }
 
   /**
-   * Validates every entry of an import document; collects all issues. Entries are
-   * checked for their shape only (`EditorEntryInputSchema`), not against the config: a
-   * backup from before a config change (a removed child, …) is restored as it was,
-   * the board skips what the config cannot express and the editor lists it as
-   * unresolved, so the parent can fix or delete it. New and changed entries
-   * (`create`, `update`, `setOverride`) are still checked against the config.
+   * Validates every entry of an import document with the shared `importEntryParts`
+   * (shape only, not against the config: a backup from before a config change, a
+   * removed child, … is restored as it was, the board skips what the config cannot
+   * express and the editor lists it as unresolved, so the parent can fix or delete it)
+   * and checks the size of each. New and changed entries (`create`, `update`,
+   * `setOverride`) are still checked against the config.
    */
   private prepareImport(
     entries: z.output<typeof ExportedEntrySchema>[],
   ): StoreResult<ImportRow[]> {
-    const issues: EditorIssue[] = [];
-    const seen = new Set<string>();
+    const prepared = importEntryParts(entries);
+    if (!prepared.ok) {
+      return invalid(prepared.issues);
+    }
     const rows: ImportRow[] = [];
     let tooLarge = false;
-    for (const [i, entry] of entries.entries()) {
-      const at = `entries.${String(i)}`;
-      if (seen.has(entry.id)) {
-        issues.push(issue(`${at}.id`, "Duplicate entry id"));
+    for (const [i, parts] of prepared.value.entries()) {
+      const entry = entries[i];
+      if (entry === undefined) {
+        throw new RangeError("importEntryParts returned an extra entry");
       }
-      seen.add(entry.id);
-      const data = validateShape(entry.data);
-      if (!data.ok) {
-        issues.push(...withPrefix(`${at}.data`, data.issues));
-        continue;
-      }
-      const master = data.value;
-      if (master.kind !== entry.kind) {
-        issues.push(issue(`${at}.kind`, "kind must match data.kind"));
-        continue;
-      }
-      for (const date of entry.exdates) {
-        const problem = this.occurrenceProblem(master, date);
-        if (problem !== null) {
-          issues.push({ ...problem, path: `${at}.exdates` });
-        }
-      }
-      const overrides: Record<string, EditorEntryInput> = {};
-      for (const [date, raw] of Object.entries(entry.overrides)) {
-        const path = `${at}.overrides.${date}`;
-        const problem = this.occurrenceProblem(master, date);
-        if (problem !== null) {
-          issues.push({ ...problem, path });
-          continue;
-        }
-        const override = validateShape(raw);
-        if (!override.ok) {
-          issues.push(...withPrefix(path, override.issues));
-        } else if (override.value.repeat !== "none") {
-          issues.push(issue(`${path}.repeat`, "A single day cannot repeat"));
-        } else if (override.value.kind !== master.kind) {
-          issues.push(
-            issue(`${path}.kind`, "A single day keeps the series' kind"),
-          );
-        } else {
-          overrides[date] = override.value;
-        }
-      }
-      const exdates = [...new Set(entry.exdates)]
-        .filter((date) => overrides[date] === undefined)
-        .sort();
-      const parts: EntryParts = {
-        data: master,
-        exdates,
-        overrides: sortedRecord(overrides),
-      };
       const serialized = serialize(parts);
       if (serialized.bytes > MAX_ENTRY_BYTES) {
         tooLarge = true;
@@ -704,24 +588,7 @@ export class EntryStore {
         serialized,
       });
     }
-    if (issues.length > 0) {
-      return invalid(issues);
-    }
     return tooLarge ? TOO_LARGE : { ok: true, value: rows };
-  }
-
-  /** Why `date` cannot carry an exception or override of `master`, or `null`. */
-  private occurrenceProblem(
-    master: EditorEntryInput,
-    date: string,
-  ): EditorIssue | null {
-    if (master.repeat === "none") {
-      return issue("date", "Only a series has single days to change");
-    }
-    if (!isOccurrenceDate(master, date)) {
-      return issue("date", "This day is not part of the series");
-    }
-    return null;
   }
 
   private validate(

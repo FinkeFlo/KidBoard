@@ -1,5 +1,6 @@
 import {
   addCalendarDays,
+  addExceptionParts,
   type AppEntryDto,
   BOARD_REFRESH_NOW,
   buildTemplates,
@@ -12,11 +13,16 @@ import {
   type EditorEntryInput,
   EditorEntryInputSchema,
   type EditorGoogleItem,
+  type EditorIssue,
   type EditorListResponse,
+  ENTRY_EXPORT_FORMAT,
+  ENTRY_EXPORT_VERSION,
   entryDateRange,
+  type EntryParts,
   formatInstant,
   googleEventItem,
   googleMealItem,
+  importEntryParts,
   ImportModeSchema,
   isOccurrenceDate,
   MAX_AGENDA_DAYS,
@@ -25,8 +31,10 @@ import {
   parseEditorEntryInput,
   type PublicConfig,
   resolveTimedRange,
+  setOverrideParts,
   splitResolvable,
   todayInZone,
+  updateEntryParts,
   WINDOW_DAYS_AFTER,
   WINDOW_DAYS_BEFORE,
 } from "@kidboard/shared";
@@ -36,7 +44,9 @@ import { z } from "zod";
  * An in-memory stand-in for the editor API of the worker (`/api/parent/entries`,
  * `/templates`, `/export`, `/import`; docs/ARCHITECTURE.md "Editor API (T-43)"), used
  * by the demo server (`pnpm dev:demo`) and the e2e mock. It validates with the same
- * shared model (`parseEditorEntryInput`), answers with the same shapes and error codes
+ * shared model (`parseEditorEntryInput`) and the same shared entry rules as the
+ * worker's store (`updateEntryParts`, `addExceptionParts`, `setOverrideParts`,
+ * `importEntryParts`), answers with the same shapes and error codes
  * (409 `conflict` with `revision`, 422 `invalid_entry` with `issues`, 422
  * `limit_reached`, 404 `not_found`) and expands weekly series with exceptions and
  * "only this day" overrides. Unlock and session are the caller's (`isSession`). Not
@@ -103,17 +113,18 @@ export interface FakeEditor {
   writes: { method: string; path: string; query: string; body: unknown }[];
 }
 
+/** The envelope of a backup document; entries are checked by `importEntryParts`. */
 const ImportDocumentSchema = z.object({
-  format: z.literal("kidboard-entries"),
-  version: z.literal(1),
+  format: z.literal(ENTRY_EXPORT_FORMAT),
+  version: z.literal(ENTRY_EXPORT_VERSION),
   entries: z.array(
     z.object({
       id: z.string().min(1),
       revision: z.number().int().min(1),
       kind: z.enum(["event", "meal"]),
-      data: EditorEntryInputSchema,
+      data: z.unknown(),
       exdates: z.array(z.iso.date()).default([]),
-      overrides: z.record(z.iso.date(), EditorEntryInputSchema).default({}),
+      overrides: z.record(z.iso.date(), z.unknown()).default({}),
       createdAt: z.iso.datetime({ offset: true }),
       updatedAt: z.iso.datetime({ offset: true }),
     }),
@@ -126,6 +137,11 @@ function error(
   extra: Record<string, unknown> = {},
 ): FakeResponse {
   return { status, json: { error: code, message: code, ...extra } };
+}
+
+/** 422 `invalid_entry` with at most 50 issues, like the worker. */
+function invalidEntry(issues: readonly EditorIssue[]): FakeResponse {
+  return error(422, "invalid_entry", { issues: issues.slice(0, 50) });
 }
 
 /** The occurrence of a series on `date`: the rule's fields moved to that day. */
@@ -285,10 +301,7 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
     const result = parseEditorEntryInput(value, config());
     return result.ok
       ? { ok: true, entry: result.entry }
-      : {
-          ok: false,
-          response: error(422, "invalid_entry", { issues: result.issues }),
-        };
+      : { ok: false, response: invalidEntry(result.issues) };
   };
 
   const create = (
@@ -385,6 +398,19 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
     json: { entry, boardRefresh: BOARD_REFRESH_NOW },
   });
 
+  /** Stores the changed parts as the entry's next revision. */
+  const save = (entry: AppEntryDto, parts: EntryParts): FakeResponse => {
+    const next: AppEntryDto = {
+      ...entry,
+      ...parts,
+      kind: parts.data.kind,
+      revision: entry.revision + 1,
+      updatedAt: stamp(),
+    };
+    store.set(entry.id, next);
+    return written(next);
+  };
+
   const handleEntry = (
     request: FakeRequest,
     id: string,
@@ -407,37 +433,11 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
       }
       const valid = validate(parsed.data.entry);
       if (!valid.ok) return valid.response;
-      const next: AppEntryDto = {
-        ...entry,
-        revision: entry.revision + 1,
-        updatedAt: stamp(),
-      };
       if (scope === "one" && date !== null) {
-        if (
-          !isOccurrenceDate(entry.data, date) ||
-          entry.data.repeat === "none"
-        ) {
-          return error(422, "invalid_entry", {
-            issues: [
-              { code: "invalid", path: "date", message: "No occurrence" },
-            ],
-          });
-        }
-        next.overrides = { ...entry.overrides, [date]: valid.entry };
-      } else {
-        next.kind = valid.entry.kind;
-        next.data = valid.entry;
-        next.exdates = entry.exdates.filter((d) =>
-          isOccurrenceDate(valid.entry, d),
-        );
-        next.overrides = Object.fromEntries(
-          Object.entries(entry.overrides).filter(([d]) =>
-            isOccurrenceDate(valid.entry, d),
-          ),
-        );
+        const parts = setOverrideParts(entry, date, valid.entry);
+        return parts.ok ? save(entry, parts.value) : invalidEntry(parts.issues);
       }
-      store.set(id, next);
-      return written(next);
+      return save(entry, updateEntryParts(entry, valid.entry));
     }
     if (request.method === "DELETE") {
       const revision = Number(query.get("revision"));
@@ -449,18 +449,8 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
         return error(409, "conflict", { revision: entry.revision });
       }
       if (scope === "one" && date !== null) {
-        const overrides = Object.fromEntries(
-          Object.entries(entry.overrides).filter(([day]) => day !== date),
-        );
-        const next: AppEntryDto = {
-          ...entry,
-          revision: entry.revision + 1,
-          exdates: [...new Set([...entry.exdates, date])].sort(),
-          overrides,
-          updatedAt: stamp(),
-        };
-        store.set(id, next);
-        return written(next);
+        const parts = addExceptionParts(entry, date);
+        return parts.ok ? save(entry, parts.value) : invalidEntry(parts.issues);
       }
       store.delete(id);
       return written(null);
@@ -476,21 +466,25 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
     if (!mode.success) return error(400, "bad_request");
     const doc = ImportDocumentSchema.safeParse(parseJson(request.body)?.value);
     if (!doc.success) {
-      return error(422, "invalid_entry", {
-        issues: doc.error.issues.slice(0, 50).map((issue) => ({
+      return invalidEntry(
+        doc.error.issues.map((issue) => ({
           code: "invalid",
           path: issue.path.map(String).join("."),
           message: issue.message,
         })),
-      });
+      );
     }
+    const prepared = importEntryParts(doc.data.entries);
+    if (!prepared.ok) return invalidEntry(prepared.issues);
     // Like the worker: `updated` = ids stored before the import, in either mode.
     const updated = doc.data.entries.filter((entry) =>
       store.has(entry.id),
     ).length;
     if (mode.data === "replace") store.clear();
-    for (const entry of doc.data.entries) {
-      store.set(entry.id, { ...entry, exdates: [...entry.exdates].sort() });
+    for (const [i, parts] of prepared.value.entries()) {
+      const entry = doc.data.entries[i];
+      if (entry === undefined) continue;
+      store.set(entry.id, { ...entry, ...parts });
     }
     return {
       status: 200,
@@ -540,8 +534,8 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
           "Content-Disposition": `attachment; filename="kidboard-entries-${today()}.json"`,
         },
         json: {
-          format: "kidboard-entries",
-          version: 1,
+          format: ENTRY_EXPORT_FORMAT,
+          version: ENTRY_EXPORT_VERSION,
           exportedAt: stamp(),
           entries: [...store.values()],
         },
