@@ -33,19 +33,14 @@ export interface DayEvent {
   timeOfDay: DayBand | null;
 }
 
-export type BandStatus = "past" | "current" | "upcoming";
-
-export interface DayBandModel {
-  id: DayBand;
-  status: BandStatus;
-  events: DayEvent[];
-}
-
 export interface DayModel {
   /** All-day events (also multi-day ones) covering the date, in feed order. */
   allDay: DayEvent[];
-  /** Always the three bands in order morning, midday, evening. */
-  bands: DayBandModel[];
+  /**
+   * Timed events covering the date, grouped by placement band (morning, midday,
+   * evening; see `timeOfDay`) and by start time within a band, ties by title.
+   */
+  events: DayEvent[];
   /** Today's meals ordered breakfast, lunch, dinner, unspecified. */
   meals: Meal[];
   /** No event and no meal on the date. */
@@ -109,20 +104,9 @@ function placementBand(
   return band === "night" ? "morning" : band;
 }
 
-function currentBandIndex(
-  date: string,
-  config: DayModelConfig,
-  now: number,
-): number {
-  if (dateKeyInZone(now, config.timeZone) !== date) return -1;
-  const band = bandOf(now, config.bands, config.timeZone);
-  return band === "night" ? -1 : DAY_BANDS.indexOf(band);
-}
-
 /**
  * Builds the day view model for `date` (`YYYY-MM-DD` in `config.timeZone`) at `now`
- * (epoch ms). Past/current status is only derived when `now` is on `date`; before
- * `morningStart` no band is current and nothing is past.
+ * (epoch ms). Past/current event status is only derived when `now` is on `date`.
  */
 export function buildDayModel(
   agenda: Pick<AgendaResponse, "events" | "meals">,
@@ -131,10 +115,12 @@ export function buildDayModel(
   now: number,
 ): DayModel {
   const allDay: DayEvent[] = [];
-  const placed = new Map<
-    DayBand,
-    { startMs: number; title: string; item: DayEvent }[]
-  >(DAY_BANDS.map((band) => [band, []]));
+  const placed: {
+    bandIndex: number;
+    startMs: number;
+    title: string;
+    item: DayEvent;
+  }[] = [];
   const isToday = dateKeyInZone(now, config.timeZone) === date;
 
   for (const event of agenda.events) {
@@ -152,7 +138,8 @@ export function buildDayModel(
     const days = timedDays(event, config.timeZone);
     if (days.first > date || days.last < date) continue;
     const band = placementBand(days.startMs, days.first, date, config);
-    placed.get(band)?.push({
+    placed.push({
+      bandIndex: DAY_BANDS.indexOf(band),
       startMs: days.startMs,
       title: event.title,
       item: {
@@ -166,19 +153,14 @@ export function buildDayModel(
     });
   }
 
-  const current = currentBandIndex(date, config, now);
-  const bands = DAY_BANDS.map((id, index): DayBandModel => {
-    const events = [...(placed.get(id) ?? [])]
-      .sort((a, b) => a.startMs - b.startMs || a.title.localeCompare(b.title))
-      .map((entry) => entry.item);
-    const status: BandStatus =
-      current === -1 || index > current
-        ? "upcoming"
-        : index === current
-          ? "current"
-          : "past";
-    return { id, status, events };
-  });
+  const events = placed
+    .sort(
+      (a, b) =>
+        a.bandIndex - b.bandIndex ||
+        a.startMs - b.startMs ||
+        a.title.localeCompare(b.title),
+    )
+    .map((entry) => entry.item);
 
   const meals = agenda.meals
     .filter((meal) => meal.date === date)
@@ -186,11 +168,8 @@ export function buildDayModel(
 
   return {
     allDay,
-    bands,
+    events,
     meals,
-    isEmpty:
-      allDay.length === 0 &&
-      meals.length === 0 &&
-      bands.every((band) => band.events.length === 0),
+    isEmpty: allDay.length === 0 && meals.length === 0 && events.length === 0,
   };
 }
