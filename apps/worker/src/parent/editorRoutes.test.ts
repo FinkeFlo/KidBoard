@@ -14,11 +14,7 @@ import {
   EditorWriteResponseSchema,
   MAX_APP_ENTRIES,
 } from "@kidboard/shared";
-import {
-  createExecutionContext,
-  reset,
-  waitOnExecutionContext,
-} from "cloudflare:test";
+import { reset } from "cloudflare:test";
 import { env as testEnv } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,6 +22,7 @@ import { createApp } from "../app";
 import { ENTRY_EXPORT_FORMAT, EntryStore } from "../entries/entryStore";
 import { STAMP_KEY } from "../entries/stamp";
 import type { Env } from "../env";
+import { testApp } from "../testing.test-utils";
 import { MAX_IMPORT_BODY_BYTES, MAX_ISSUES } from "./editorRoutes";
 import { MAX_PARENT_BODY_BYTES } from "./routes";
 
@@ -161,13 +158,12 @@ interface Harness {
 }
 
 function harness(): Harness {
-  const clock = { now: NOW };
   let overrides: Partial<Env> = {};
-  const cacheName = `kidboard-editor-${String(cacheCounter++)}`;
-  const app = createApp({
-    now: () => clock.now,
-    openCache: () => caches.open(cacheName),
+  const app = testApp({
+    now: NOW,
+    cacheName: `kidboard-editor-${String(cacheCounter++)}`,
   });
+  const { clock } = app;
   let session: string | undefined;
   const call: Harness["call"] = async (path, init = {}) => {
     const { session: parent, ...rest } = init;
@@ -176,13 +172,11 @@ function harness(): Harness {
     if (parent !== undefined && parent !== null) {
       headers.set("X-KidBoard-Parent", parent);
     }
-    const ctx = createExecutionContext();
     const response = await app.fetch(
-      new Request(`https://board.example.test${path}`, { ...rest, headers }),
+      path,
+      { ...rest, headers },
       env(overrides),
-      ctx,
     );
-    await waitOnExecutionContext(ctx);
     const text = await response.text();
     responseTexts.push(text);
     let json: unknown = null;

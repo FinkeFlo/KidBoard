@@ -8,17 +8,12 @@ import {
   type EditorEntryInputRaw,
   type Meal,
 } from "@kidboard/shared";
-import {
-  createExecutionContext,
-  reset,
-  waitOnExecutionContext,
-} from "cloudflare:test";
+import { reset } from "cloudflare:test";
 import { env as testEnv } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import eventsIcs from "../../../../fixtures/ics/api-events.ics?raw";
 import mealsIcs from "../../../../fixtures/ics/api-meals.ics?raw";
-import { createApp } from "../app";
 import { loadConfig } from "../config/loadConfig";
 import {
   type AppEntry,
@@ -27,6 +22,7 @@ import {
 } from "../entries/entryStore";
 import type { Env } from "../env";
 import { cacheBackend, kvBackend, SourceStore } from "../feeds/sourceStore";
+import { testApp } from "../testing.test-utils";
 import { invalidateAppSources } from "./appSources";
 
 // Synthetic secret URLs (reserved `.invalid` TLD).
@@ -89,25 +85,16 @@ function harness(
   cacheName = `kidboard-app-${String(cacheCounter++)}`,
   options: { d1TimeoutMs?: number } = {},
 ): Harness {
-  const clock = { now: NOW };
-  const app = createApp({
-    now: () => clock.now,
-    openCache: () => caches.open(cacheName),
-    ...options,
-  });
+  const app = testApp({ ...options, now: NOW, cacheName });
   return {
-    clock,
+    clock: app.clock,
     cacheName,
     agenda: async (query = FULL, environment = env()) => {
-      const ctx = createExecutionContext();
       const response = await app.fetch(
-        new Request(`https://board.example.test/api/agenda${query}`, {
-          headers: { Authorization: `Bearer ${ACCESS}` },
-        }),
+        `/api/agenda${query}`,
+        { headers: { Authorization: `Bearer ${ACCESS}` } },
         environment,
-        ctx,
       );
-      await waitOnExecutionContext(ctx);
       const json: unknown = await response.json();
       return {
         status: response.status,

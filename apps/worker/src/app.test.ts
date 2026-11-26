@@ -27,9 +27,10 @@ import mealsIcs from "../../../fixtures/ics/api-meals.ics?raw";
 import bringIcs from "../../../fixtures/ics/bring.ics?raw";
 import runawayIcs from "../../../fixtures/ics/runaway.ics?raw";
 import { FEED_RETRY_AFTER_FAILURE_MS } from "./agenda/loadSource";
-import { type AppOptions, createApp } from "./app";
+import type { AppOptions } from "./app";
 import type { Env } from "./env";
 import worker from "./index";
+import { testApp } from "./testing.test-utils";
 
 // Synthetic secret URLs (reserved `.invalid` TLD). The tests assert that neither
 // string ever shows up in a response or in console output.
@@ -116,31 +117,23 @@ function harness(
     backend?: Backend;
   } = {},
 ): Harness {
-  const clock = { now: NOW };
+  const {
+    cacheName = `kidboard-test-${String(cacheCounter++)}`,
+    backend,
+    ...appOptions
+  } = options;
   const withBackend = (overrides: Partial<Env> = {}): Env =>
     baseEnv(
-      options.backend === "kv"
+      backend === "kv"
         ? { KIDBOARD_CACHE: testEnv.KIDBOARD_CACHE, ...overrides }
         : overrides,
     );
-  const cacheName =
-    options.cacheName ?? `kidboard-test-${String(cacheCounter++)}`;
-  const app = createApp({
-    ...options,
-    now: () => clock.now,
-    openCache: () => caches.open(cacheName),
-  });
+  const app = testApp({ ...appOptions, now: NOW, cacheName });
   return {
-    clock,
+    clock: app.clock,
     env: withBackend,
     call: async (path, init, env = withBackend()) => {
-      const ctx = createExecutionContext();
-      const response = await app.fetch(
-        new Request(`https://board.example.test${path}`, init),
-        env,
-        ctx,
-      );
-      await waitOnExecutionContext(ctx);
+      const response = await app.fetch(path, init, env);
       const text = await response.clone().text();
       seenResponses.push(text, JSON.stringify([...response.headers]));
       return response;

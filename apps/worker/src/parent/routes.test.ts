@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../app";
 import type { Env } from "../env";
+import { testApp } from "../testing.test-utils";
 import { MAX_PARENT_BODY_BYTES } from "./routes";
 import { SERVER_SECRET_KEY } from "./session";
 
@@ -71,21 +72,19 @@ interface Harness {
 
 /** A fresh app = a fresh isolate (own key cache). */
 function harness(): Harness {
-  const clock = { now: NOW };
-  const app = createApp({ now: () => clock.now });
-  const raw = async (
+  const app = testApp({ now: NOW });
+  const raw = (
     path: string,
     init?: RequestInit,
     e: Env = env(),
-  ): Promise<Response> =>
-    app.fetch(new Request(`https://board.example.test${path}`, init), e);
+  ): Promise<Response> => app.fetch(path, init, e);
   const call = (
     path: string,
     init?: RequestInit,
     e: Env = env(),
   ): Promise<Response> => raw(path, withAccess(init), e);
   return {
-    clock,
+    clock: app.clock,
     call,
     raw,
     unlock: (pin, e) =>
