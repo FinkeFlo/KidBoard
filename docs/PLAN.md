@@ -44,7 +44,7 @@ operation, works offline with the last known state.
   Acceptance:
   1. Root `package.json` with `packageManager: pnpm@10.x`, `engines.node`, scripts
      `dev`, `build`, `lint`, `typecheck`, `test`, `test:e2e`, `format`, `format:check`;
-     `pnpm-workspace.yaml`; `.nvmrc` + `.node-version` (Node 22 LTS).
+     `pnpm-workspace.yaml`; `.nvmrc` (Node 22 LTS; `.node-version` removed in T-52).
   2. `tsconfig.base.json` with `strict`, `noUncheckedIndexedAccess`,
      `exactOptionalPropertyTypes`, `verbatimModuleSyntax`; per-package tsconfigs; root
      `typecheck` covers all packages.
@@ -392,7 +392,7 @@ not address. These rules apply to every M5b task:
    fullscreen control; burn-in and kiosk e2e re-run against the rail and the today ring.
 
 - [x] **T-29 Final design tokens** (risk: medium, deps: M5)
-  Acceptance: `apps/web/src/styles/tokens.css` replaced by `docs/design/tokens.css` (legacy band
+  Acceptance: the hand-off tokens adopted into `apps/web/src/styles/tokens.css`, the single source since T-53 (legacy band
   tokens stay until T-30b); a weekend surface token kept; `tokens.test.ts` extended with the
   pairs listed in `docs/design/README.md` (text on child tints, time-of-day accents on tints,
   today ring, nav, soft error) plus: night `nav-active` vs. inactive button and page (≥ 3:1, or a
@@ -685,7 +685,7 @@ often). Merge rules 1–6 of M5b apply. The editor is a parent surface: touch ta
   other-PIN tokens → 403 `parent_locked` (a wrong PIN → 403 `wrong_pin`; 401 stays reserved for the access token);
   every attempt is reserved before the compare (per isolate and atomically in D1, a success
   deletes its reservation); lockout after 5 failures in 15 min → 429 + `Retry-After`, reset
-  after the window; access token still
+  after the window (changed by T-50: counted since the last right PIN, D1 only; see ADR-0013); access token still
   required in front of it; CORS adds `POST, PATCH, DELETE`, `Content-Type` and
   `X-KidBoard-Parent` for allowed origins only; request bodies limited to 16 KB and parsed
   with zod; editor off → all `/api/parent/*` 404; `.dev.vars.example` and the deploy-button
@@ -977,6 +977,49 @@ and re-checked by Sonnet until no blocking findings; CI green.
   M7+ plan refined. (M3 follow-up) release-please `initial-version` set (e.g. `0.1.0`) so it never proposes
   1.0.0 early; maintainer enables "Allow GitHub Actions to create and approve pull requests". (Pre-release) release-please runs only on manual dispatch; the maintainer cuts the release, then the `push` trigger is restored.
 
+## M12 – Review follow-ups (before v1.0.0)
+
+Follow-ups from the repository, security and simplification review of 2026-11-26.
+
+- [x] **T-50 Worker security** (risk: **high** → Opus, deps: M11)
+  Wrong PINs count since the last right PIN (every 5th locks, 15 min doubling to 2 h), every
+  D1 step reads the clock when it runs and a compared wrong PIN is always counted (settle =
+  delete + insert); feed summary/description capped before parsing; https enforced after
+  redirects (`insecure-redirect`); import `revision` bounded and exdates/overrides capped. PR #8.
+- [x] **T-51 Web security** (risk: **high** → Opus, deps: M11)
+  A typed PIN is cleared after a failed unlock request; `?key=` is only accepted in the
+  server's token format (`packages/shared/src/secretToken.ts`); gitleaks rule for Google
+  secret iCal URLs plus an optional lefthook pre-commit scan; exact script end-tag match for
+  the CSP hash. PR #9.
+- [x] **T-52 Repository tooling** (risk: medium, deps: –)
+  Context7 tool names for subagents under every server name; wildcard deny rules for
+  wrangler deploy/delete/secret; Dependabot ignores majors of typescript/eslint/@eslint/js;
+  e2e in its own CI job; 25 pure-logic web tests in the node environment; `.node-version`
+  removed (`.nvmrc` stays). PR #6.
+- [x] **T-53 One source per fact in the docs** (risk: low, deps: –)
+  Stale `docs/design/tokens.*` deleted (`apps/web/src/styles/tokens.css` is the single
+  source); `docs/CONFIG.md` the one reference for variables and token/PIN rules, new
+  `docs/CONFIG.de.md`; ARCHITECTURE links ADRs; DEPLOY says what the button needs and adds a
+  ZIP path without GitHub. PR #7.
+- [x] **T-54 Simplification in web and shared** (risk: medium, deps: –)
+  Behaviour-preserving: `buildDayModel` returns one ordered event list; tile sizes as a base
+  row plus overrides; one `useContentBox` hook; `dates.ts` built on `wallTime.ts`; dead code
+  removed. PR #11.
+- [x] **T-55 Shared entry rules** (risk: medium, deps: –)
+  Update/exception/override/import rules in `packages/shared/src/editor/entryRules.ts`, used
+  by `EntryStore` and the fake editor; shared worker `testApp()` and web
+  `fakeBoardWrapper()`; the planned test trimming was dropped (its hypothesis did not hold). PR #10.
+- [x] **T-57 Review follow-ups after the merges** (risk: low, deps: T-50–T-55)
+  Plan and progress entries for T-50–T-55; CONFIG/DEPLOY EN + DE describe the real lockout
+  and `?key=` rules; the tile size snapshot replaced by an explicit table test; a fall-back
+  night band-order test for `buildDayModel`; `Board.test.tsx` uses `fakeBoardWrapper()`.
+- [ ] **T-58 Prebuilt release package for deploys without Git** (risk: medium, deps: T-28)
+  Goal: attach a ready-built bundle (worker + assets) to each GitHub release, so a parent can
+  deploy with one command and no build on their machine.
+  Acceptance: documented in DEPLOY EN + DE as a third path; verified from a clean machine
+  without git. Open question to settle first via the Cloudflare docs: whether the dashboard
+  accepts such an upload including the KV and D1 bindings.
+
 ## M7+ – Later (not in MVP)
 
 * **M10 School, later** (the rest of M10 after T-33–T-38, if wanted): optional
@@ -1022,3 +1065,4 @@ and re-checked by Sonnet until no blocking findings; CI green.
 | 2026-11-22 | T-10: worker cache uses an auto-provisioned KV binding (`KIDBOARD_CACHE`) with Cache API/memory fallback; cached window `[today−1, today+32)` | Cache API is a no-op on `*.workers.dev`; T-19 needs a 30-day countdown lookahead (T-10 review, structural) |
 | 2026-11-22 | M0 milestone review follow-ups: `autoReturnSeconds` in T-06, `format:check` in DoD, fixture loading note in T-08, typed `Env` in T-10, tsconfig split in T-11 | Findings of the M0 review by reviewer-opus |
 | 2026-11-22 | Worker test tooling renamed to `@cloudflare/vitest-plugin` (T-03, T-08, T-10) | `@cloudflare/vitest-pool-workers` is deprecated on npm and supports only Vitest 4 |
+| 2026-11-26 | New milestone M12 Review follow-ups (before v1.0.0): T-50–T-55 and T-57 done, T-58 (prebuilt release package for deploys without Git) open; three stale statements corrected: T-01 `.nvmrc` only, T-29 tokens now in `apps/web/src/styles/tokens.css` (single source since T-53), T-42 lockout rule changed by T-50 | Repository, security and simplification review; maintainer asked for a deploy path without a GitHub account |
