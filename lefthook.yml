@@ -11,13 +11,14 @@ pre-commit:
       run: node scripts/check-forbidden-terms.mjs
     # Secret scan of the staged changes with the repo's .gitleaks.toml. Optional
     # locally (CI scans the full history either way), so it never blocks a
-    # contributor who has not installed gitleaks.
+    # contributor who has not installed gitleaks. No double quotes in the script:
+    # on Windows lefthook runs `"<sh>" -c "<script>"` without escaping them.
     - name: gitleaks
       run: |
         if command -v gitleaks >/dev/null 2>&1; then
           gitleaks git --staged --redact --no-banner --verbose .
         else
-          echo "gitleaks is not installed: skipping the local secret scan (CI still runs it)."
+          echo 'gitleaks is not installed: skipping the local secret scan (CI still runs it).'
         fi
 
 commit-msg:
