@@ -97,10 +97,7 @@ export function buildWeekModel(
       date,
       isToday: offset === 0,
       isWeekend: isWeekendDate(date),
-      events: rankByImportance([
-        ...day.allDay,
-        ...day.bands.flatMap((band) => band.events),
-      ]),
+      events: rankByImportance([...day.allDay, ...day.events]),
       meals: day.meals,
     };
   });
