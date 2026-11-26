@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { AppConfigSchema } from "@kidboard/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
