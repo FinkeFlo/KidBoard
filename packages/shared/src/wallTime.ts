@@ -1,5 +1,7 @@
 import { tzOffset } from "@date-fns/tz";
 
+import { pad } from "./pad";
+
 /**
  * Conversion between wall-clock times in an IANA zone and absolute instants.
  *
@@ -134,10 +136,6 @@ export function wallTimeAt(epochMs: number, timeZone: string): WallTime {
     minute: wall.getUTCMinutes(),
     second: wall.getUTCSeconds(),
   };
-}
-
-function pad(value: number, length = 2): string {
-  return String(Math.abs(value)).padStart(length, "0");
 }
 
 /** `YYYY-MM-DD`. */
