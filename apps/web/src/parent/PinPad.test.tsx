@@ -187,14 +187,22 @@ describe("PinPad", () => {
     ["unavailable", en.parent.pin.error.unavailable],
     ["failed", en.parent.pin.error.failed],
   ] as const)(
-    "explains the error %s and keeps the PIN for a retry",
+    "explains the error %s and clears the PIN, so nobody can submit it later",
     async (error, text) => {
       const gate = fakeGate({ stage: "pin" });
       renderWithGate(<PinPad />, gate);
       type("123456");
       await submitWith(gate, { kind: "error", error });
       expect(screen.getByTestId("pin-feedback")).toHaveTextContent(text);
-      expect(dots()).toHaveAttribute("data-count", "6");
+      expect(dots()).toHaveAttribute("data-count", "0");
+      expect(key(en.parent.pin.submit)).toBeDisabled();
+      // Neither OK nor Enter sends the old PIN again.
+      fireEvent.click(key(en.parent.pin.submit));
+      fireEvent.keyDown(screen.getByTestId("pin-pad"), { key: "Enter" });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(gate.unlock).toHaveBeenCalledTimes(1);
     },
   );
 
