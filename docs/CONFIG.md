@@ -31,7 +31,7 @@ Set locally in `.dev.vars` in the repository root, next to `wrangler.jsonc` (cop
 | `KIDBOARD_PUBLIC`         | no       | unset              | Explicit opt-in for a public read-only board: with the value `1` **and no** `KIDBOARD_ACCESS_TOKEN`, the board is served without any check (anyone with the link sees your family's calendar; the editor stays off). If a token is set, it is enforced regardless of this variable. |
 | `KIDBOARD_ALLOWED_ORIGINS`| no       | same origin only   | Comma-separated list of allowed CORS origins, e.g. `http://localhost:5173`. Only for API use from another origin; the board itself is same-origin. |
 | `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh (integer 60-86400; other values fall back to 3600 with a log warning). With the KV cache at least `ceil(calendars × 86400 / 500)` (KV Free plan write quota; 2 calendars → 346; with the parent editor on, its two app sources count as calendars; while weather is configured or the parent editor is on, 49 writes/day are reserved for the forecast first, i.e. `ceil(calendars × 86400 / 451)`).                                    |
-| `KIDBOARD_PARENT_PIN`     | no       | unset (editor off) | 6 to 12 digits that unlock the parent editor. Not accepted (editor stays off, the log says why): unset, shorter or longer, non-digits, still `REPLACE_ME`, one repeated digit (`111111`) or a run of rising or falling digits (`123456`, `654321`). Choose something not guessable: no birthdays or dates. After 5 wrong PINs in 15 minutes the editor locks for 15 minutes; every further lockout while failures continue doubles the time (up to 2 hours); a right PIN resets this. The editor also needs a valid `KIDBOARD_ACCESS_TOKEN` and the D1 binding `KIDBOARD_DATA`. |
+| `KIDBOARD_PARENT_PIN`     | no       | unset (editor off) | 6 to 12 digits that unlock the parent editor. Not accepted (editor stays off, the log says why): unset, shorter or longer, non-digits, still `REPLACE_ME`, one repeated digit (`111111`) or a run of rising or falling digits (`123456`, `654321`). Choose something not guessable: no birthdays or dates. Wrong PINs add up until the next right PIN (they do not expire); every 5th one locks the editor for 15 minutes, and every further lockout doubles the time (up to 2 hours); a right PIN resets the count and the time. The editor also needs a valid `KIDBOARD_ACCESS_TOKEN` and the D1 binding `KIDBOARD_DATA`. |
 | `KIDBOARD_FEED_TOKEN`     | no       | unset (no feed)    | Secret token of the phone feed `/api/feed.ics?token=…` with the editor's entries; 32-256 characters `A-Z a-z 0-9 _ -`. With a valid one the parent area shows the subscribe link. Changing it ends every subscription. |
 | `KIDBOARD_CONFIG`         | yes      | -                  | The JSON document described below (single line). Missing or invalid: the API answers `500` and the log lists the validation errors.             |
 | `KIDBOARD_CACHE`          | automatic | -                 | KV namespace binding of the feed cache (see [API behavior](#api-behavior)). Declared without an id in `wrangler.jsonc`; Wrangler creates it on the first deploy. |
@@ -49,8 +49,9 @@ everything except `/api/health`, unless you opt in to a public board with `KIDBO
 2. The page stores the token in the tablet's local storage and immediately **removes `?key=`
    from the address bar**, so it does not stay in the URL, bookmarks or screenshots. From
    then on it calls the API with `Authorization: Bearer <token>`.
-3. Later visits need no `?key=`. A new `?key=` replaces the stored token (use it after
-   rotating the token).
+3. Later visits need no `?key=`. A new `?key=` in the valid token format replaces the
+   stored token (use it after rotating the token); anything else is removed from the
+   address and ignored.
 4. After a **`401`** (token revoked or wrong) the tablet **forgets** the stored token and shows
    "This tablet needs a new access link" (error code `KB-401`): open the tablet link with the current
    `?key=<token>` once more.

@@ -154,7 +154,7 @@ Editor bleiben erhalten: Der Deploy nutzt den Speicher des Workers weiter, der s
 demselben Namen läuft; die IDs, die Wrangler eventuell in `wrangler.jsonc` schreibt, musst du
 nicht aufheben. Das gilt, solange der Worker seinen Namen (`kidboard`) behält und im selben
 Cloudflare-Konto bleibt. Ein umbenannter Worker oder ein anderes Konto beginnt mit leerem
-Cache und leerer Datenbank: vorher im Editor eine Sicherung speichern ("Sicherung
+Cache und leerer Datenbank, und die Secrets müssen neu gesetzt werden (wie oben): vorher im Editor eine Sicherung speichern ("Sicherung
 herunterladen", siehe [Der Eltern-Editor](../README.de.md#der-eltern-editor)).
 
 ## 5. Deployment prüfen
@@ -243,7 +243,7 @@ Workers Static Assets auf alle statischen Antworten anwendet:
 | `/api/config` antwortet `500 server_misconfigured` | `KIDBOARD_CONFIG` fehlt oder ist ungültig (Workers Logs nennen die Fehler), oder `KIDBOARD_ACCESS_TOKEN` fehlt oder erfüllt die [Token-Regeln](CONFIG.de.md#secrets-und-umgebungsvariablen) nicht (das Log nennt den Grund). |
 | Editor lange gesperrt | Es wurden wiederholt falsche PINs eingegeben; die Sperre wächst mit jeder weiteren Sperre ([Sperr-Regeln](CONFIG.de.md#secrets-und-umgebungsvariablen)) und endet von selbst. Wer das Zugriffstoken hat, kann das wiederholen: `KIDBOARD_ACCESS_TOKEN` wechseln und den Tablet-Link neu öffnen. |
 | Ein Kalender fehlt, `sources[].status` ist `error` | Secret-Name passt nicht zur Kalender-ID (`CAL_<ID>_URL`, Großbuchstaben) oder die iCal-Adresse ist falsch. |
-| Deploy-Formular (GitHub): "Your GitHub authorization has expired …" | Laut Cloudflares Anleitung zur Neuinstallation: <https://github.com/settings/installations> öffnen, "Cloudflare Workers & Pages" wählen, deinstallieren, dann GitHub neu verbinden (das Deploy-Formular neu starten und die App installieren, wenn danach gefragt wird). |
+| Deploy-Formular (GitHub): "Your GitHub authorization has expired …" | Laut Cloudflares Anleitung zur Neuinstallation: <https://github.com/settings/installations> öffnen, "Cloudflare Workers & Pages" wählen, deinstallieren, dann GitHub neu verbinden. Unser Rat: danach das Deploy-Formular neu starten und die App installieren, wenn danach gefragt wird. |
 | Build bricht mit pnpm-Fehler ab | Build-Variable `PNPM_VERSION=10.28.0` setzen (Worker > Settings > Build). |
 | `The directory specified by the "assets.directory" field ... does not exist` | Die Web-App wurde nicht gebaut: `pnpm deploy:cloudflare` bzw. Build-Befehl `pnpm run build` verwenden. |
 | Alte Version wird angezeigt | Das Tablet sucht stündlich nach einer neuen Version und lädt sich selbst neu; oder einmal neu laden. |
