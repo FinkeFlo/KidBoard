@@ -6,6 +6,7 @@ export * from "./editor";
 export * from "./model";
 export * from "./primitives";
 export * from "./protocol";
+export * from "./secretToken";
 export * from "./title";
 export * from "./wallTime";
 export * from "./weather";

@@ -1,3 +1,7 @@
+import {
+  SECRET_TOKEN_MAX_LENGTH,
+  SECRET_TOKEN_MIN_LENGTH,
+} from "@kidboard/shared";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
 import {
@@ -7,6 +11,10 @@ import {
 } from "./accessToken";
 import type { KeyValueStorage } from "./storage";
 import { TEST_TOKEN } from "./testing.test-utils";
+
+/** Low-entropy synthetic tokens in the server format (gitleaks-friendly). */
+const OLD_TOKEN = "TESTONLY-old-access-token-0000000000000";
+const NEW_TOKEN = "TESTONLY-new-access-token-0000000000000";
 
 function memoryStorage(initial: Record<string, string> = {}): KeyValueStorage {
   const data = new Map(Object.entries(initial));
@@ -63,18 +71,73 @@ describe("consumeAccessToken", () => {
     expect(history.replaceState).not.toHaveBeenCalled();
   });
 
-  it("lets a new ?key= replace the stored token", () => {
-    const storage = memoryStorage({
-      [ACCESS_TOKEN_STORAGE_KEY]: "old-TESTONLY",
-    });
+  it("lets a new well-formed ?key= replace the stored token", () => {
+    const storage = memoryStorage({ [ACCESS_TOKEN_STORAGE_KEY]: OLD_TOKEN });
     const token = consumeAccessToken({
       storage,
       history: fakeHistory(),
-      location: { href: "https://kb.test/?key=new-TESTONLY" },
+      location: { href: `https://kb.test/?key=${NEW_TOKEN}` },
     });
 
-    expect(token).toBe("new-TESTONLY");
-    expect(storage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBe("new-TESTONLY");
+    expect(token).toBe(NEW_TOKEN);
+    expect(storage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBe(NEW_TOKEN);
+  });
+
+  it("trims a well-formed ?key= before storing it", () => {
+    const storage = memoryStorage();
+    const token = consumeAccessToken({
+      storage,
+      history: fakeHistory(),
+      location: { href: `https://kb.test/?key=%20${NEW_TOKEN}%0A` },
+    });
+
+    expect(token).toBe(NEW_TOKEN);
+    expect(storage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBe(NEW_TOKEN);
+  });
+
+  it.each([
+    ["too short", "x"],
+    ["one below the minimum", "a".repeat(SECRET_TOKEN_MIN_LENGTH - 1)],
+    ["above the maximum", "a".repeat(SECRET_TOKEN_MAX_LENGTH + 1)],
+    ["other characters", `${NEW_TOKEN}%2B%3D`],
+    ["an inner space", `${NEW_TOKEN}%20${NEW_TOKEN}`],
+  ])(
+    "strips a malformed ?key= (%s) and keeps the stored token untouched",
+    (_label, key) => {
+      const storage = memoryStorage({ [ACCESS_TOKEN_STORAGE_KEY]: OLD_TOKEN });
+      const history = fakeHistory();
+      const token = consumeAccessToken({
+        storage,
+        history,
+        location: { href: `https://kb.test/week?key=${key}&view=1` },
+      });
+
+      expect(token).toBe(OLD_TOKEN);
+      expect(storage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBe(OLD_TOKEN);
+      expect(history.replaceState).toHaveBeenCalledWith(
+        { from: "test" },
+        "",
+        "/week?view=1",
+      );
+    },
+  );
+
+  it("strips a malformed ?key= and returns undefined without a stored token", () => {
+    const storage = memoryStorage();
+    const history = fakeHistory();
+    const token = consumeAccessToken({
+      storage,
+      history,
+      location: { href: "https://kb.test/?key=x" },
+    });
+
+    expect(token).toBeUndefined();
+    expect(storage.getItem(ACCESS_TOKEN_STORAGE_KEY)).toBeNull();
+    expect(history.replaceState).toHaveBeenCalledWith(
+      expect.anything(),
+      "",
+      "/",
+    );
   });
 
   it("strips an empty ?key= and keeps the stored token", () => {

@@ -1,3 +1,5 @@
+import { hasSecretTokenFormat } from "@kidboard/shared";
+
 import type { KeyValueStorage } from "./storage";
 
 /** localStorage key of the access token (kept outside the persisted query cache). */
@@ -16,8 +18,10 @@ export interface ConsumeAccessTokenOptions {
 
 /**
  * Reads the optional API access token once at startup (CONFIG.md,
- * `KIDBOARD_ACCESS_TOKEN`): a non-empty `?key=` wins and is stored, otherwise the
- * stored token is used. `?key=` is always removed from the visible URL
+ * `KIDBOARD_ACCESS_TOKEN`): a `?key=` in the server's token format
+ * (`hasSecretTokenFormat`, after trimming) wins and is stored, otherwise the stored
+ * token is used. A malformed `?key=` (a typo, a cut-off link, `?key=x`) never replaces
+ * a working stored token: the 401 it would cause wipes the token and the cache. `?key=` is always removed from the visible URL
  * (`history.replaceState`) so it does not linger in the address bar, bookmarks or
  * screenshots; the API is then called with `Authorization: Bearer` only.
  * Storage failures are swallowed: the token from the URL still works for this session.
@@ -38,7 +42,7 @@ export function consumeAccessToken(
       "",
       `${url.pathname}${url.search}${url.hash}`,
     );
-    if (fromUrl !== "") {
+    if (hasSecretTokenFormat(fromUrl)) {
       try {
         storage?.setItem(ACCESS_TOKEN_STORAGE_KEY, fromUrl);
       } catch {

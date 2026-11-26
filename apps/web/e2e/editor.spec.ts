@@ -23,7 +23,7 @@ import {
  */
 
 /** Low-entropy synthetic access token (gitleaks-friendly). */
-const TOKEN = "TESTONLY-not-a-secret";
+const TOKEN = "TESTONLY-not-a-secret-access-token-000000";
 const HOLD_MS = 2000;
 
 const GOOGLE_EVENTS = [

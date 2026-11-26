@@ -12,7 +12,7 @@ import {
 } from "./mockApi";
 
 /** Low-entropy synthetic access token (gitleaks-friendly). */
-const TOKEN = "TESTONLY-not-a-secret";
+const TOKEN = "TESTONLY-not-a-secret-access-token-000000";
 /** ADR-0013: hold time of the hidden entry. */
 const HOLD_MS = 2000;
 
