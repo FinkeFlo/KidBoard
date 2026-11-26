@@ -1,4 +1,6 @@
-import { type RefObject, useLayoutEffect, useState } from "react";
+import type { RefObject } from "react";
+
+import { rootRem, useContentBox } from "./useContentBox";
 
 /** Content-box width of `element` in rem right now: `clientWidth` minus the inline padding. */
 export function measureContentWidthRem(element: HTMLElement): number {
@@ -9,9 +11,9 @@ export function measureContentWidthRem(element: HTMLElement): number {
   return Math.max(0, element.clientWidth - padding) / rootRem();
 }
 
-function rootRem(): number {
-  const size = parseFloat(getComputedStyle(document.documentElement).fontSize);
-  return Number.isFinite(size) && size > 0 ? size : 16;
+function widthFromEntry(entry: ResizeObserverEntry): number | undefined {
+  const next = entry.contentRect.width;
+  return Number.isFinite(next) ? next / rootRem() : undefined;
 }
 
 /**
@@ -23,23 +25,5 @@ function rootRem(): number {
 export function useContentWidth(
   ref: RefObject<HTMLElement | null>,
 ): number | null {
-  const [width, setWidth] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (element === null || typeof ResizeObserver === "undefined") {
-      return undefined;
-    }
-    setWidth(measureContentWidthRem(element));
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[entries.length - 1];
-      if (entry === undefined) return;
-      const next = entry.contentRect.width;
-      if (Number.isFinite(next)) setWidth(next / rootRem());
-    });
-    observer.observe(element);
-    return () => {
-      observer.disconnect();
-    };
-  }, [ref]);
-  return width;
+  return useContentBox(ref, measureContentWidthRem, widthFromEntry, Object.is);
 }
