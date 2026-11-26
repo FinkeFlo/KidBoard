@@ -1080,8 +1080,10 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
   every inline script, i.e. the theme boot script; no `unsafe-inline`/`unsafe-eval`,
   `object-src`/`base-uri`/`form-action 'none'`), `X-Content-Type-Options: nosniff`,
   `Referrer-Policy: no-referrer` and a `Permissions-Policy` without camera, microphone,
-  geolocation, payment, usb (wake lock and fullscreen stay allowed). Framing is not
-  restricted (wall dashboards may embed the board). Cache-Control is not overridden:
+  geolocation, payment, usb (wake lock and fullscreen stay allowed). Framing is limited
+  to the board's own origin (`frame-ancestors 'self'`, `FRAME_ANCESTORS` in
+  `staticHeaders.ts`); a wall dashboard that embeds the board needs its origin added
+  there ([docs/DEPLOY.md](DEPLOY.md#7-http-caching-and-security-headers)). Cache-Control is not overridden:
   the platform default `public, max-age=0, must-revalidate` + `ETag` is right for
   `sw.js`, `index.html` and the manifest.
 - **CSP compatibility:** zod runs `jitless` (`apps/web/src/zodConfig.ts`, first import of
@@ -1091,4 +1093,4 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
   the service worker).
 - **Logs:** a `/?key=` navigation is answered by static asset serving and never invokes
   the Worker, so Workers Logs / Logpush (`workers_trace_events`) do not record it. API
-  requests are logged without query string. Details: [docs/DEPLOY.md](DEPLOY.md#logs-and-the-key-link).
+  requests are logged without query string. Details: [docs/DEPLOY.md](DEPLOY.md#8-logs-and-the-key-link).
