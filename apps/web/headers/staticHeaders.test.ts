@@ -67,6 +67,22 @@ describe("inlineScriptHashes", () => {
     );
   });
 
+  it("ends a script at an end tag with whitespace or attributes, like the HTML parser", () => {
+    expect(
+      inlineScriptHashes(`<script>${MDN_SCRIPT}</script\t\n bar>`),
+    ).toEqual([MDN_HASH]);
+    expect(
+      inlineScriptHashes(
+        `<script>${MDN_SCRIPT}</script foo="1">\n<script></script >`,
+      ),
+    ).toEqual([MDN_HASH, EMPTY_HASH]);
+    // `</scripty>` is not an end tag of the script: the body runs to the real one.
+    expect(inlineScriptHashes("<script>a</scripty>b</script>")).toHaveLength(1);
+    expect(inlineScriptHashes("<script>a</scripty>b</script>")).not.toEqual(
+      inlineScriptHashes("<script>a</script>"),
+    );
+  });
+
   it("returns nothing for a page without inline scripts", () => {
     expect(inlineScriptHashes(`<script src="/a.js"></script>`)).toEqual([]);
   });
