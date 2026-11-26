@@ -76,8 +76,9 @@ central service: every family runs its own copy.
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/FinkeFlo/kidboard)
 
 The button needs a free GitHub or GitLab account: Cloudflare installs its GitHub App
-"Cloudflare Workers & Pages" and puts a copy of KidBoard into your account. No GitHub
-account? The terminal way in [docs/DEPLOY.md](docs/DEPLOY.md) needs none.
+"Cloudflare Workers & Pages" (or, for GitLab, its GitLab integration) and puts a copy of
+KidBoard into your account. No GitHub account? The terminal way in
+[docs/DEPLOY.md](docs/DEPLOY.md) needs none.
 
 1. Click the button, log in to Cloudflare and connect GitHub or GitLab.
 2. Fill in three fields:
@@ -99,6 +100,10 @@ account? The terminal way in [docs/DEPLOY.md](docs/DEPLOY.md) needs none.
    shows `KB-500`, a secret is still wrong: Workers & Pages > your Worker > Settings >
    Variables and Secrets (details in [docs/DEPLOY.md](docs/DEPLOY.md)).
 
+On GitHub, limit the app's access to the new repository after the first deploy
+([how](docs/DEPLOY.md#3-option-a-deploy-to-cloudflare-button)). If the form says "Your
+GitHub authorization has expired …", see [troubleshooting](docs/DEPLOY.md#9-troubleshooting).
+
 **Your copy does not update by itself.** The button creates a separate copy of KidBoard in
 your GitHub/GitLab account; Cloudflare rebuilds it whenever that copy changes, but changes
 to this repository do not reach it automatically. To hear about new versions, watch this
@@ -109,16 +114,18 @@ checklist below before you update.
 **Upgrading from an earlier version.** Check these five points before or right after the
 update; otherwise the board may answer with an error (`KB-500`) or the editor stays off:
 
-1. **Access token required.** Without a valid `KIDBOARD_ACCESS_TOKEN` (32 to 256 characters
-   `A-Z a-z 0-9 _ -`) the API now refuses everything. A shorter token, or one with `+`, `/`
-   or `=` (for example from `openssl rand -base64`), no longer works: create a new one
+1. **Access token required.** Without a valid `KIDBOARD_ACCESS_TOKEN`
+   ([rules](docs/CONFIG.md#secrets-and-environment-variables)) the API now refuses
+   everything. A shorter token, or one with `+`, `/` or `=` (for example from
+   `openssl rand -base64`), no longer works: create a new one
    (`openssl rand -hex 32`), set the secret and open the tablet link with the new
    `?key=<token>` once. A public board needs `KIDBOARD_PUBLIC="1"` and no token.
 2. **Child colours.** In `KIDBOARD_CONFIG` only `child-1` ... `child-6` or hex (`#rgb`,
    `#rrggbb`) are valid; a name like `"red"` or `rgb(...)` makes the whole configuration
    invalid. Change them, e.g. `"red"` to `"#cc0000"`.
-3. **PIN.** A PIN with one repeated digit or a run like `123456` switches the editor off
-   (the log says why). Choose another PIN.
+3. **PIN.** A PIN that is too easy to guess, such as a run like `123456`, switches the
+   editor off (the log says why;
+   [rules](docs/CONFIG.md#secrets-and-environment-variables)). Choose another PIN.
 4. **Embedding.** Other sites can no longer embed the board in a frame (for example a Home
    Assistant dashboard). Add the dashboard's address to `FRAME_ANCESTORS` in
    `apps/web/headers/staticHeaders.ts`, see [docs/DEPLOY.md](docs/DEPLOY.md).
