@@ -83,7 +83,11 @@ secrets always do. The template for all of them is [`.dev.vars.example`](../.dev
      in the root `package.json` and the root `wrangler.jsonc`)
 
    Node.js 22 comes from `.nvmrc`, pnpm from the `packageManager` field.
-6. Create and deploy. The first build takes a few minutes.
+6. Create and deploy. The first build takes a few minutes. Then check the secrets
+   (replace `<url>`): `curl -s https://<url>/api/config` must answer `401 unauthorized`.
+   `500 server_misconfigured` means `KIDBOARD_ACCESS_TOKEN` or `KIDBOARD_CONFIG` is still
+   wrong (step 7 or [section 9](#9-troubleshooting)). On a brand-new database the very
+   first board load can take a few seconds or show an error once; reload.
 7. Google calendars or a changed setting: Workers & Pages > your Worker > Settings >
    Variables and Secrets. Add `calendars` to `KIDBOARD_CONFIG` and one `CAL_<ID>_URL` per
    calendar (Add, type "Secret"). Saving deploys a new version.

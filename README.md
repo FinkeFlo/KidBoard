@@ -88,7 +88,9 @@ central service: every family runs its own copy.
    Keep the suggested storage (`KIDBOARD_CACHE`, `KIDBOARD_DATA`): Cloudflare creates it.
 
 3. Deploy, then open `https://<your-worker>.workers.dev/?key=<token>` **once** on the
-   tablet. The board remembers the token and removes it from the address bar.
+   tablet. The board remembers the token and removes it from the address bar. If the board
+   shows `KB-500`, a secret is still wrong: Workers & Pages > your Worker > Settings >
+   Variables and Secrets (details in [docs/DEPLOY.md](docs/DEPLOY.md)).
 
 **Your copy does not update by itself.** The button creates a separate copy of KidBoard in
 your GitHub/GitLab account; Cloudflare rebuilds it whenever that copy changes, but changes

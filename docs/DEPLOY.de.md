@@ -86,7 +86,12 @@ Im Dashboard gesetzte Klartext-Variablen bleiben bei späteren Deploys erhalten
      festgelegte `wrangler`-Version und die Root-`wrangler.jsonc`)
 
    Node.js 22 kommt aus `.nvmrc`, pnpm aus dem Feld `packageManager`.
-6. Erstellen und deployen. Der erste Build dauert ein paar Minuten.
+6. Erstellen und deployen. Der erste Build dauert ein paar Minuten. Danach die Secrets
+   prüfen (`<url>` ersetzen): `curl -s https://<url>/api/config` muss `401 unauthorized`
+   antworten. `500 server_misconfigured` heißt: `KIDBOARD_ACCESS_TOKEN` oder
+   `KIDBOARD_CONFIG` stimmt noch nicht (Schritt 7 oder [Abschnitt 9](#9-fehlersuche)). Bei
+   einer ganz neuen Datenbank kann das allererste Laden des Boards ein paar Sekunden dauern
+   oder einmal einen Fehler zeigen; neu laden.
 7. Google-Kalender oder geänderte Einstellungen: Workers & Pages > dein Worker > Settings >
    Variables and Secrets. `calendars` in `KIDBOARD_CONFIG` ergänzen und je Kalender ein
    `CAL_<ID>_URL` anlegen (Add, Typ "Secret"). Speichern deployt eine neue Version.

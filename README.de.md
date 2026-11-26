@@ -92,7 +92,9 @@ gibt keinen zentralen Dienst: Jede Familie betreibt ihre eigene Kopie.
    legt ihn selbst an.
 
 3. Deployen, dann `https://<dein-worker>.workers.dev/?key=<token>` **einmal** auf dem Tablet
-   öffnen. Das Board merkt sich das Token und entfernt es aus der Adresszeile.
+   öffnen. Das Board merkt sich das Token und entfernt es aus der Adresszeile. Zeigt das
+   Board `KB-500`, stimmt ein Secret noch nicht: Workers & Pages > dein Worker > Settings >
+   Variables and Secrets (Details in [docs/DEPLOY.de.md](docs/DEPLOY.de.md)).
 
 **Deine Kopie aktualisiert sich nicht von selbst.** Der Button legt eine eigene Kopie von
 KidBoard in deinem GitHub-/GitLab-Konto an; Cloudflare baut sie bei jeder Änderung an dieser
