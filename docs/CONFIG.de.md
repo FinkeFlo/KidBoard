@@ -16,7 +16,7 @@ Deployment: [DEPLOY.de.md](DEPLOY.de.md)). Pro Kalender in `calendars` gibt es
 Pflicht: `KIDBOARD_ACCESS_TOKEN` (32-256 Zeichen `A-Z a-z 0-9 _ -`, z. B. `openssl rand -hex 32`; alle API-Aufrufe außer `/api/health` brauchen den
 Token als `Authorization: Bearer <token>` oder `?key=<token>`; besser den Header, denn `?key=`
 landet im Browserverlauf; Workers Logs entfernen den Query-String, `redact_query_string`). Ohne gültiges Token (fehlt, leer, zu kurz, falsche Zeichen oder noch `REPLACE_ME`) verweigert die API alles mit `500` und das Log nennt den Grund: das Board schaltet nie ungeschützt. Ein bewusst öffentliches Board gibt es nur per Opt-in `KIDBOARD_PUBLIC="1"` ohne Token (jeder mit dem Link sieht den Familienkalender, der Editor bleibt aus). `/api/health` bleibt öffentlich und liefert nur `{ "ok": true }`.
-Optional: `KIDBOARD_PARENT_PIN` (6-12 Ziffern, schaltet den Eltern-Editor ein; braucht zusätzlich das Zugriffstoken. Abgelehnt werden (Editor bleibt aus, das Log nennt den Grund) zu kurze/lange oder nicht-numerische Werte, eine einzige wiederholte Ziffer (`111111`) und Zahlenreihen (`123456`, `654321`); bitte keine Geburtstage oder Datumsangaben. Nach 5 falschen PINs in 15 Minuten sperrt der Editor 15 Minuten; jede weitere Sperre verdoppelt die Zeit (höchstens 2 Stunden), eine richtige PIN setzt zurück), `KIDBOARD_FEED_TOKEN` (32-256 Zeichen `A-Z a-z 0-9 _ -`, schaltet den Handy-Feed der Editor-Einträge ein; der Eltern-Bereich zeigt dann den Abo-Link; ein neuer Wert beendet alle Abos), `KIDBOARD_ALLOWED_ORIGINS` (nur für API-Zugriffe von anderen Origins; das Board selbst ist same-origin), `KIDBOARD_CACHE_TTL` (Sekunden, 60-86400, Standard 3600; andere Werte fallen mit einer Log-Warnung auf 3600 zurück; mit
+Optional: `KIDBOARD_PARENT_PIN` (6-12 Ziffern, schaltet den Eltern-Editor ein; braucht zusätzlich das Zugriffstoken. Abgelehnt werden (Editor bleibt aus, das Log nennt den Grund) zu kurze/lange oder nicht-numerische Werte, eine einzige wiederholte Ziffer (`111111`) und Zahlenreihen (`123456`, `654321`); bitte keine Geburtstage oder Datumsangaben. Falsche PINs zählen bis zur nächsten richtigen PIN zusammen (sie verfallen nicht); jede 5. sperrt den Editor 15 Minuten, jede weitere Sperre verdoppelt die Zeit (höchstens 2 Stunden), eine richtige PIN setzt Zähler und Zeit zurück), `KIDBOARD_FEED_TOKEN` (32-256 Zeichen `A-Z a-z 0-9 _ -`, schaltet den Handy-Feed der Editor-Einträge ein; der Eltern-Bereich zeigt dann den Abo-Link; ein neuer Wert beendet alle Abos), `KIDBOARD_ALLOWED_ORIGINS` (nur für API-Zugriffe von anderen Origins; das Board selbst ist same-origin), `KIDBOARD_CACHE_TTL` (Sekunden, 60-86400, Standard 3600; andere Werte fallen mit einer Log-Warnung auf 3600 zurück; mit
 KV-Cache mindestens `Kalender × 86400 / 500`; bei eingeschaltetem Eltern-Editor zählen
 seine zwei App-Quellen mit; solange Wetter konfiguriert oder der Eltern-Editor an ist, sind
 zuerst 49 Schreibvorgänge pro Tag für die Vorhersage reserviert, also `Kalender × 86400 /
@@ -41,8 +41,9 @@ Ist `KIDBOARD_ACCESS_TOKEN` gesetzt, das Board auf dem
 Tablet **einmal** als `https://<dein-worker>.workers.dev/?key=<token>` öffnen (z. B. als
 Start-URL in Fully Kiosk). Die Seite speichert das Token im lokalen Speicher des Tablets und
 **entfernt `?key=` sofort aus der Adresszeile**; danach ruft sie die API mit
-`Authorization: Bearer` auf. Spätere Besuche brauchen kein `?key=`; ein neues `?key=` ersetzt
-das gespeicherte Token (nach einem Token-Wechsel). Nach einem **`401`** (Token ungültig oder
+`Authorization: Bearer` auf. Spätere Besuche brauchen kein `?key=`; ein neues `?key=` im
+gültigen Token-Format ersetzt das gespeicherte Token (nach einem Token-Wechsel), alles andere
+wird aus der Adresse entfernt und ignoriert. Nach einem **`401`** (Token ungültig oder
 widerrufen) **vergisst** das Tablet das Token und zeigt "Dieses Tablet braucht einen neuen Zugangslink" (Fehlercode
 `KB-401`): den Tablet-Link mit dem aktuellen `?key=<token>` noch einmal öffnen. Mit
 öffentlichem Opt-in (`KIDBOARD_PUBLIC="1"`, kein Token) ist das alles nicht nötig.
