@@ -7,9 +7,8 @@ import { logWarn } from "../log";
  * {@link MAX_FAILURES}th wrong PIN locks the unlock route. The first lockout lasts
  * {@link PARENT_LOCKOUT_SECONDS}; every further lockout without a right PIN in between
  * doubles it (15 min, 30, 60, 120 up to {@link MAX_LOCKOUT_SECONDS}), so at most
- * {@link MAX_FAILURES} PINs are compared per lockout period and guessing a PIN through
- * the lockout never gets cheaper than a few hundred tries per year. Spreading wrong PINs
- * over time does not help: they do not age out.
+ * {@link MAX_FAILURES} PINs are compared per lockout period: once the cap is reached,
+ * about 60 a day. Spreading wrong PINs over time does not help: they do not age out.
  */
 export const MAX_FAILURES = 5;
 /**
