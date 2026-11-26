@@ -44,19 +44,26 @@ Option 1.
   left). 401 stays reserved for the access token: the board client forgets its token on
   any 401. Bearer header, no cookies → no CSRF; CORS for listed origins
   additionally allows `POST, PATCH, DELETE` and the two headers.
-* **Lockout:** after 5 wrong PINs within 15 minutes the unlock route answers 429
-  `parent_lockout` (with `Retry-After`) for 15 minutes. The lockout escalates: every
-  further lockout while failures continue doubles the time (15 minutes, 30, 60, ... capped at
-  2 hours); a right PIN resets the level. Counted in D1 (ADR-0014, strongly consistent),
-  not per IP: a family has one board. Every attempt is *reserved* before the PIN is
-  compared, so parallel requests cannot test more than 5 PINs per window: one D1 batch
-  inserts the attempt row only if no lockout is active and the window holds fewer than 5
-  attempts; not reserved → 429 without comparing. A wrong PIN keeps the row, marked as a
-  settled failure (the one that reaches the limit sets the lockout and raises the level); a
-  right PIN deletes its reservation, every settled failure of the window and the level, so
-  a parent's earlier typos do not count against the next unlock. Reservations of parallel
-  attempts still being compared are not cleared: at most 5 PINs are compared at once, and
-  without the right PIN at most 5 per window.
+* **Lockout:** wrong PINs are counted since the last right PIN, not per time window;
+  every 5th one locks the unlock route, which answers 429 `parent_lockout` (with
+  `Retry-After`) for 15 minutes. The lockout escalates: every further lockout without a
+  right PIN in between doubles the time (15 minutes, 30, 60, ... capped at 2 hours); a
+  right PIN resets the count and the level. Counted in D1 (ADR-0014, strongly
+  consistent), not per IP: a family has one board. Every attempt is *reserved* before the
+  PIN is compared, so parallel requests cannot test more than 5 PINs per lockout period:
+  one D1 batch inserts the attempt row only if no lockout is active and fewer than 5
+  attempts are counted; not reserved → 429 without comparing. A wrong PIN keeps the row,
+  marked as a settled failure that never ages out and is written even if the reservation
+  has aged out meanwhile (the one that reaches the limit sets the lockout and raises the
+  level). Every step uses the time at which it runs, not the time the request started,
+  so a slowly sent request cannot place its attempt or its lockout in the past. The failures behind a lockout are dropped by the first
+  attempt after it has ended, so the next period starts with a fresh count of 5 at the
+  escalated level. A right PIN deletes its reservation, every settled failure and the
+  level, so a parent's earlier typos do not count against the next unlock. Reservations of
+  parallel attempts still being compared are not cleared: at most 5 PINs are compared at
+  once, and without the right PIN at most 5 per lockout period. Only a reservation that
+  never settles (a crashed request) stops counting after 15 minutes, so it cannot lock
+  the parents out for good.
 * **Tablet UI:** no visible "edit" button for children. The entry is a small, low-contrast
   ✏️ control in the nav rail that opens only after a 2-second press and hold (same pattern
   as the fullscreen control), then a PIN pad. The session lives in memory only (not in
@@ -64,10 +71,15 @@ Option 1.
   hidden, and on "Done"; the board's auto-return does not run while the editor is open.
 
 ## Consequences
-* A random 6-digit PIN with a lockout of 5 tries per 15 minutes that doubles up to 2 hours
-  is years of expected online guessing even with a stolen access token; acceptable for a
-  family calendar. Trivial PINs are refused at start for that reason. A
-  right PIN resets the count, which helps only someone who already knows the PIN.
+* A random 6-digit PIN with 5 tries per lockout, the lockout doubling from 15 minutes up
+  to 2 hours, is years of expected online guessing even with a stolen access token (about
+  60 tries a day once the cap is reached; spreading tries over time gains nothing, since
+  wrong PINs do not age out); acceptable for a family calendar. Trivial PINs are refused
+  at start for that reason. A right PIN resets the count, which helps only someone who
+  already knows the PIN.
+* Because wrong PINs do not age out, stray ones add up until the next right PIN: four
+  old typos (or a child's taps) plus one more lock the editor for 15 minutes. Accepted:
+  the parent sees the attempts left on the PIN pad, and every right PIN clears them.
 * Residual risk: a PIN built from a date (e.g. a birthday as `DDMMYY`, a few tens of thousands
   of plausible values) falls much faster; at 5 tries per 2 hours a holder of the access token
   finds it in roughly ten months on average. Hence the docs advise against dates, and

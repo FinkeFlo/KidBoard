@@ -323,13 +323,14 @@ describe("lockout", () => {
     expect((await h.unlock(PIN)).status).toBe(200);
   });
 
-  it("does not lock for 5 failures spread over more than 15 minutes", async () => {
+  it("also locks for 5 failures spread over more than 15 minutes", async () => {
     const h = harness();
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 4; i++) {
       expect((await h.unlock(OTHER_PIN)).status).toBe(403);
-      h.clock.now += 4 * MINUTE; // 0, 4, 8, 12, 16 → never 5 within 15 min
+      h.clock.now += 4 * MINUTE; // 0, 4, 8, 12, 16: wrong PINs do not age out
     }
-    expect((await h.unlock(PIN)).status).toBe(200);
+    expect((await h.unlock(OTHER_PIN)).status).toBe(429);
+    expect((await h.unlock(PIN)).status).toBe(429);
   });
 
   it("is shared through D1 across isolates", async () => {
@@ -790,5 +791,117 @@ describe("CORS on /api/parent/*", () => {
     expect(response.headers.get("Access-Control-Allow-Methods")).toBe(
       "GET,HEAD,OPTIONS",
     );
+  });
+});
+
+describe("lockout with slowly sent bodies", () => {
+  /**
+   * An unlock whose body is held back until `send()`: `started` resolves once the
+   * route begins to read it (highWaterMark 0: nothing is pulled before that).
+   */
+  function slowUnlock(
+    h: Harness,
+    pin: string,
+  ): { started: Promise<void>; send: () => void; response: Promise<Response> } {
+    const bytes = new TextEncoder().encode(JSON.stringify({ pin }));
+    let markStarted = (): void => undefined;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    let release = (): void => undefined;
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const body = new ReadableStream<Uint8Array>(
+      {
+        async pull(controller) {
+          markStarted();
+          await released;
+          controller.enqueue(bytes);
+          controller.close();
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const response = h.call("/api/parent/unlock", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": String(bytes.byteLength),
+      },
+      body,
+    });
+    return { started, send: release, response };
+  }
+
+  async function settledRows(): Promise<number> {
+    return (await metaRows()).filter((r) => r.key.startsWith("parent_fail:s:"))
+      .length;
+  }
+
+  /** 5 wrong PINs in a row; returns the last response (the one that locks). */
+  async function fiveWrong(h: Harness): Promise<Response | undefined> {
+    const responses: Response[] = [];
+    for (let i = 0; i < 5; i++) {
+      responses.push(await h.unlock(OTHER_PIN));
+    }
+    expect(responses.slice(0, 4).map((r) => r.status)).toEqual([
+      403, 403, 403, 403,
+    ]);
+    return responses[4];
+  }
+
+  it("a late body cannot place its failure or the lockout in the past", async () => {
+    const h = harness();
+    await unlockToken(h);
+    const slow = slowUnlock(h, OTHER_PIN);
+    await slow.started;
+    h.clock.now += 20 * MINUTE; // the body arrives 20 minutes after the headers
+    const left: unknown[] = [];
+    for (let i = 0; i < 4; i++) {
+      left.push((await json(await h.unlock(OTHER_PIN))).attemptsLeft);
+    }
+    expect(left).toEqual([4, 3, 2, 1]);
+    slow.send();
+    const fifth = await slow.response;
+    expect(fifth.status).toBe(429);
+    expect(fifth.headers.get("Retry-After")).toBe("900");
+    // The lockout is in force: even the right PIN is refused, with a truthful wait.
+    const next = await h.unlock(PIN);
+    expect(next.status).toBe(429);
+    expect(next.headers.get("Retry-After")).toBe("900");
+    expect(await settledRows()).toBe(5);
+    // Raised once: the next lockout doubles.
+    h.clock.now += 900_000;
+    expect((await fiveWrong(h))?.headers.get("Retry-After")).toBe("1800");
+  });
+
+  it("parallel late bodies around the 5th failure compare at most 5 PINs and lock", async () => {
+    const h = harness();
+    await unlockToken(h);
+    const slow = Array.from({ length: 3 }, (_, i) =>
+      slowUnlock(h, String(300000 + i)),
+    );
+    await Promise.all(slow.map((s) => s.started));
+    h.clock.now += 20 * MINUTE;
+    for (let i = 0; i < 3; i++) {
+      expect((await h.unlock(OTHER_PIN)).status).toBe(403);
+    }
+    for (const s of slow) {
+      s.send();
+    }
+    const statuses = (await Promise.all(slow.map((s) => s.response))).map(
+      (r) => r.status,
+    );
+    expect(statuses.every((s) => s === 403 || s === 429)).toBe(true);
+    expect(statuses).toContain(429);
+    // Exactly 5 compared wrong PINs (3 fast, 2 slow); the third slow one was refused.
+    expect(await settledRows()).toBe(5);
+    const next = await h.unlock(PIN);
+    expect(next.status).toBe(429);
+    expect(next.headers.get("Retry-After")).toBe("900");
+    // The level was raised once.
+    h.clock.now += 900_000;
+    expect((await fiveWrong(h))?.headers.get("Retry-After")).toBe("1800");
   });
 });

@@ -328,10 +328,11 @@ exact routes, status codes and storage keys are in the doc comments of the sourc
   `requireParentSession`, the guard of the editor routes (`X-KidBoard-Parent`,
   `403 parent_locked`).
 * `parent/lockout.ts`: attempt reservation and the escalating lockout, D1 only, so it holds
-  across isolates.
+  across isolates. Wrong PINs are counted since the last right PIN, not per time window,
+  and every D1 step uses the time at which it runs.
 * `http/cors.ts`: the extra methods and headers for listed origins, on `/api/parent/*` only.
 
-The lock condition counts all attempts in the window, including parallel ones still being
+The lock condition counts all counted attempts, including parallel ones still being
 compared, not only settled failures: deliberately conservative; it differs only for
 parallel attempts, which one tablet does not produce.
 

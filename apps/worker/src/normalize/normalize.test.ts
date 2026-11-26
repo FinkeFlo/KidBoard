@@ -10,8 +10,11 @@ import { describe, expect, it } from "vitest";
 import dstIcs from "../../../../fixtures/ics/dst.ics?raw";
 import { expandCalendar, type Occurrence } from "../ical/expandCalendar";
 import {
+  capUtf16,
   limitTitle,
+  MAX_DESCRIPTION_UNITS,
   MAX_ITEMS_PER_SOURCE,
+  MAX_SUMMARY_UNITS,
   MAX_TITLE_GRAPHEMES,
   normalize,
   type NormalizeResult,
@@ -655,5 +658,89 @@ describe("normalize limits", () => {
     expect(result.events.some((e) => e.title === "Heute")).toBe(true);
     // Output order stays all-day first.
     expect(result.events[0]?.allDay).toBe(true);
+  });
+});
+
+describe("normalize input caps", () => {
+  /** True if `text` holds a surrogate code unit without its partner. */
+  const hasLoneSurrogate = (text: string): boolean =>
+    // Without the `u` flag the regex sees code units, so lone surrogates match.
+    /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(
+      text,
+    );
+
+  it("capUtf16 keeps short text and never ends in half a surrogate pair", () => {
+    expect(capUtf16("Turnen", 10)).toBe("Turnen");
+    expect(capUtf16("abcdef", 3)).toBe("abc");
+    // "ab😀": the cut after 3 units would split the emoji, so it ends before it.
+    expect(capUtf16("ab😀", 3)).toBe("ab");
+    expect(capUtf16("ab😀", 4)).toBe("ab😀");
+  });
+
+  it("parses at most MAX_SUMMARY_UNITS of a summary", () => {
+    // One grapheme of thousands of code units survives limitTitle: the input cap bounds it.
+    const summary = `B${"\u0301".repeat(20_000)}`;
+    const title = normalize([occ({ summary })], family, config).events[0]
+      ?.title;
+    expect(title?.startsWith("B\u0301")).toBe(true);
+    expect(title?.length).toBeLessThanOrEqual(MAX_SUMMARY_UNITS);
+  });
+
+  it("does not leave half an emoji at the summary cut", () => {
+    // The high surrogate of the emoji sits exactly at the last unit kept.
+    const summary = `B${"\u0301".repeat(MAX_SUMMARY_UNITS - 2)}😀 rest`;
+    expect(summary.charCodeAt(MAX_SUMMARY_UNITS - 1)).toBe(0xd83d);
+    const title =
+      normalize([occ({ summary })], family, config).events[0]?.title ?? "";
+    expect(title).not.toBe("");
+    expect(hasLoneSurrogate(title)).toBe(false);
+    expect(title.length).toBe(MAX_SUMMARY_UNITS - 1);
+  });
+
+  it("leaves normal titles and descriptions as they were", () => {
+    const [event] = normalize(
+      [
+        occ({
+          summary: "⚽ Fußball mit Ben",
+          description: "Bring: 🥤 🍎\n#countdown",
+        }),
+      ],
+      family,
+      config,
+    ).events;
+    expect(event).toMatchObject({
+      title: "Fußball mit Ben",
+      countdown: true,
+      bring: ["🥤", "🍎"],
+    });
+  });
+
+  it("scans at most MAX_DESCRIPTION_UNITS of a description", () => {
+    const filler = "x".repeat(MAX_DESCRIPTION_UNITS);
+    const late = normalize(
+      [occ({ summary: "⚽ Spiel", description: `${filler}\n#countdown` })],
+      family,
+      config,
+    ).events[0];
+    expect(late?.countdown).toBe(false);
+    const early = normalize(
+      [occ({ summary: "⚽ Spiel", description: `#countdown\n${filler}` })],
+      family,
+      config,
+    ).events[0];
+    expect(early?.countdown).toBe(true);
+  });
+
+  it("gives a UID-less event with a huge summary a stable id from the capped text", () => {
+    const head = `⚽ ${"x".repeat(MAX_SUMMARY_UNITS)}`;
+    const id = (summary: string): string | undefined =>
+      normalize([occ({ summary, uid: "" })], family, config).events[0]?.id;
+    const first = id(`${head}${"y".repeat(100_000)}`);
+    expect(first).toMatch(/^[0-9a-f]{16}$/);
+    expect(id(`${head}${"y".repeat(100_000)}`)).toBe(first);
+    // Only the first MAX_SUMMARY_UNITS units take part.
+    expect(id(`${head}${"z".repeat(50)}`)).toBe(first);
+    // Short summaries still tell UID-less events apart.
+    expect(id("⚽ Spiel A")).not.toBe(id("⚽ Spiel B"));
   });
 });

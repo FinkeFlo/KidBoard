@@ -60,8 +60,8 @@ function isoSeconds(epochSeconds: number): string {
  *   token) → 404 `not_found`; bodies over {@link MAX_PARENT_BODY_BYTES} → 413
  *   `payload_too_large`;
  * * `POST /unlock` `{ pin }` → `{ token, expiresAt }` (15 min); wrong PIN → 403
- *   `wrong_pin` with `attemptsLeft`; the 5th wrong PIN within 15 min and every request
- *   during the following lockout (15 min, doubling per repeated lockout, at most 2 h)
+ *   `wrong_pin` with `attemptsLeft`; every 5th wrong PIN since the last right PIN and
+ *   every request during the following lockout (15 min, doubling per repeated lockout, at most 2 h)
  *   → 429 `parent_lockout` with `Retry-After`. Each attempt is reserved against the
  *   limit before the PIN is compared; the right PIN clears the wrong ones and the
  *   escalation (see `lockout.ts`);
@@ -103,7 +103,9 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
       // Unreachable behind the editor gate; keeps the types honest.
       return notFound(c);
     }
-    const nowSeconds = Math.floor(options.now() / 1000);
+    // Every D1 step takes the clock when it runs, never the time the request started:
+    // a body may arrive long after the headers (ADR-0013).
+    const nowSeconds = (): number => Math.floor(options.now() / 1000);
     const body = await parseJsonBody(c, UnlockBodySchema);
     if (!body.ok) {
       return body.response;
@@ -111,12 +113,12 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
     await keys.ensureSchema(db);
     // Reserve the attempt against the limit before the PIN is compared (ADR-0013): if
     // D1 fails here, no PIN is compared at all.
-    const reserved = await reserveAttempt(db, nowSeconds);
+    const reserved = await reserveAttempt(db, nowSeconds());
     if (!reserved.ok) {
       return lockout(c, reserved.retryAfterSeconds);
     }
     if (!(await tokensEqual(body.value.pin, expected))) {
-      const outcome = await recordFailure(db, reserved, nowSeconds);
+      const outcome = await recordFailure(db, reserved, nowSeconds());
       if (outcome.locked) {
         return lockout(c, outcome.retryAfterSeconds);
       }
@@ -135,7 +137,8 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
     } catch (error) {
       // The PIN was right: go on with the session and retry the delete past the
       // response, so the attempt does not stay counted against the lockout. If the
-      // retry fails too, the row ages out with the 15-minute window.
+      // retry fails too, the reservation ages out after 15 minutes; earlier wrong PINs
+      // stay counted until the next right PIN.
       logWarn(
         `parent unlock: releasing the attempt failed (${errorName(error)}), retrying`,
       );
@@ -148,7 +151,7 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
         }),
       );
     }
-    const expiresAt = nowSeconds + SESSION_TTL_SECONDS;
+    const expiresAt = nowSeconds() + SESSION_TTL_SECONDS;
     const token = await signSession(await keys.key(db, expected), expiresAt);
     return c.json({ token, expiresAt: isoSeconds(expiresAt) });
   });

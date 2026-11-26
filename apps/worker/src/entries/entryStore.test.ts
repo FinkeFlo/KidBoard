@@ -12,7 +12,10 @@ import {
   ENTRY_EXPORT_FORMAT,
   type EntryExport,
   EntryStore,
+  IMPORT_REVISION_CLAMP,
   MAX_ENTRY_BYTES,
+  MAX_ENTRY_EXCEPTIONS,
+  MAX_IMPORT_REVISION,
   type StoreResult,
 } from "./entryStore";
 import { SchemaGate } from "./schema";
@@ -738,6 +741,84 @@ describe("export / import", () => {
       }
     }
     expect((await s.list()).map((e) => e.id)).toEqual([dentist.id]);
+  });
+
+  it("bounds the revision and the number of exceptions and overrides of an import", async () => {
+    const s = store();
+    const swim = ok(await s.create(SWIMMING));
+    const doc = await s.exportAll();
+    const valid = doc.entries[0];
+    if (valid === undefined) {
+      throw new Error("no entry");
+    }
+    // Every Monday from 2026-03-09 on: plenty of valid dates.
+    const mondays = Array.from({ length: MAX_ENTRY_EXCEPTIONS + 1 }, (_, i) =>
+      new Date(Date.UTC(2026, 2, 9 + 7 * i)).toISOString().slice(0, 10),
+    );
+    const cases: [unknown, string][] = [
+      [
+        { ...doc, entries: [{ ...valid, revision: MAX_IMPORT_REVISION + 1 }] },
+        "entries.0.revision",
+      ],
+      [
+        { ...doc, entries: [{ ...valid, revision: 2 ** 53 - 1 }] },
+        "entries.0.revision",
+      ],
+      [
+        { ...doc, entries: [{ ...valid, exdates: mondays }] },
+        "entries.0.exdates",
+      ],
+      [
+        {
+          ...doc,
+          entries: [
+            {
+              ...valid,
+              overrides: Object.fromEntries(
+                mondays.map((date) => [date, { ...SWIMMING, repeat: "none" }]),
+              ),
+            },
+          ],
+        },
+        "entries.0.overrides",
+      ],
+    ];
+    for (const [input, path] of cases) {
+      const result = await s.importAll(input, "replace");
+      if (result.ok || result.error !== "invalid") {
+        throw new Error(`expected invalid for ${path}`);
+      }
+      expect(result.issues.map((i) => i.path)).toContain(path);
+    }
+    expect((await s.list()).map((e) => [e.id, e.revision])).toEqual([
+      [swim.id, 1],
+    ]);
+
+    // At the cap the import still works; the revision it gets is clamped.
+    ok(
+      await s.importAll(
+        { ...doc, entries: [{ ...valid, revision: MAX_IMPORT_REVISION }] },
+        "replace",
+      ),
+    );
+    const [imported] = await s.list();
+    expect(imported?.revision).toBe(IMPORT_REVISION_CLAMP + 1);
+    // Edit, export, re-import (both modes): this store's own export always imports.
+    const edited = ok(
+      await s.update(swim.id, IMPORT_REVISION_CLAMP + 1, SWIMMING),
+    );
+    expect(edited.revision).toBe(IMPORT_REVISION_CLAMP + 2);
+    const again = await s.exportAll();
+    ok(await s.importAll(again, "replace"));
+    ok(await s.importAll(again, "merge"));
+    const [final] = await s.list();
+    expect(final?.revision).toBeGreaterThan(edited.revision);
+    expect(final?.revision).toBeLessThan(MAX_IMPORT_REVISION);
+    // A client still holding the pre-import revision gets a conflict.
+    expect(await s.update(swim.id, edited.revision, SWIMMING)).toMatchObject({
+      ok: false,
+      error: "conflict",
+    });
   });
 
   it("restores entries the config can no longer express (shape-checked only)", async () => {

@@ -1,5 +1,6 @@
 import {
   type AppConfig,
+  BRING_SCAN_LIMIT,
   type CalendarEvent,
   type CalendarSource,
   formatCalendarDate,
@@ -53,6 +54,30 @@ export function limitTitle(title: string): string {
   return parts.length <= MAX_TITLE_GRAPHEMES
     ? title
     : `${parts.slice(0, MAX_TITLE_GRAPHEMES - 1).join("")}…`;
+}
+
+/**
+ * Feed summaries and descriptions are untrusted and parsed once per occurrence of a
+ * series: they are cut to these many UTF-16 code units before parsing, so the work per
+ * occurrence is bounded whatever the feed sends. The summary limit is far above what
+ * survives {@link limitTitle} (120 graphemes), so normal titles are unaffected. The
+ * description is only scanned (bring lines, `#countdown`), and the bring scan reads no
+ * further than {@link BRING_SCAN_LIMIT} anyway; a `#countdown` tag beyond it is ignored.
+ */
+export const MAX_SUMMARY_UNITS = 1024;
+export const MAX_DESCRIPTION_UNITS = BRING_SCAN_LIMIT;
+
+/**
+ * `text` cut to at most `limit` UTF-16 code units, never ending in the first half of a
+ * surrogate pair (a lone high surrogate could otherwise reach the output).
+ */
+export function capUtf16(text: string, limit: number): string {
+  if (text.length <= limit) {
+    return text;
+  }
+  const last = text.charCodeAt(limit - 1);
+  const end = last >= 0xd800 && last <= 0xdbff ? limit - 1 : limit;
+  return text.slice(0, end);
 }
 
 /** Hard cap of days a single all-day meal event is spread over (guards unbounded spans). */
@@ -244,7 +269,14 @@ export function normalize(
     return bring;
   };
 
-  for (const o of occurrences) {
+  for (const raw of occurrences) {
+    // Capped once; everything below (parsing, bring scan, ids of UID-less events) sees
+    // only the capped text.
+    const o: Occurrence = {
+      ...raw,
+      summary: capUtf16(raw.summary, MAX_SUMMARY_UNITS),
+      description: capUtf16(raw.description, MAX_DESCRIPTION_UNITS),
+    };
     const parsed = parseTitle(o.summary, {
       kind: source.kind,
       children: config.children,

@@ -56,13 +56,39 @@ export type StoreFailure =
 
 export type StoreResult<T> = { ok: true; value: T } | StoreFailure;
 
+/**
+ * Highest revision an import accepts (2^40, exactly representable). Larger values are
+ * refused, so a crafted file cannot push revisions near 2^53, where `revision + 1` is no
+ * longer exact in JavaScript and optimistic concurrency breaks.
+ */
+export const MAX_IMPORT_REVISION = 2 ** 40;
+
+/**
+ * An imported revision takes part in the new revision only up to this value (2^30).
+ * From there, revisions grow by one per write or import, so stored revisions stay far
+ * below {@link MAX_IMPORT_REVISION} and every export of this store imports again.
+ */
+export const IMPORT_REVISION_CLAMP = 2 ** 30;
+
+/**
+ * Most exceptions (and, separately, overrides) an imported entry may list: each takes
+ * at least 13 bytes of its JSON column (`"YYYY-MM-DD",`), so more can never fit into
+ * {@link MAX_ENTRY_BYTES}. Checked by the schema, before any date is validated.
+ */
+export const MAX_ENTRY_EXCEPTIONS = Math.floor(MAX_ENTRY_BYTES / 13);
+
 const ExportedEntrySchema = z.strictObject({
   id: EntryIdSchema,
-  revision: z.number().int().min(1),
+  revision: z.number().int().min(1).max(MAX_IMPORT_REVISION),
   kind: EditorKindSchema,
   data: z.unknown(),
-  exdates: z.array(DateKeySchema).default([]),
-  overrides: z.record(DateKeySchema, z.unknown()).default({}),
+  exdates: z.array(DateKeySchema).max(MAX_ENTRY_EXCEPTIONS).default([]),
+  overrides: z
+    .record(DateKeySchema, z.unknown())
+    .refine((o) => Object.keys(o).length <= MAX_ENTRY_EXCEPTIONS, {
+      message: `At most ${String(MAX_ENTRY_EXCEPTIONS)} overrides per entry`,
+    })
+    .default({}),
   createdAt: DateTimeStringSchema,
   updatedAt: DateTimeStringSchema,
 });
@@ -499,7 +525,7 @@ export class EntryStore {
         statements.push(
           upsert.bind(
             row.id,
-            row.revision,
+            Math.min(row.revision, IMPORT_REVISION_CLAMP),
             row.parts.data.kind,
             row.serialized.data,
             row.serialized.exdates,
