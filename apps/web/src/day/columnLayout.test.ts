@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 
 import { columnLayout, MIN_TILES, STRIP_ICONS_MAX } from "./columnLayout";

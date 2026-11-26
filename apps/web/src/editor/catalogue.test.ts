@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { EmojiSchema, isEmojiGrapheme } from "@kidboard/shared";
 import emojiData from "emojibase-data/en/data.json";
 import { describe, expect, it } from "vitest";

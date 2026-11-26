@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { FALLBACK_ICON_TABLE } from "@kidboard/shared";
 import { describe, expect, it } from "vitest";
 

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 
 import { eventFixture, mealFixture } from "../components/fixtures.test-utils";
