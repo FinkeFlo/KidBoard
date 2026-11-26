@@ -1,7 +1,7 @@
 ---
 name: builder-opus
 description: Escalation builder on Opus for high-risk KidBoard tasks (iCal, time zones, security, caching/offline, CI/release, architecture) or after two failed reviews. Same role as builder.
-tools: Read, Grep, Glob, Write, Edit, Bash, mcp__Context7__resolve-library-id, mcp__Context7__query-docs
+tools: Read, Grep, Glob, Write, Edit, Bash, mcp__Context7__*, mcp__context7__*, mcp__claude_ai_Context7__*, mcp__plugin_context7_context7__*
 model: claude-opus-5-5
 ---
 
