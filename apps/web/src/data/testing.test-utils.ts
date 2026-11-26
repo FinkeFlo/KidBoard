@@ -11,8 +11,9 @@ import type { QueryClient } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
 import { vi } from "vitest";
 
-import type { ApiClient } from "./apiClient";
+import { type ApiClient, createApiClient } from "./apiClient";
 import { DataProvider } from "./DataProvider";
+import { createQueryClient } from "./queryClient";
 import type { KeyValueStorage } from "./storage";
 
 /** Low-entropy synthetic token (gitleaks-friendly). */
@@ -210,6 +211,36 @@ export function dataWrapper(
       children,
     );
   };
+}
+
+export interface FakeBoardWrapperOptions {
+  /** The fake backend the API client talks to (with {@link TEST_TOKEN}). */
+  fake: FakeFetch;
+  storage: KeyValueStorage | undefined;
+  /** Receives the new query client, so the test can clear it afterwards. */
+  clients: QueryClient[];
+  onUnauthorized?: () => void;
+}
+
+/**
+ * {@link dataWrapper} for a board on the fake backend: a fresh query client without
+ * retries (registered in `clients`) and an API client on `fake.fetch`.
+ */
+export function fakeBoardWrapper(
+  options: FakeBoardWrapperOptions,
+): (props: { children: ReactNode }) => ReactNode {
+  const client = createQueryClient({
+    retry: false,
+    ...(options.onUnauthorized === undefined
+      ? {}
+      : { onUnauthorized: options.onUnauthorized }),
+  });
+  options.clients.push(client);
+  return dataWrapper(
+    createApiClient({ fetch: options.fake.fetch, token: TEST_TOKEN }),
+    client,
+    options.storage,
+  );
 }
 
 /** In-memory {@link KeyValueStorage} (one per test, so throttled writes cannot leak). */
