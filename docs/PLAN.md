@@ -896,7 +896,7 @@ layout without scrolling), a T-27a-style UI/UX click test of the new surfaces by
 agents (Haiku, Sonnet, Opus) at both sizes, light/night, fixed via the builder/reviewer loop
 and re-checked by Sonnet until no blocking findings; CI green.
 
-- [ ] **T-56 Weather place in the parent editor** (risk: **high** → Opus, deps: M9, M11)
+- [x] **T-56 Weather place in the parent editor** (risk: **high** → Opus, deps: M9, M11)
   Parents turn the weather on, change the town or turn it off in the editor instead of
   editing `KIDBOARD_CONFIG` (maintainer: "the weather is missing" on a board whose config
   had no `weather` block). A first slice of the M12 setup idea, only for weather.
