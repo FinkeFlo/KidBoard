@@ -5,7 +5,6 @@ import {
   type FormatContext,
   formatDayMonth,
   formatDayMonthShort,
-  formatLongDate,
   formatTime,
   formatWeekday,
 } from "./format";
@@ -23,8 +22,6 @@ describe("date/time formatting", () => {
     expect(formatDayMonthShort(instant, berlinEn)).toBe("Mar 2");
     expect(formatDayMonthShort("2025-11-26", berlinEn)).toBe("Nov 26");
     expect(formatDayMonthShort("2025-11-26", berlinDe)).toMatch(/^26\. Nov/);
-    expect(formatLongDate(instant, berlinEn)).toBe("March 2, 2025");
-    expect(formatLongDate(instant, berlinDe)).toBe("2. März 2025");
   });
 
   it("uses 24 h for de and 12 h for en", () => {
@@ -79,8 +76,6 @@ describe("date/time formatting", () => {
       // UTC-midnight parsing would yield Saturday, October 25.
       expect(formatWeekday("2025-10-26", nyEn)).toBe("Sunday");
       expect(formatWeekday("2025-10-26", nyDe)).toBe("Sonntag");
-      expect(formatLongDate("2025-10-26", nyEn)).toBe("October 26, 2025");
-      expect(formatLongDate("2025-10-26", nyDe)).toBe("26. Oktober 2025");
       expect(formatDayMonth("2025-10-26", nyEn)).toBe("October 26");
       expect(formatDayMonth("2025-10-26", nyDe)).toBe("26. Oktober");
     });
@@ -89,23 +84,23 @@ describe("date/time formatting", () => {
       // Auckland is UTC+13 in January; year boundary as an extra edge.
       expect(formatWeekday("2025-01-01", aklEn)).toBe("Wednesday");
       expect(formatWeekday("2025-01-01", aklDe)).toBe("Mittwoch");
-      expect(formatLongDate("2025-01-01", aklEn)).toBe("January 1, 2025");
-      expect(formatLongDate("2025-01-01", aklDe)).toBe("1. Januar 2025");
+      expect(formatDayMonth("2025-01-01", aklEn)).toBe("January 1");
+      expect(formatDayMonth("2025-01-01", aklDe)).toBe("1. Januar");
       expect(formatDayMonth("2024-12-31", aklEn)).toBe("December 31");
       expect(formatDayMonth("2024-12-31", aklDe)).toBe("31. Dezember");
     });
 
     it("keeps DST transition days intact (Europe/Berlin)", () => {
       expect(formatWeekday("2025-03-30", berlinDe)).toBe("Sonntag");
-      expect(formatLongDate("2025-03-30", berlinDe)).toBe("30. März 2025");
+      expect(formatDayMonth("2025-03-30", berlinDe)).toBe("30. März");
       expect(formatDayMonth("2025-03-30", berlinEn)).toBe("March 30");
       expect(formatWeekday("2025-10-26", berlinEn)).toBe("Sunday");
-      expect(formatLongDate("2025-10-26", berlinDe)).toBe("26. Oktober 2025");
+      expect(formatDayMonth("2025-10-26", berlinDe)).toBe("26. Oktober");
       expect(formatDayMonth("2025-10-26", berlinEn)).toBe("October 26");
     });
 
     it("accepts a leap day", () => {
-      expect(formatLongDate("2024-02-29", nyEn)).toBe("February 29, 2024");
+      expect(formatDayMonth("2024-02-29", nyEn)).toBe("February 29");
     });
 
     it("rejects malformed date keys instead of rolling over", () => {
@@ -116,8 +111,8 @@ describe("date/time formatting", () => {
         "2025-00-10",
       ]) {
         expect(() => formatWeekday(key, berlinDe)).toThrow(RangeError);
-        expect(() => formatLongDate(key, berlinDe)).toThrow(/Invalid date key/);
         expect(() => formatDayMonth(key, berlinDe)).toThrow(RangeError);
+        expect(() => formatDayMonth(key, berlinDe)).toThrow(/Invalid date key/);
       }
     });
 
