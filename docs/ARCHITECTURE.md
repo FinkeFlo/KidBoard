@@ -331,15 +331,17 @@ conditional insert of a `kb_meta` row `parent_fail:<uuid>` → epoch s succeeds 
 without an active `parent_lock_until` and with fewer than 5 counted attempts (every
 settled failure plus the reservations of the last 15 min; older, never settled
 reservations are dropped); not reserved → `429 parent_lockout` with `Retry-After`, no
-compare. A wrong PIN renames the row to `parent_fail:s:<uuid>` (a settled failure; counted
-until the next right PIN, it does not age out) and, as the 5th counted attempt, writes
+compare. A wrong PIN replaces the row with `parent_fail:s:<uuid>` (a settled failure,
+written even if the reservation has aged out; counted until the next right PIN, it does
+not age out) and, as the 5th counted attempt, writes
 `parent_lock_until` and raises `parent_lock_level` (the lock lasts 15 min x 2^(level-1),
 capped at 2 h, also answered with 429). The first reservation after a lockout has ended
 deletes the settled failures older than its end, so the next period counts from 5 again
 at the escalated level. A right PIN deletes its own row, every settled failure and the
 level, so earlier typos of the parent no longer count. Reservations of parallel attempts
 still being compared are kept, so at most 5 PINs are compared at once, and without the
-right PIN at most 5 per lockout period. If deleting the rows after a right PIN fails, the
+right PIN at most 5 per lockout period. Each D1 step reads the clock when it runs (after
+the body has arrived), so the lockout end always lies ahead. If deleting the rows after a right PIN fails, the
 session is still issued and the delete is retried once past the response (`waitUntil`);
 if that fails too, the reservation ages out after 15 min and the settled failures stay
 until the next right PIN.

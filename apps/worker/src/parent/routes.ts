@@ -103,7 +103,9 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
       // Unreachable behind the editor gate; keeps the types honest.
       return notFound(c);
     }
-    const nowSeconds = Math.floor(options.now() / 1000);
+    // Every D1 step takes the clock when it runs, never the time the request started:
+    // a body may arrive long after the headers (ADR-0013).
+    const nowSeconds = (): number => Math.floor(options.now() / 1000);
     const body = await parseJsonBody(c, UnlockBodySchema);
     if (!body.ok) {
       return body.response;
@@ -111,12 +113,12 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
     await keys.ensureSchema(db);
     // Reserve the attempt against the limit before the PIN is compared (ADR-0013): if
     // D1 fails here, no PIN is compared at all.
-    const reserved = await reserveAttempt(db, nowSeconds);
+    const reserved = await reserveAttempt(db, nowSeconds());
     if (!reserved.ok) {
       return lockout(c, reserved.retryAfterSeconds);
     }
     if (!(await tokensEqual(body.value.pin, expected))) {
-      const outcome = await recordFailure(db, reserved, nowSeconds);
+      const outcome = await recordFailure(db, reserved, nowSeconds());
       if (outcome.locked) {
         return lockout(c, outcome.retryAfterSeconds);
       }
@@ -149,7 +151,7 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
         }),
       );
     }
-    const expiresAt = nowSeconds + SESSION_TTL_SECONDS;
+    const expiresAt = nowSeconds() + SESSION_TTL_SECONDS;
     const token = await signSession(await keys.key(db, expected), expiresAt);
     return c.json({ token, expiresAt: isoSeconds(expiresAt) });
   });

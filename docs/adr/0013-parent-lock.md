@@ -53,8 +53,10 @@ Option 1.
   PIN is compared, so parallel requests cannot test more than 5 PINs per lockout period:
   one D1 batch inserts the attempt row only if no lockout is active and fewer than 5
   attempts are counted; not reserved → 429 without comparing. A wrong PIN keeps the row,
-  marked as a settled failure that never ages out (the one that reaches the limit sets the
-  lockout and raises the level). The failures behind a lockout are dropped by the first
+  marked as a settled failure that never ages out and is written even if the reservation
+  has aged out meanwhile (the one that reaches the limit sets the lockout and raises the
+  level). Every step uses the time at which it runs, not the time the request started,
+  so a slowly sent request cannot place its attempt or its lockout in the past. The failures behind a lockout are dropped by the first
   attempt after it has ended, so the next period starts with a fresh count of 5 at the
   escalated level. A right PIN deletes its reservation, every settled failure and the
   level, so a parent's earlier typos do not count against the next unlock. Reservations of

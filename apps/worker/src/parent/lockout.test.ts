@@ -219,4 +219,34 @@ describe("lockout counting", () => {
       "[kidboard] parent unlock: wrong PIN, locked for 900 s after repeated wrong PINs",
     );
   });
+
+  it("counts a wrong PIN whose reservation aged out before it settled", async () => {
+    const slow = await reserve(T0);
+    // Another attempt 15 min + 1 s later drops the unsettled reservation.
+    expect(await wrongPin(T0 + RESERVATION_TTL_SECONDS + 1)).toMatchObject({
+      attemptsLeft: 4,
+    });
+    expect(
+      await recordFailure(db(), slow, T0 + RESERVATION_TTL_SECONDS + 2),
+    ).toEqual({ locked: false, attemptsLeft: 3 });
+    expect(
+      (await attemptKeys()).filter((k) => k.startsWith("parent_fail:s:")),
+    ).toHaveLength(2);
+  });
+
+  it("starts the lockout at the time of the failure, not of the reservation", async () => {
+    for (let i = 0; i < 4; i++) {
+      await wrongPin(T0 + i);
+    }
+    const reserved = await reserve(T0 + 10);
+    const settleAt = T0 + 10 + 600;
+    expect(await recordFailure(db(), reserved, settleAt)).toEqual({
+      locked: true,
+      retryAfterSeconds: 900,
+    });
+    expect(await reserveAttempt(db(), settleAt + 1)).toEqual({
+      ok: false,
+      retryAfterSeconds: 899,
+    });
+  });
 });

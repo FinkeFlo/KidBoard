@@ -19,15 +19,21 @@ export const RESERVATION_TTL_SECONDS = 15 * 60;
 export const MAX_LOCKOUT_SECONDS = 2 * 60 * 60;
 
 /**
- * `kb_meta` keys: one row per attempt (→ epoch seconds of the attempt), reserved as
- * `parent_fail:<uuid>` before the PIN is compared; a wrong PIN renames it to
- * `parent_fail:s:<uuid>` (settled failure), a right PIN deletes it together with every
- * settled failure. Plus the end of the latest lockout (`parent_lock_until` → epoch
+ * `kb_meta` keys: one row per attempt, reserved as `parent_fail:<uuid>` (→ epoch
+ * seconds of the reservation) before the PIN is compared; a wrong PIN replaces it with
+ * `parent_fail:s:<uuid>` (settled failure, → epoch seconds of the settle step), a right
+ * PIN deletes it together with every settled failure. Plus the end of the latest lockout (`parent_lock_until` → epoch
  * seconds; the row stays after the lockout ended) and the number of lockouts since the
  * last right PIN (`parent_lock_level`). Reservations lie in the key range
  * `(FAIL_PREFIX, SETTLED_PREFIX)` (a UUID starts with a hex digit, which sorts before
  * `s`) and settled failures in `(SETTLED_PREFIX, SETTLED_END)`, so the primary key index
  * serves the scans.
+ *
+ * Every step reads the clock when it runs (the caller passes a fresh time per call), so
+ * a request whose body arrived late cannot write an old time. The settle step inserts
+ * the settled row whether or not the reservation is still there: a compared wrong PIN
+ * is always counted, even if its reservation has aged out in the meantime. The lockout
+ * end is computed from the time of the settle step, so a lockout always lies ahead.
  *
  * Life of the settled rows: they stay counted until a right PIN deletes them. The
  * failure that brings the count to {@link MAX_FAILURES} sets the lockout and keeps its
@@ -58,7 +64,7 @@ export interface Refused {
   retryAfterSeconds: number;
 }
 
-/** A reserved attempt: settle it with `fail` or `release` once the PIN is compared. */
+/** A reserved attempt: settle it with `recordFailure` or `clearFailures` once the PIN is compared. */
 export interface Reservation {
   ok: true;
   id: string;
@@ -167,8 +173,8 @@ export async function reserveAttempt(
  * requests whose PIN is still being compared, not only settled failures. Deliberate:
  * it errs on the closed side and differs only while attempts run in parallel, which one
  * family tablet does not produce (a parent types one PIN at a time). The settle write
- * (rename to the settled key range) decides what a later right PIN clears and that the
- * row no longer ages out.
+ * (into the settled key range) decides what a later right PIN clears and that the row
+ * no longer ages out. `nowSeconds` must be read right before the call.
  */
 export async function recordFailure(
   db: D1Database,
@@ -180,9 +186,16 @@ export async function recordFailure(
          AND NOT EXISTS (SELECT 1 FROM kb_meta WHERE key = ?5 AND value > ?6)`;
   const results = await db.batch<{ value: unknown }>([
     // Settle the reservation: it stays counted, now as a failure a right PIN clears.
+    // Delete + insert rather than a rename: the settled row is written even if the
+    // reservation has already aged out, so no compared wrong PIN goes uncounted.
     db
-      .prepare("UPDATE kb_meta SET key = ?1 WHERE key = ?2")
-      .bind(SETTLED_PREFIX + reservation.id, FAIL_PREFIX + reservation.id),
+      .prepare("DELETE FROM kb_meta WHERE key = ?1")
+      .bind(FAIL_PREFIX + reservation.id),
+    db
+      .prepare(
+        "INSERT INTO kb_meta (key, value) VALUES (?1, ?2) ON CONFLICT (key) DO NOTHING",
+      )
+      .bind(SETTLED_PREFIX + reservation.id, nowSeconds),
     // Raise the level first; the lock below is sized from the raised level.
     db
       .prepare(
@@ -226,8 +239,8 @@ export async function recordFailure(
       .bind(FAIL_PREFIX, SETTLED_PREFIX, SETTLED_END, reservationStart),
     db.prepare("SELECT value FROM kb_meta WHERE key = ?1").bind(LOCK_KEY),
   ]);
-  const count = asNumber(results[3]?.results[0]?.value) ?? 0;
-  const lockedUntil = asNumber(results[4]?.results[0]?.value) ?? 0;
+  const count = asNumber(results[4]?.results[0]?.value) ?? 0;
+  const lockedUntil = asNumber(results[5]?.results[0]?.value) ?? 0;
   if (lockedUntil > nowSeconds) {
     const retryAfterSeconds = lockedUntil - nowSeconds;
     logWarn(
