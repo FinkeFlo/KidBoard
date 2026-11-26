@@ -18,7 +18,7 @@ import {
  */
 
 /** Low-entropy synthetic token (gitleaks-friendly). */
-const TOKEN = "TESTONLY-not-a-secret";
+const TOKEN = "TESTONLY-not-a-secret-access-token-000000";
 
 /** Today (Sunday) and tomorrow (Monday) have their own events. */
 const AGENDA = agenda(

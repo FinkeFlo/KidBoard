@@ -16,7 +16,7 @@ import { DataProvider } from "./DataProvider";
 import type { KeyValueStorage } from "./storage";
 
 /** Low-entropy synthetic token (gitleaks-friendly). */
-export const TEST_TOKEN = "TESTONLY-not-a-secret";
+export const TEST_TOKEN = "TESTONLY-not-a-secret-access-token-000000";
 
 export const TODAY = "2026-11-22";
 
