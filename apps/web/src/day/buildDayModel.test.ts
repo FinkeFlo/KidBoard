@@ -277,6 +277,35 @@ describe("buildDayModel", () => {
     ]);
   });
 
+  it("orders by band, not by instant, when a boundary lies inside the repeated hour", () => {
+    // The only case where the band decides against the start instant: on the
+    // fall-back night 02:00-03:00 runs twice, and with middayStart at 02:30 the
+    // earlier instant (02:40 CEST = 00:40Z) lies in the later band, the later
+    // instant (02:10 CET = 01:10Z) in the earlier one.
+    const config: DayModelConfig = {
+      timeZone: "Europe/Berlin",
+      bands: {
+        morningStart: "01:00",
+        middayStart: "02:30",
+        eveningStart: "17:00",
+      },
+    };
+    const day = "2026-10-25";
+    const events = [
+      timed("cest", "2026-10-25T02:40:00+02:00", "2026-10-25T02:50:00+02:00"),
+      timed("cet", "2026-10-25T02:10:00+01:00", "2026-10-25T02:20:00+01:00"),
+    ];
+    expect(Date.parse("2026-10-25T02:40:00+02:00")).toBeLessThan(
+      Date.parse("2026-10-25T02:10:00+01:00"),
+    );
+    const now = Date.parse("2026-10-25T08:00:00+01:00");
+    const model = buildDayModel({ events, meals: [] }, config, day, now);
+    expect(model.events.map((e) => [e.event.id, e.timeOfDay])).toEqual([
+      ["cet", "morning"],
+      ["cest", "midday"],
+    ]);
+  });
+
   it("marks past, current and upcoming events from now", () => {
     const events = [
       timed("over", "2026-11-22T08:00:00+01:00", "2026-11-22T09:00:00+01:00"),
