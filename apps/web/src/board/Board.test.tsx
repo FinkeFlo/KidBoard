@@ -14,16 +14,13 @@ import {
   mealFixture,
   MIA,
 } from "../components/fixtures.test-utils";
-import { createApiClient } from "../data/apiClient";
-import { createQueryClient } from "../data/queryClient";
 import {
   agendaFixture,
   configFixture,
   createFakeFetch,
   createMemoryStorage,
-  dataWrapper,
+  fakeBoardWrapper,
   type FakeFetch,
-  TEST_TOKEN,
 } from "../data/testing.test-utils";
 import { STALE_BANNER_DELAY_MS } from "../day/DiscreetStatusBanner";
 import { applyLocale } from "../i18n";
@@ -38,13 +35,11 @@ let fake: FakeFetch;
 let clients: QueryClient[] = [];
 
 function renderDay(): void {
-  const client = createQueryClient({ retry: false });
-  clients.push(client);
-  const Wrapper = dataWrapper(
-    createApiClient({ fetch: fake.fetch, token: TEST_TOKEN }),
-    client,
-    createMemoryStorage(),
-  );
+  const Wrapper = fakeBoardWrapper({
+    fake,
+    storage: createMemoryStorage(),
+    clients,
+  });
   render(
     <Wrapper>
       <Board />
