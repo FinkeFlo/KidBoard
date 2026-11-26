@@ -111,7 +111,8 @@ This way needs no GitHub account and no git, only:
 - pnpm 10: after installing Node, run `corepack enable` once.
 
 1. Get KidBoard: on the [repository page](https://github.com/FinkeFlo/kidboard) choose
-   **Code > Download ZIP** (the current `main`) and unpack it. If you use git, cloning
+   **Code > Download ZIP** (the current `main`; once there are releases, the source
+   archive of the latest release works the same way) and unpack it. If you use git, cloning
    works just as well: `git clone https://github.com/FinkeFlo/kidboard.git`.
 2. Open a terminal in the unpacked folder and run:
 
@@ -137,10 +138,14 @@ name: copy `.dev.vars.example` to `.dev.vars.production`, fill it in, run
 `pnpm exec wrangler secret bulk .dev.vars.production` and delete the file afterwards.
 
 Updating later: download the ZIP again and unpack it into a new, empty folder (do not mix
-it with the old one), then run `pnpm install` and `pnpm deploy:cloudflare` there (log in
-again with `pnpm exec wrangler login` if Wrangler asks). With a clone:
-`git pull && pnpm install && pnpm deploy:cloudflare`. Your secrets, settings and entries
-stay in Cloudflare either way.
+it with the old one). Keep the old folder: on the first deploy Wrangler writes the ids of
+the KV namespace and the D1 database it created into its `wrangler.jsonc`. Copy its
+`"kv_namespaces"` and `"d1_databases"` entries over the same entries in the new folder's
+`wrangler.jsonc`, so the new version keeps using your existing data. Then run
+`pnpm install` and `pnpm deploy:cloudflare` in the new folder (log in again with
+`pnpm exec wrangler login` if Wrangler asks). With a clone:
+`git pull && pnpm install && pnpm deploy:cloudflare`. Your secrets stay in Cloudflare
+either way.
 
 ## 5. Check the deployment
 

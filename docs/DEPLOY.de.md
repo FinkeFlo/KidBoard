@@ -114,7 +114,8 @@ Dieser Weg braucht kein GitHub-Konto und kein git, nur:
 - pnpm 10: nach der Installation von Node einmal `corepack enable` ausführen.
 
 1. KidBoard holen: auf der [Repository-Seite](https://github.com/FinkeFlo/kidboard)
-   **Code > Download ZIP** wählen (der aktuelle Stand von `main`) und entpacken. Wer git
+   **Code > Download ZIP** wählen (der aktuelle Stand von `main`; sobald es Releases gibt,
+   geht das Quellcode-Archiv des neuesten Release genauso) und entpacken. Wer git
    nutzt, kann genauso klonen: `git clone https://github.com/FinkeFlo/kidboard.git`.
 2. Ein Terminal im entpackten Ordner öffnen und ausführen:
 
@@ -141,10 +142,16 @@ Git ignoriert wird: `.dev.vars.example` nach `.dev.vars.production` kopieren, au
 löschen.
 
 Später aktualisieren: das ZIP erneut herunterladen und in einen neuen, leeren Ordner
-entpacken (nicht mit dem alten mischen), dort `pnpm install` und `pnpm deploy:cloudflare`
-ausführen (fragt Wrangler danach, erneut mit `pnpm exec wrangler login` anmelden). Mit
-einem Klon: `git pull && pnpm install && pnpm deploy:cloudflare`. Secrets, Einstellungen und
-Einträge bleiben in jedem Fall in Cloudflare.
+entpacken (nicht mit dem alten mischen). Den alten Ordner behalten: Beim ersten Deploy
+schreibt Wrangler die IDs des angelegten KV-Namespace und der D1-Datenbank in dessen
+`wrangler.jsonc`. Dessen Einträge
+`"kv_namespaces"` und `"d1_databases"` über dieselben Einträge in der `wrangler.jsonc` des
+neuen Ordners kopieren, damit die neue
+Version deine vorhandenen Daten weiter nutzt. Dann im neuen Ordner `pnpm install` und
+`pnpm deploy:cloudflare` ausführen (fragt Wrangler danach, erneut mit
+`pnpm exec wrangler login` anmelden). Mit einem Klon:
+`git pull && pnpm install && pnpm deploy:cloudflare`. Die Secrets bleiben in jedem Fall in
+Cloudflare.
 
 ## 5. Deployment prüfen
 
