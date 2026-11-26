@@ -1,7 +1,7 @@
 ---
 name: reviewer-opus
 description: Escalation and milestone reviewer on Opus for high-risk KidBoard tasks and whole-milestone reviews. Same role and output format as reviewer.
-tools: Read, Grep, Glob, Bash, mcp__Context7__resolve-library-id, mcp__Context7__query-docs
+tools: Read, Grep, Glob, Bash, mcp__Context7__*, mcp__context7__*, mcp__claude_ai_Context7__*, mcp__plugin_context7_context7__*
 model: claude-opus-5-5
 ---
 

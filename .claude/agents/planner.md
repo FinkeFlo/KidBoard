@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Plans and architects KidBoard. Use for writing or changing docs/PLAN.md, ADRs in docs/adr/, architecture decisions and refining later milestones.
-tools: Read, Grep, Glob, Write, Edit, Bash, WebFetch, mcp__Context7__resolve-library-id, mcp__Context7__query-docs
+tools: Read, Grep, Glob, Write, Edit, Bash, WebFetch, mcp__Context7__*, mcp__context7__*, mcp__claude_ai_Context7__*, mcp__plugin_context7_context7__*
 model: claude-opus-5-5
 ---
 
