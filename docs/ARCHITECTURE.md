@@ -328,17 +328,22 @@ a new PIN or a new database ends every session. Wrong PIN → `403 wrong_pin` wi
 `attemptsLeft` (401 stays the access token's). Each attempt is reserved before the
 compare (`parent/lockout.ts`, D1 only) by one D1 batch whose
 conditional insert of a `kb_meta` row `parent_fail:<uuid>` → epoch s succeeds only
-without an active `parent_lock_until` and with fewer than 5 rows in the last 15 min (older
-rows are dropped); not reserved → `429 parent_lockout` with `Retry-After`, no compare. A
-wrong PIN renames the row to `parent_fail:s:<uuid>` (a settled failure; still counted)
-and, as the 5th in 15 min, writes `parent_lock_until` and raises `parent_lock_level` (the
-lock lasts 15 min x 2^(level-1), capped at 2 h, also answered with 429); a right PIN deletes
-its own row, every settled failure and the level, so earlier typos of the parent no longer
-count. Reservations of parallel attempts
+without an active `parent_lock_until` and with fewer than 5 counted attempts (every
+settled failure plus the reservations of the last 15 min; older, never settled
+reservations are dropped); not reserved → `429 parent_lockout` with `Retry-After`, no
+compare. A wrong PIN renames the row to `parent_fail:s:<uuid>` (a settled failure; counted
+until the next right PIN, it does not age out) and, as the 5th counted attempt, writes
+`parent_lock_until` and raises `parent_lock_level` (the lock lasts 15 min x 2^(level-1),
+capped at 2 h, also answered with 429). The first reservation after a lockout has ended
+deletes the settled failures older than its end, so the next period counts from 5 again
+at the escalated level. A right PIN deletes its own row, every settled failure and the
+level, so earlier typos of the parent no longer count. Reservations of parallel attempts
 still being compared are kept, so at most 5 PINs are compared at once, and without the
-right PIN at most 5 per window. If deleting the rows after a right PIN fails, the session is still issued and the delete is
-retried once past the response (`waitUntil`); rows left behind age out with the window.
-The lock condition counts all attempts in the window, including parallel ones still being
+right PIN at most 5 per lockout period. If deleting the rows after a right PIN fails, the
+session is still issued and the delete is retried once past the response (`waitUntil`);
+if that fails too, the reservation ages out after 15 min and the settled failures stay
+until the next right PIN.
+The lock condition counts all counted attempts, including parallel ones still being
 compared, not only settled failures: deliberately conservative; it differs only for
 parallel attempts, which one tablet does not produce.
 `requireParentSession` (`parent/session.ts`) guards editor routes: it verifies

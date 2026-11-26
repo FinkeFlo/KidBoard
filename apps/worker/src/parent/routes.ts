@@ -60,8 +60,8 @@ function isoSeconds(epochSeconds: number): string {
  *   token) → 404 `not_found`; bodies over {@link MAX_PARENT_BODY_BYTES} → 413
  *   `payload_too_large`;
  * * `POST /unlock` `{ pin }` → `{ token, expiresAt }` (15 min); wrong PIN → 403
- *   `wrong_pin` with `attemptsLeft`; the 5th wrong PIN within 15 min and every request
- *   during the following lockout (15 min, doubling per repeated lockout, at most 2 h)
+ *   `wrong_pin` with `attemptsLeft`; every 5th wrong PIN since the last right PIN and
+ *   every request during the following lockout (15 min, doubling per repeated lockout, at most 2 h)
  *   → 429 `parent_lockout` with `Retry-After`. Each attempt is reserved against the
  *   limit before the PIN is compared; the right PIN clears the wrong ones and the
  *   escalation (see `lockout.ts`);
@@ -135,7 +135,8 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
     } catch (error) {
       // The PIN was right: go on with the session and retry the delete past the
       // response, so the attempt does not stay counted against the lockout. If the
-      // retry fails too, the row ages out with the 15-minute window.
+      // retry fails too, the reservation ages out after 15 minutes; earlier wrong PINs
+      // stay counted until the next right PIN.
       logWarn(
         `parent unlock: releasing the attempt failed (${errorName(error)}), retrying`,
       );

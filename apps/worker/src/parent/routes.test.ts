@@ -324,13 +324,14 @@ describe("lockout", () => {
     expect((await h.unlock(PIN)).status).toBe(200);
   });
 
-  it("does not lock for 5 failures spread over more than 15 minutes", async () => {
+  it("also locks for 5 failures spread over more than 15 minutes", async () => {
     const h = harness();
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 4; i++) {
       expect((await h.unlock(OTHER_PIN)).status).toBe(403);
-      h.clock.now += 4 * MINUTE; // 0, 4, 8, 12, 16 → never 5 within 15 min
+      h.clock.now += 4 * MINUTE; // 0, 4, 8, 12, 16: wrong PINs do not age out
     }
-    expect((await h.unlock(PIN)).status).toBe(200);
+    expect((await h.unlock(OTHER_PIN)).status).toBe(429);
+    expect((await h.unlock(PIN)).status).toBe(429);
   });
 
   it("is shared through D1 across isolates", async () => {

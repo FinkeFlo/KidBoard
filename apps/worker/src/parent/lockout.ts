@@ -3,33 +3,56 @@ import { PARENT_LOCKOUT_SECONDS } from "@kidboard/shared";
 import { logWarn } from "../log";
 
 /**
- * ADR-0013: 5 wrong PINs within 15 minutes lock the unlock route. The first lockout
- * lasts {@link PARENT_LOCKOUT_SECONDS}; every further lockout without a right PIN in between
- * doubles it (15 min, 30, 60, 120 up to {@link MAX_LOCKOUT_SECONDS}), so guessing a PIN
- * through the lockout never gets cheaper than a few hundred tries per year.
+ * ADR-0013: wrong PINs count since the last right PIN, not per time window. Every
+ * {@link MAX_FAILURES}th wrong PIN locks the unlock route. The first lockout lasts
+ * {@link PARENT_LOCKOUT_SECONDS}; every further lockout without a right PIN in between
+ * doubles it (15 min, 30, 60, 120 up to {@link MAX_LOCKOUT_SECONDS}), so at most
+ * {@link MAX_FAILURES} PINs are compared per lockout period and guessing a PIN through
+ * the lockout never gets cheaper than a few hundred tries per year. Spreading wrong PINs
+ * over time does not help: they do not age out.
  */
 export const MAX_FAILURES = 5;
-export const FAILURE_WINDOW_SECONDS = 15 * 60;
+/**
+ * How long an *unsettled* reservation (an attempt whose PIN compare never reported
+ * back, e.g. a crashed request) stays counted. Settled failures never age out.
+ */
+export const RESERVATION_TTL_SECONDS = 15 * 60;
 export const MAX_LOCKOUT_SECONDS = 2 * 60 * 60;
 
 /**
  * `kb_meta` keys: one row per attempt (→ epoch seconds of the attempt), reserved as
  * `parent_fail:<uuid>` before the PIN is compared; a wrong PIN renames it to
  * `parent_fail:s:<uuid>` (settled failure), a right PIN deletes it together with every
- * settled failure. Plus the end of an active lockout (`parent_lock_until` → epoch
- * seconds) and the number of lockouts since the last right PIN (`parent_lock_level`).
- * All attempt keys lie in the key range `(FAIL_PREFIX, FAIL_END)` and the settled ones
- * in `(SETTLED_PREFIX, SETTLED_END)` (a UUID never starts with `s`), so the primary key
- * index serves the scans.
+ * settled failure. Plus the end of the latest lockout (`parent_lock_until` → epoch
+ * seconds; the row stays after the lockout ended) and the number of lockouts since the
+ * last right PIN (`parent_lock_level`). Reservations lie in the key range
+ * `(FAIL_PREFIX, SETTLED_PREFIX)` (a UUID starts with a hex digit, which sorts before
+ * `s`) and settled failures in `(SETTLED_PREFIX, SETTLED_END)`, so the primary key index
+ * serves the scans.
+ *
+ * Life of the settled rows: they stay counted until a right PIN deletes them. The
+ * failure that brings the count to {@link MAX_FAILURES} sets the lockout and keeps its
+ * row, so during the lockout the rows show the attempts that caused it (and attempts
+ * that were still being compared when it started settle next to them; no new attempt
+ * is reserved while it runs). The first reservation after the lockout has ended deletes
+ * every settled row older than the end of that lockout (`value < parent_lock_until`): they
+ * were paid for with the lockout, so the next period starts with a fresh count of
+ * {@link MAX_FAILURES} at the escalated level. Rows reserved after the end have
+ * `value >= parent_lock_until` and are kept. The level stays until a right PIN.
  */
 const FAIL_PREFIX = "parent_fail:";
-const FAIL_END = "parent_fail;";
 const SETTLED_PREFIX = "parent_fail:s:";
 const SETTLED_END = "parent_fail:s;";
 const LOCK_KEY = "parent_lock_until";
 const LEVEL_KEY = "parent_lock_level";
-/** Attempt rows inside the window; binds ?1 = FAIL_PREFIX, ?2 = FAIL_END, ?3 = window start. */
-const IN_WINDOW = "key > ?1 AND key < ?2 AND value > ?3";
+
+/**
+ * Attempt rows that count against the limit: every settled failure plus the
+ * reservations younger than {@link RESERVATION_TTL_SECONDS}. Binds ?1 = FAIL_PREFIX,
+ * ?2 = SETTLED_PREFIX, ?3 = SETTLED_END, ?4 = oldest counted reservation time (exclusive).
+ */
+const COUNTED =
+  "((key > ?1 AND key < ?2 AND value > ?4) OR (key > ?2 AND key < ?3))";
 
 export interface Refused {
   ok: false;
@@ -54,24 +77,26 @@ function asNumber(value: unknown): number | null {
  * Unlock attempt limiter (ADR-0013); D1 is the only state, so it holds across isolates.
  * An attempt is *reserved* before the PIN is compared, atomically against the limit
  * (one batch whose conditional insert is the check), so parallel requests cannot test
- * more than MAX_FAILURES PINs per window. A wrong PIN keeps the reservation as a
- * settled failure and starts the lockout once the window holds MAX_FAILURES; a right
- * PIN deletes it, clears the settled failures of the window (the parent typed the PIN;
- * earlier typos no longer count) and resets the escalation. Reservations of attempts
- * still being compared stay counted, so even next to a right PIN no more than
- * MAX_FAILURES PINs are being compared at once.
+ * more than MAX_FAILURES PINs per lockout period. A wrong PIN keeps the reservation as
+ * a settled failure and starts the lockout once MAX_FAILURES attempts are counted; a
+ * right PIN deletes it, clears every settled failure (the parent typed the PIN; earlier
+ * typos no longer count) and resets the escalation. Reservations of attempts still
+ * being compared stay counted, so even next to a right PIN no more than MAX_FAILURES
+ * PINs are being compared at once. A reservation that never settles (crashed request)
+ * stops counting after RESERVATION_TTL_SECONDS, so it cannot lock parents out forever.
  */
 
 /**
- * Reserves a new attempt: drops attempts older than the window, inserts the attempt
- * row only if no lockout is active and the window holds fewer than
- * {@link MAX_FAILURES} rows, and reads back whether it was inserted.
+ * Reserves a new attempt: drops reservations older than {@link RESERVATION_TTL_SECONDS}
+ * and the settled failures paid for by a lockout that has ended, inserts the attempt
+ * row only if no lockout is active and fewer than {@link MAX_FAILURES} attempts are
+ * counted, and reads back whether it was inserted.
  */
 export async function reserveAttempt(
   db: D1Database,
   nowSeconds: number,
 ): Promise<Reservation | Refused> {
-  const windowStart = nowSeconds - FAILURE_WINDOW_SECONDS;
+  const reservationStart = nowSeconds - RESERVATION_TTL_SECONDS;
   const id = crypto.randomUUID();
   const key = FAIL_PREFIX + id;
   const results = await db.batch<{ value: unknown }>([
@@ -79,18 +104,27 @@ export async function reserveAttempt(
       .prepare(
         "DELETE FROM kb_meta WHERE key > ?1 AND key < ?2 AND value <= ?3",
       )
-      .bind(FAIL_PREFIX, FAIL_END, windowStart),
+      .bind(FAIL_PREFIX, SETTLED_PREFIX, reservationStart),
+    // Strict `<`: a failure reserved in the second the lockout ended is a new one.
+    db
+      .prepare(
+        `DELETE FROM kb_meta WHERE key > ?1 AND key < ?2
+           AND (SELECT value FROM kb_meta WHERE key = ?3) <= ?4
+           AND value < (SELECT value FROM kb_meta WHERE key = ?3)`,
+      )
+      .bind(SETTLED_PREFIX, SETTLED_END, LOCK_KEY, nowSeconds),
     db
       .prepare(
         `INSERT INTO kb_meta (key, value)
-         SELECT ?4, ?5
-         WHERE NOT EXISTS (SELECT 1 FROM kb_meta WHERE key = ?6 AND value > ?5)
-           AND (SELECT COUNT(*) FROM kb_meta WHERE ${IN_WINDOW}) < ?7`,
+         SELECT ?5, ?6
+         WHERE NOT EXISTS (SELECT 1 FROM kb_meta WHERE key = ?7 AND value > ?6)
+           AND (SELECT COUNT(*) FROM kb_meta WHERE ${COUNTED}) < ?8`,
       )
       .bind(
         FAIL_PREFIX,
-        FAIL_END,
-        windowStart,
+        SETTLED_PREFIX,
+        SETTLED_END,
+        reservationStart,
         key,
         nowSeconds,
         LOCK_KEY,
@@ -100,44 +134,51 @@ export async function reserveAttempt(
       .prepare("SELECT COUNT(*) AS value FROM kb_meta WHERE key = ?1")
       .bind(key),
     db.prepare("SELECT value FROM kb_meta WHERE key = ?1").bind(LOCK_KEY),
+    // Only reservations: settled failures never age out, so they set no retry time.
     db
-      .prepare(`SELECT MIN(value) AS value FROM kb_meta WHERE ${IN_WINDOW}`)
-      .bind(FAIL_PREFIX, FAIL_END, windowStart),
+      .prepare(
+        "SELECT MIN(value) AS value FROM kb_meta WHERE key > ?1 AND key < ?2",
+      )
+      .bind(FAIL_PREFIX, SETTLED_PREFIX),
   ]);
-  if (asNumber(results[2]?.results[0]?.value) === 1) {
+  if (asNumber(results[3]?.results[0]?.value) === 1) {
     return { ok: true, id };
   }
-  const lockedUntil = asNumber(results[3]?.results[0]?.value) ?? 0;
-  const oldest = asNumber(results[4]?.results[0]?.value);
+  const lockedUntil = asNumber(results[4]?.results[0]?.value) ?? 0;
+  const oldestReservation = asNumber(results[5]?.results[0]?.value);
+  // Without an active lockout the limit is full only while attempts are still being
+  // compared (the failure that fills it sets the lockout): they settle in moments, at
+  // the latest their reservations age out.
   const retryAt =
     lockedUntil > nowSeconds
       ? lockedUntil
-      : (oldest ?? nowSeconds) + FAILURE_WINDOW_SECONDS;
+      : (oldestReservation ?? nowSeconds) + RESERVATION_TTL_SECONDS;
   return { ok: false, retryAfterSeconds: Math.max(1, retryAt - nowSeconds) };
 }
 
 /**
- * The reserved attempt was a wrong PIN: it stays counted; once the window holds
- * {@link MAX_FAILURES} attempts and no lockout is active, the lockout starts and its
- * level rises (duration {@link PARENT_LOCKOUT_SECONDS} doubled per earlier lockout, at most
+ * The reserved attempt was a wrong PIN: it stays counted; once {@link MAX_FAILURES}
+ * attempts are counted and no lockout is active, the lockout starts and its level rises
+ * (duration {@link PARENT_LOCKOUT_SECONDS} doubled per earlier lockout, at most
  * {@link MAX_LOCKOUT_SECONDS}). Both conditional inserts test the same state, and the
- * batch is one transaction, so parallel failures escalate once.
+ * batch is one transaction, so parallel failures escalate once. Every wrong PIN is
+ * logged (counts only; this function never sees the PIN).
  *
- * The lock condition counts every attempt in the window, including reservations of
- * parallel requests whose PIN is still being compared, not only settled failures.
- * Deliberate: it errs on the closed side and differs only while attempts run in
- * parallel, which one family tablet does not produce (a parent types one PIN at a
- * time). The settle write (rename to the settled key range) only decides what a
- * later right PIN clears.
+ * The lock condition counts every counted attempt, including reservations of parallel
+ * requests whose PIN is still being compared, not only settled failures. Deliberate:
+ * it errs on the closed side and differs only while attempts run in parallel, which one
+ * family tablet does not produce (a parent types one PIN at a time). The settle write
+ * (rename to the settled key range) decides what a later right PIN clears and that the
+ * row no longer ages out.
  */
 export async function recordFailure(
   db: D1Database,
   reservation: Reservation,
   nowSeconds: number,
 ): Promise<FailureOutcome> {
-  const windowStart = nowSeconds - FAILURE_WINDOW_SECONDS;
-  const mustLock = `(SELECT COUNT(*) FROM kb_meta WHERE ${IN_WINDOW}) >= ?6
-         AND NOT EXISTS (SELECT 1 FROM kb_meta WHERE key = ?4 AND value > ?5)`;
+  const reservationStart = nowSeconds - RESERVATION_TTL_SECONDS;
+  const mustLock = `(SELECT COUNT(*) FROM kb_meta WHERE ${COUNTED}) >= ?7
+         AND NOT EXISTS (SELECT 1 FROM kb_meta WHERE key = ?5 AND value > ?6)`;
   const results = await db.batch<{ value: unknown }>([
     // Settle the reservation: it stays counted, now as a failure a right PIN clears.
     db
@@ -147,14 +188,15 @@ export async function recordFailure(
     db
       .prepare(
         `INSERT INTO kb_meta (key, value)
-         SELECT ?7, 1
+         SELECT ?8, 1
          WHERE ${mustLock}
          ON CONFLICT (key) DO UPDATE SET value = value + 1`,
       )
       .bind(
         FAIL_PREFIX,
-        FAIL_END,
-        windowStart,
+        SETTLED_PREFIX,
+        SETTLED_END,
+        reservationStart,
         LOCK_KEY,
         nowSeconds,
         MAX_FAILURES,
@@ -163,15 +205,16 @@ export async function recordFailure(
     db
       .prepare(
         `INSERT INTO kb_meta (key, value)
-         SELECT ?4, ?5 + MIN(?8 * (1 << MIN(MAX(
-           (SELECT value FROM kb_meta WHERE key = ?7) - 1, 0), 20)), ?9)
+         SELECT ?5, ?6 + MIN(?9 * (1 << MIN(MAX(
+           (SELECT value FROM kb_meta WHERE key = ?8) - 1, 0), 20)), ?10)
          WHERE ${mustLock}
          ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
       )
       .bind(
         FAIL_PREFIX,
-        FAIL_END,
-        windowStart,
+        SETTLED_PREFIX,
+        SETTLED_END,
+        reservationStart,
         LOCK_KEY,
         nowSeconds,
         MAX_FAILURES,
@@ -180,17 +223,24 @@ export async function recordFailure(
         MAX_LOCKOUT_SECONDS,
       ),
     db
-      .prepare(`SELECT COUNT(*) AS value FROM kb_meta WHERE ${IN_WINDOW}`)
-      .bind(FAIL_PREFIX, FAIL_END, windowStart),
+      .prepare(`SELECT COUNT(*) AS value FROM kb_meta WHERE ${COUNTED}`)
+      .bind(FAIL_PREFIX, SETTLED_PREFIX, SETTLED_END, reservationStart),
     db.prepare("SELECT value FROM kb_meta WHERE key = ?1").bind(LOCK_KEY),
   ]);
   const count = asNumber(results[3]?.results[0]?.value) ?? 0;
   const lockedUntil = asNumber(results[4]?.results[0]?.value) ?? 0;
   if (lockedUntil > nowSeconds) {
-    logWarn("parent unlock locked after repeated wrong PINs");
-    return { locked: true, retryAfterSeconds: lockedUntil - nowSeconds };
+    const retryAfterSeconds = lockedUntil - nowSeconds;
+    logWarn(
+      `parent unlock: wrong PIN, locked for ${String(retryAfterSeconds)} s after repeated wrong PINs`,
+    );
+    return { locked: true, retryAfterSeconds };
   }
-  return { locked: false, attemptsLeft: Math.max(0, MAX_FAILURES - count) };
+  const attemptsLeft = Math.max(0, MAX_FAILURES - count);
+  logWarn(
+    `parent unlock: wrong PIN, ${String(attemptsLeft)} of ${String(MAX_FAILURES)} attempts left`,
+  );
+  return { locked: false, attemptsLeft };
 }
 
 /**
