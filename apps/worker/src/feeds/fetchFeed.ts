@@ -76,6 +76,11 @@ export async function fetchFeed(
     throw new FeedFetchError(signal.aborted ? "timeout" : "network");
   }
 
+  // Deliberately open for an empty `url`: per the Fetch standard only a `Response`
+  // constructed in code (`new Response(…)`, which the fetch mocks of five test files
+  // return) has one. A response that came over the network, as every response of the
+  // Workers runtime's fetch does, always carries its final URL, so production traffic
+  // is always checked. The configured URL itself is https (checked in `loadSource`).
   if (response.url !== "" && !isHttpsUrl(response.url)) {
     await cancelQuietly(response.body);
     throw new FeedFetchError("insecure-redirect");
