@@ -43,7 +43,9 @@ The gate must be green before every commit and pull request.
 
 [Conventional Commits](https://www.conventionalcommits.org/), e.g.
 `feat(web): add week view (T-18)`. [lefthook](https://lefthook.dev/) runs checks and
-commitlint on commit; do not bypass the hooks.
+commitlint on commit; do not bypass the hooks. If [gitleaks](https://github.com/gitleaks/gitleaks)
+is installed, the pre-commit hook also scans the staged changes with `.gitleaks.toml`
+(otherwise it is skipped with a note; CI always scans).
 
 ### Plan and ADR workflow
 
@@ -86,7 +88,9 @@ Commit und Pull Request grün sein. E2E-Tests: `pnpm test:e2e`, Formatieren: `pn
 
 [Conventional Commits](https://www.conventionalcommits.org/), z. B.
 `feat(web): add week view (T-18)`. lefthook prüft beim Commit (inkl. commitlint); Hooks nicht
-umgehen.
+umgehen. Ist [gitleaks](https://github.com/gitleaks/gitleaks) installiert, prüft der
+pre-commit-Hook auch die gestagten Änderungen mit `.gitleaks.toml` (sonst wird er mit
+Hinweis übersprungen; CI prüft immer).
 
 ### Plan- und ADR-Ablauf
 

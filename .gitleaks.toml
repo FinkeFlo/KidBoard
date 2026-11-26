@@ -1,0 +1,15 @@
+# gitleaks configuration (read from the repo root by `gitleaks git .` in CI and by the
+# lefthook pre-commit job). Keeps all built-in rules and adds KidBoard's main secret.
+title = "KidBoard gitleaks configuration"
+
+[extend]
+useDefault = true
+
+# The secret iCal address of a Google calendar: whoever has it can read the calendar.
+# Template placeholders (e.g. in `.dev.vars.example`) are not hex and do not match.
+[[rules]]
+id = "google-calendar-secret-ical-url"
+description = "Google Calendar secret iCal address"
+regex = '''calendar\.google\.com/calendar/ical/[^/\s"']+/private-[0-9a-f]{16,}/'''
+keywords = ["calendar/ical/"]
+tags = ["calendar", "url"]
