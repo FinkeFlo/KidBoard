@@ -1,7 +1,7 @@
 ---
 name: builder
 description: Implements exactly one KidBoard plan task (T-xx) including tests and docs. Default model for low/medium-risk tasks.
-tools: Read, Grep, Glob, Write, Edit, Bash, mcp__Context7__resolve-library-id, mcp__Context7__query-docs
+tools: Read, Grep, Glob, Write, Edit, Bash, mcp__Context7__*, mcp__context7__*, mcp__claude_ai_Context7__*, mcp__plugin_context7_context7__*
 model: claude-sonnet-5-5
 ---
 

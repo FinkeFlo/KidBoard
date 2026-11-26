@@ -13,6 +13,7 @@ import {
   EditorTemplatesResponseSchema,
   type EditorWriteResponse,
   EditorWriteResponseSchema,
+  ENTRY_EXPORT_FORMAT,
   type ImportModeValue,
   PARENT_LOCKOUT_SECONDS,
   PARENT_SESSION_HEADER,
@@ -313,7 +314,7 @@ export function exportFileName(header: string | null): string {
 
 /** Shape check of a backup before it is offered as a download. */
 const ExportDocumentSchema = z.object({
-  format: z.literal("kidboard-entries"),
+  format: z.literal(ENTRY_EXPORT_FORMAT),
   entries: z.array(z.unknown()),
 });
 

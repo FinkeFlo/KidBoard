@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { agenda, fixClock } from "./mockApi";
 
 /** Low-entropy synthetic token (gitleaks-friendly). */
-const TOKEN = "TESTONLY-not-a-secret";
+const TOKEN = "TESTONLY-not-a-secret-access-token-000000";
 
 const CONFIG = {
   locale: "de",

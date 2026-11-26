@@ -63,160 +63,103 @@ export interface SizeClasses {
   cue: string;
 }
 
+/** Per size, the fields that always differ, plus whatever differs from {@link BASE}. */
+type SizeOverrides = Pick<SizeClasses, "tile" | "disc" | "emoji" | "title"> &
+  Partial<SizeClasses>;
+
+/** Values shared by most sizes; each size overrides only what it changes. */
+const BASE: Omit<SizeClasses, "tile" | "disc" | "emoji" | "title"> = {
+  titleCut: "",
+  metaText: "text-meta",
+  allDayIcon: "size-6",
+  timeIcon: "text-[1.5rem]",
+  badge: "size-6",
+  badgeText: "text-caption",
+  badgeOverlap: "-ms-1.5",
+  badgeFloat: false,
+  stacked: false,
+  inline: false,
+  weekRow: false,
+  cue: "size-6",
+};
+
+/** A size's classes: {@link BASE} with `overrides` applied. */
+function withBase(overrides: SizeOverrides): SizeClasses {
+  return { ...BASE, ...overrides };
+}
+
 // Full class names so Tailwind can see them. Today's large emoji stay >= 3.5rem, medium
 // ones are 3rem and dense ones 2.75rem; slim tiles (the last step before "+N", so a whole
 // day still fits) put the title and time in one row next to a 2rem emoji (as on week tiles). The disc
 // leaves a thin light ring around the glyph.
 const SIZES: Record<TileSize, SizeClasses> = {
-  large: {
+  large: withBase({
     tile: "h-tile gap-3 ps-3 pe-3",
     disc: "size-[4.25rem]",
     emoji: "text-[3.5rem]",
     title: "text-tile line-clamp-2",
-    titleCut: "",
-    metaText: "text-meta",
-    allDayIcon: "size-6",
-    timeIcon: "text-[1.5rem]",
     badge: "size-6.5",
     badgeText: "text-meta",
-    badgeOverlap: "-ms-1.5",
     badgeFloat: true,
-    stacked: false,
-    inline: false,
-    weekRow: false,
-    cue: "size-6",
-  },
-  medium: {
+  }),
+  medium: withBase({
     tile: "h-18 gap-3 ps-3 pe-3",
     disc: "size-[3.75rem]",
     emoji: "text-[3rem]",
     title: "text-tile-compact line-clamp-2",
-    titleCut: "",
-    metaText: "text-meta",
-    allDayIcon: "size-6",
-    timeIcon: "text-[1.5rem]",
-    badge: "size-6",
-    badgeText: "text-caption",
-    badgeOverlap: "-ms-1.5",
     badgeFloat: true,
-    stacked: false,
-    inline: false,
-    weekRow: false,
-    cue: "size-6",
-  },
-  dense: {
+  }),
+  dense: withBase({
     tile: "h-14 gap-2.5 ps-2.5 pe-3",
     disc: "size-[3.125rem]",
     emoji: "text-[2.75rem]",
     title: "text-tile-compact line-clamp-1",
-    titleCut: "",
-    metaText: "text-meta",
-    allDayIcon: "size-6",
-    timeIcon: "text-[1.5rem]",
     badge: "size-7",
     badgeText: "text-body",
     badgeOverlap: "-ms-1.75",
-    badgeFloat: false,
-    stacked: false,
-    inline: false,
-    weekRow: false,
-    cue: "size-6",
-  },
-  slim: {
+  }),
+  slim: withBase({
     tile: "h-11 gap-2.5 ps-2 pe-3",
     disc: "size-9",
     emoji: "text-[2rem]",
     title: "text-tile-compact",
-    titleCut: "",
-    metaText: "text-meta",
-    allDayIcon: "size-6",
-    timeIcon: "text-[1.5rem]",
-    badge: "size-6",
-    badgeText: "text-caption",
-    badgeOverlap: "-ms-1.5",
-    badgeFloat: false,
-    stacked: false,
     inline: true,
-    weekRow: false,
     cue: "size-4",
-  },
-  compact: {
+  }),
+  compact: withBase({
     tile: "h-tile-compact gap-1.5 ps-1.5 pe-1.5",
     disc: "size-12",
     emoji: "text-[2.5rem]",
     title: "text-tile-compact line-clamp-2",
-    titleCut: "",
-    metaText: "text-meta",
-    allDayIcon: "size-6",
-    timeIcon: "text-[1.5rem]",
-    badge: "size-6",
-    badgeText: "text-caption",
-    badgeOverlap: "-ms-1.5",
     badgeFloat: true,
-    stacked: false,
-    inline: false,
-    weekRow: false,
-    cue: "size-6",
-  },
-  "compact-dense": {
+  }),
+  "compact-dense": withBase({
     tile: "h-15 gap-1.5 ps-1.5 pe-1.5",
     disc: "size-11",
     emoji: "text-[2.25rem]",
     title: "text-tile-compact line-clamp-1",
-    titleCut: "",
-    metaText: "text-meta",
-    allDayIcon: "size-6",
-    timeIcon: "text-[1.5rem]",
-    badge: "size-6",
-    badgeText: "text-caption",
-    badgeOverlap: "-ms-1.5",
-    badgeFloat: false,
-    stacked: false,
-    inline: false,
-    weekRow: false,
-    cue: "size-6",
-  },
+  }),
   // Week tiles stack emoji, the title and the time; the title shows where the column is
   // wide enough (container query on the column's list), else only the name has it. The
   // normal size gives it two lines (broken at spaces, never hyphenated), dense one.
-  week: {
+  week: withBase({
     tile: "h-29 flex-col justify-center gap-0.5 px-1.5",
     disc: null,
     emoji: "text-[2.5rem]",
     title: "text-meta leading-tight",
     titleCut: "line-clamp-2 break-words",
-    metaText: "text-meta",
-    allDayIcon: "size-6",
-    timeIcon: "text-[1.5rem]",
-    badge: "size-6",
-    badgeText: "text-caption",
-    badgeOverlap: "-ms-1.5",
-    badgeFloat: false,
     stacked: true,
-    inline: false,
-    weekRow: false,
-    cue: "size-6",
-  },
-  "week-dense": {
+  }),
+  "week-dense": withBase({
     tile: "h-21 flex-col justify-center gap-0.5 px-1.5",
     disc: null,
     emoji: "text-[2rem]",
     title: "text-caption",
     titleCut: "block truncate",
-    metaText: "text-meta",
-    allDayIcon: "size-6",
-    timeIcon: "text-[1.5rem]",
-    badge: "size-6",
-    badgeText: "text-caption",
-    badgeOverlap: "-ms-1.5",
-    badgeFloat: false,
     stacked: true,
-    inline: false,
-    weekRow: false,
-    cue: "size-6",
-  },
+  }),
   // Smaller emoji and time row, so one more stacked tile fits before the slim row.
-  "week-small": {
+  "week-small": withBase({
     tile: "h-19 flex-col justify-center gap-0.5 px-1.5",
     disc: null,
     emoji: "text-[1.75rem]",
@@ -228,16 +171,13 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badge: "size-5",
     badgeText: "text-[0.75rem]",
     badgeOverlap: "-ms-1.25",
-    badgeFloat: false,
     stacked: true,
-    inline: false,
-    weekRow: false,
     cue: "size-4",
-  },
+  }),
   // Last step before "+N" in a week column: a small emoji beside the title (with the
   // badges at its end) and the time, so a busy day keeps its titles and no event is
   // summed up while one more of these still fits.
-  "week-slim": {
+  "week-slim": withBase({
     tile: "h-12 gap-2 ps-1.5 pe-1",
     disc: null,
     emoji: "text-[1.75rem]",
@@ -249,12 +189,9 @@ const SIZES: Record<TileSize, SizeClasses> = {
     badge: "size-5",
     badgeText: "text-[0.75rem]",
     badgeOverlap: "-ms-1.25",
-    badgeFloat: false,
-    stacked: false,
-    inline: false,
     weekRow: true,
     cue: "size-4",
-  },
+  }),
 };
 
 /** Prominent (now / next) variants of today's sizes: taller, larger emoji and title. */

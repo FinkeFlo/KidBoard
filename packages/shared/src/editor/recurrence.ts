@@ -1,4 +1,5 @@
 import { addCalendarDays, calendarDaysBetween } from "../dates";
+import { pad } from "../pad";
 import type { EditorRepeat } from "./entry";
 import { startOfZonedDayMs } from "./zonedTime";
 
@@ -21,14 +22,10 @@ function compactDate(date: string): string {
   return date.replaceAll("-", "");
 }
 
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
 function compactUtc(epochMs: number): string {
   const at = new Date(epochMs);
   return (
-    `${String(at.getUTCFullYear()).padStart(4, "0")}${pad(at.getUTCMonth() + 1)}${pad(at.getUTCDate())}` +
+    `${pad(at.getUTCFullYear(), 4)}${pad(at.getUTCMonth() + 1)}${pad(at.getUTCDate())}` +
     `T${pad(at.getUTCHours())}${pad(at.getUTCMinutes())}${pad(at.getUTCSeconds())}Z`
   );
 }

@@ -1,6 +1,7 @@
 import {
   addCalendarDays,
   type AgendaResponse,
+  isoWeekday,
   type Meal,
 } from "@kidboard/shared";
 
@@ -33,11 +34,9 @@ export interface WeekDay {
   meals: Meal[];
 }
 
-/** Day of the week of a calendar date (0 = Sunday); pure calendar math, no time zone. */
+/** Saturday or Sunday (ISO weekday 6 or 7); pure calendar math, no time zone. */
 export function isWeekendDate(date: string): boolean {
-  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
-  const day = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-  return day === 0 || day === 6;
+  return isoWeekday(date) >= 6;
 }
 
 /**
@@ -97,10 +96,7 @@ export function buildWeekModel(
       date,
       isToday: offset === 0,
       isWeekend: isWeekendDate(date),
-      events: rankByImportance([
-        ...day.allDay,
-        ...day.bands.flatMap((band) => band.events),
-      ]),
+      events: rankByImportance([...day.allDay, ...day.events]),
       meals: day.meals,
     };
   });

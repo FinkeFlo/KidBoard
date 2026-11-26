@@ -16,14 +16,13 @@ never go into the repository: they are Worker secrets in your Cloudflare account
 You need:
 
 1. A free **Cloudflare account** (and for option A a GitHub or GitLab account).
-2. An **access token** (required): a random string of 32 to 256 characters (`A-Z a-z 0-9 _ -`),
-   for example the output of `openssl rand -hex 32`. Without a valid one the API refuses
-   every request (`500 server_misconfigured`), so your calendar is never public by accident.
-   A deliberately public board needs the explicit opt-in `KIDBOARD_PUBLIC="1"` (and no token).
-3. A **parent PIN** of 6 to 12 digits for the editor. Not a single repeated digit or a run
-   like `123456`, and no birthdays: the editor stays off with a log message if the PIN is too
-   easy to guess. Five wrong PINs lock the editor, the lock time doubles with every further
-   lockout (15 minutes up to 2 hours).
+2. An **access token** (required), for example the output of `openssl rand -hex 32`.
+   Without a valid one the API refuses every request, so your calendar is never public by
+   accident. Allowed length and characters, and the opt-in for a deliberately public board:
+   [CONFIG.md](CONFIG.md#secrets-and-environment-variables).
+3. A **parent PIN** of 6 to 12 digits for the editor, not easy to guess (no birthdays). Which
+   PINs are refused and how wrong PINs lock the editor:
+   [CONFIG.md](CONFIG.md#secrets-and-environment-variables).
 4. Your **settings** (`KIDBOARD_CONFIG`) as **one line of JSON**: children, time zone, ...
    The deploy form pre-fills an example with two children and no calendars. All options are
    in [CONFIG.md](CONFIG.md).
@@ -40,25 +39,34 @@ You need:
 
 ## 2. Secrets and variables
 
-The worker reads exactly these names (`apps/worker/src/env.ts`):
+The worker reads exactly these names (`apps/worker/src/env.ts`). What each one accepts, its
+default and what happens with a missing or invalid value:
+[CONFIG.md](CONFIG.md#secrets-and-environment-variables).
 
-| Name                       | Kind                | Required | Notes                                                                                            |
-| -------------------------- | ------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `CAL_<ID>_URL`             | secret              | per calendar (optional) | Only for calendars listed in `KIDBOARD_CONFIG`, e.g. `CAL_KINDER_URL`. A missing one only marks that calendar as `error`. |
-| `KIDBOARD_ACCESS_TOKEN`    | secret              | yes      | 32 to 256 characters `A-Z a-z 0-9 _ -`. Unset, empty, too short or still containing `REPLACE_ME`: the API answers `500` (fail closed). Needed for the editor. |
-| `KIDBOARD_PUBLIC`          | variable            | no       | `1` = public read-only board without a token (opt-in; ignored when a token is set). |
-| `KIDBOARD_CONFIG`          | secret or variable  | yes      | Single-line JSON. Missing/invalid: `/api/config` and `/api/agenda` answer `500`.                 |
-| `KIDBOARD_ALLOWED_ORIGINS` | variable            | no       | Only for cross-origin API use; the board itself is same-origin.                                  |
-| `KIDBOARD_CACHE_TTL`       | variable            | no       | Seconds a feed counts as fresh, default 3600.                                                    |
-| `KIDBOARD_CACHE`           | KV namespace binding | automatic | Declared without an id in `wrangler.jsonc`; Wrangler creates it on the first deploy.            |
-| `KIDBOARD_PARENT_PIN`      | secret              | no       | 6 to 12 digits; turns on the parent editor (with `KIDBOARD_DATA` and a valid `KIDBOARD_ACCESS_TOKEN`). Unset, invalid, too easy (`111111`, `123456`) or `REPLACE_ME`, or no valid access token = editor off. |
-| `KIDBOARD_DATA`            | D1 database binding | automatic | Entries made in the editor (ADR-0014). Declared without an id in `wrangler.jsonc`; Wrangler creates it on the first deploy, the worker creates its tables. |
-| `KIDBOARD_FEED_TOKEN`      | secret              | no       | Turns on the phone feed of the editor's entries (32 to 256 characters `A-Z a-z 0-9 _ -`); the parent area then shows the subscribe link. Unset = no feed. |
+| Name                       | Kind                 | Required                | What for                                         |
+| -------------------------- | -------------------- | ----------------------- | ------------------------------------------------ |
+| `CAL_<ID>_URL`             | secret               | per calendar (optional) | Secret iCal address of a calendar in `calendars` |
+| `KIDBOARD_ACCESS_TOKEN`    | secret               | yes                     | Protects the API; needed for the editor          |
+| `KIDBOARD_PUBLIC`          | variable             | no                      | Opt-in for a public board without a token        |
+| `KIDBOARD_CONFIG`          | secret or variable   | yes                     | Your settings as single-line JSON                |
+| `KIDBOARD_ALLOWED_ORIGINS` | variable             | no                      | Only for API use from another origin             |
+| `KIDBOARD_CACHE_TTL`       | variable             | no                      | Seconds a feed counts as fresh                   |
+| `KIDBOARD_CACHE`           | KV namespace binding | automatic               | Feed cache; created on the first deploy          |
+| `KIDBOARD_PARENT_PIN`      | secret               | no                      | Turns on the parent editor                       |
+| `KIDBOARD_DATA`            | D1 database binding  | automatic               | Editor entries; created on the first deploy      |
+| `KIDBOARD_FEED_TOKEN`      | secret               | no                      | Turns on the phone feed of the editor's entries  |
 
 Plain-text variables set in the dashboard survive later deploys (`keep_vars: true`);
 secrets always do. The template for all of them is [`.dev.vars.example`](../.dev.vars.example).
 
 ## 3. Option A: "Deploy to Cloudflare" button
+
+The quickest way, but it needs a free **GitHub or GitLab account**. Here is what happens:
+Cloudflare asks you to install its GitHub App **"Cloudflare Workers & Pages"** (or, for
+GitLab, its GitLab integration) and give it access to your repositories. It then creates a copy of KidBoard as a new repository in your
+account (private if you tick that box) and deploys it. Every later change pushed to that
+copy deploys again. No GitHub account? Use
+[option B](#4-option-b-from-your-computer-no-github-account-wrangler-cli).
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/FinkeFlo/kidboard)
 
@@ -83,21 +91,40 @@ secrets always do. The template for all of them is [`.dev.vars.example`](../.dev
      in the root `package.json` and the root `wrangler.jsonc`)
 
    Node.js 22 comes from `.nvmrc`, pnpm from the `packageManager` field.
-6. Create and deploy. The first build takes a few minutes.
+6. Create and deploy. The first build takes a few minutes. Then check the secrets
+   (replace `<url>`): `curl -s https://<url>/api/config` must answer `401 unauthorized`.
+   `500 server_misconfigured` means `KIDBOARD_ACCESS_TOKEN` or `KIDBOARD_CONFIG` is still
+   wrong (step 7 or [section 9](#9-troubleshooting)). On a brand-new database the very
+   first board load can take a few seconds or show an error once; reload.
 7. Google calendars or a changed setting: Workers & Pages > your Worker > Settings >
    Variables and Secrets. Add `calendars` to `KIDBOARD_CONFIG` and one `CAL_<ID>_URL` per
    calendar (Add, type "Secret"). Saving deploys a new version.
 
-## 4. Option B: from a local clone (Wrangler CLI)
+**Limit the app's access after the first deploy** (GitHub). The app may have been given
+access to all your repositories. Open <https://github.com/settings/installations>, choose
+"Cloudflare Workers & Pages" > Configure, set **Repository access** to **Only select
+repositories** and pick your new KidBoard repository. Cloudflare's docs describe how to
+limit it.
 
-Requires Node 22 and pnpm 10 (`corepack enable`).
+## 4. Option B: from your computer, no GitHub account (Wrangler CLI)
 
-```sh
-git clone https://github.com/FinkeFlo/kidboard.git && cd kidboard
-pnpm install
-pnpm exec wrangler login          # opens the browser once
-pnpm deploy:cloudflare            # builds apps/web, then `wrangler deploy`
-```
+This way needs no GitHub account and no git, only:
+
+- a free Cloudflare account,
+- [Node.js](https://nodejs.org/) 22 (LTS),
+- pnpm 10: after installing Node, run `corepack enable` once.
+
+1. Get KidBoard: on the [repository page](https://github.com/FinkeFlo/kidboard) choose
+   **Code > Download ZIP** (the current `main`; once there are releases, the source
+   archive of the latest release works the same way) and unpack it. If you use git, cloning
+   works just as well: `git clone https://github.com/FinkeFlo/kidboard.git`.
+2. Open a terminal in the unpacked folder and run:
+
+   ```sh
+   pnpm install
+   pnpm exec wrangler login          # opens the browser once
+   pnpm deploy:cloudflare            # builds apps/web, then `wrangler deploy`
+   ```
 
 The first deploy creates the Worker, its KV namespace and its D1 database. Then set the secrets (each command
 prompts for the value; every change is deployed at once):
@@ -114,7 +141,16 @@ Or all at once from a filled-in copy of the template, which is git-ignored becau
 name: copy `.dev.vars.example` to `.dev.vars.production`, fill it in, run
 `pnpm exec wrangler secret bulk .dev.vars.production` and delete the file afterwards.
 
-Updating later: `git pull && pnpm install && pnpm deploy:cloudflare`. Secrets stay.
+Updating later: download the ZIP again, unpack it into a new, empty folder (do not mix it
+with the old one) and run `pnpm install` and `pnpm deploy:cloudflare` there (log in again
+with `pnpm exec wrangler login` if Wrangler asks). With a clone:
+`git pull && pnpm install && pnpm deploy:cloudflare`. Your secrets, the cache and the
+editor's entries stay: the deploy reuses the storage of the Worker already deployed under
+the same name, so you do not need to keep the ids Wrangler may write into `wrangler.jsonc`.
+This holds as long as the Worker keeps its name (`kidboard`) and your Cloudflare account. A
+renamed Worker or another account starts with an empty cache and an empty database: save a
+backup in the editor first ("Download backup", see
+[the parent editor](../README.md#the-parent-editor)).
 
 ## 5. Check the deployment
 
@@ -195,9 +231,10 @@ which Workers Static Assets applies to all static responses:
 | Symptom | Cause and fix |
 | --- | --- |
 | Board says "This tablet needs a new access link" | Wrong or changed token: open `https://<url>/?key=<token>` again. |
-| `/api/config` answers `500 server_misconfigured` | `KIDBOARD_CONFIG` missing or invalid (Workers Logs list the validation errors), or `KIDBOARD_ACCESS_TOKEN` is missing, shorter than 32 characters, uses other characters or still contains `REPLACE_ME` (the log names the reason). |
-| Editor locked for a long time | Wrong PINs were entered repeatedly (the lock doubles, up to 2 hours at a time) and ends by itself. A holder of the access token can repeat this: rotate `KIDBOARD_ACCESS_TOKEN` and open the tablet link again. |
+| `/api/config` answers `500 server_misconfigured` | `KIDBOARD_CONFIG` missing or invalid (Workers Logs list the validation errors), or `KIDBOARD_ACCESS_TOKEN` is missing or does not meet the [token rules](CONFIG.md#secrets-and-environment-variables) (the log names the reason). |
+| Editor locked for a long time | Wrong PINs were entered repeatedly; the lock grows with every further lockout ([lockout rules](CONFIG.md#secrets-and-environment-variables)) and ends by itself. A holder of the access token can repeat this: rotate `KIDBOARD_ACCESS_TOKEN` and open the tablet link again. |
 | A calendar is missing, `sources[].status` is `error` | Secret name does not match the calendar id (`CAL_<ID>_URL`, upper case) or the iCal address is wrong. |
+| Deploy form (GitHub): "Your GitHub authorization has expired …" | Cloudflare's reinstall instructions say: open <https://github.com/settings/installations>, choose "Cloudflare Workers & Pages", uninstall it, then connect GitHub again (start the deploy form again and install the app when asked). |
 | Build fails with a pnpm error | Add the build variable `PNPM_VERSION=10.28.0` (Worker > Settings > Build). |
 | `The directory specified by the "assets.directory" field ... does not exist` | The web app was not built: use `pnpm deploy:cloudflare` or the build command `pnpm run build`. |
 | Old version still shown | The tablet checks for a new version hourly and reloads itself; or reload once. |
@@ -209,6 +246,8 @@ Without a Cloudflare account (no real deploy): `pnpm exec wrangler deploy --dry-
 with fake secrets (`TESTONLY-not-a-secret` token, calendars from `fixtures/ics` on a local
 HTTP server), `curl` against `/api/health`, `/api/config`, `/api/agenda` (with and without
 token) and the static paths (`Cache-Control`, `_headers`), and a headless Chromium opening
-`/?key=…` (token stored and stripped, service worker active, zero CSP violations). The
+`/?key=…` (token stored and stripped, service worker active, zero CSP violations). Option B without
+git: an archive of the repository without `.git`, unpacked, ran `pnpm install` (the git
+hooks are skipped), `pnpm build` and `pnpm deploy:cloudflare --dry-run`. The
 button flow, Workers Builds and the production log behaviour follow the Cloudflare docs and
 need a real account to confirm.

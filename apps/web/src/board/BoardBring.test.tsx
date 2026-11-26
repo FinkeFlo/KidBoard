@@ -10,17 +10,14 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BEN, eventFixture, MIA } from "../components/fixtures.test-utils";
-import { createApiClient } from "../data/apiClient";
 import { PERSIST_STORAGE_KEY } from "../data/persister";
-import { createQueryClient } from "../data/queryClient";
 import {
   agendaFixture,
   configFixture,
   createFakeFetch,
   createMemoryStorage,
-  dataWrapper,
+  fakeBoardWrapper,
   type FakeFetch,
-  TEST_TOKEN,
 } from "../data/testing.test-utils";
 import { Board } from "./Board";
 
@@ -69,13 +66,7 @@ let clients: QueryClient[] = [];
 let storage: ReturnType<typeof createMemoryStorage>;
 
 function renderBoard(): ReturnType<typeof render> {
-  const client = createQueryClient({ retry: false });
-  clients.push(client);
-  const Wrapper = dataWrapper(
-    createApiClient({ fetch: fake.fetch, token: TEST_TOKEN }),
-    client,
-    storage,
-  );
+  const Wrapper = fakeBoardWrapper({ fake, storage, clients });
   return render(
     <Wrapper>
       <Board />

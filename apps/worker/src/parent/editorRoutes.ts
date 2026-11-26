@@ -155,19 +155,6 @@ function logStorageError(error: unknown): void {
   logWarn(`editor: D1 unavailable (${errorName(error)})`);
 }
 
-function toDto(entry: AppEntry): AppEntry {
-  return {
-    id: entry.id,
-    revision: entry.revision,
-    kind: entry.kind,
-    data: entry.data,
-    exdates: entry.exdates,
-    overrides: entry.overrides,
-    createdAt: entry.createdAt,
-    updatedAt: entry.updatedAt,
-  };
-}
-
 /**
  * Editor API (T-43, ADR-0014) on the parent sub-app, every route behind the parent
  * session (403 `parent_locked`); the editor-off 404 and the 16 KB body limit of the
@@ -241,7 +228,8 @@ export function registerEditorRoutes(
   ): Promise<Response> => {
     await board.invalidateApps(ctx);
     const body: EditorWriteResponse = {
-      entry: entry === null ? null : toDto(entry),
+      // A stored entry is the DTO (`AppEntry` = shared `AppEntryDto`).
+      entry,
       boardRefresh: BOARD_REFRESH_NOW,
     };
     return c.json(body, status);

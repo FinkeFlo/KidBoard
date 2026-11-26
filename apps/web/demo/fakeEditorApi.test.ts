@@ -215,6 +215,18 @@ describe("fake editor API", () => {
         },
       ).status,
     ).toBe(422);
+    // A single day cannot repeat (the shared rule, as in the worker).
+    expect(
+      call(
+        editor,
+        "PATCH",
+        `/api/parent/entries/${id}?scope=one&date=2026-12-06`,
+        { revision: 2, entry: SWIM },
+      ).json,
+    ).toMatchObject({
+      error: "invalid_entry",
+      issues: [{ path: "repeat" }],
+    });
     const stale = call(
       editor,
       "PATCH",
@@ -263,6 +275,14 @@ describe("fake editor API", () => {
         `/api/parent/entries/${id}?scope=one&date=${TODAY}&revision=1`,
       ).json,
     ).toMatchObject({ entry: { exdates: [TODAY], revision: 2 } });
+    // Not a day of the rule: no exception.
+    expect(
+      call(
+        editor,
+        "DELETE",
+        `/api/parent/entries/${id}?scope=one&date=2026-11-24&revision=2`,
+      ).json,
+    ).toMatchObject({ error: "invalid_entry", issues: [{ path: "date" }] });
     const list = EditorListResponseSchema.parse(
       call(editor, "GET", `/api/parent/entries?from=${TODAY}&days=14`).json,
     );
@@ -347,6 +367,19 @@ describe("fake editor API", () => {
       call(other, "POST", "/api/parent/import?mode=merge", { format: "x" })
         .status,
     ).toBe(422);
+    // Entries are checked by the shared import rule: nothing is stored on an issue.
+    const [first] = doc.entries;
+    const bad = {
+      ...doc,
+      entries: [{ ...first, exdates: ["2026-11-24"] }],
+    };
+    expect(
+      call(other, "POST", "/api/parent/import?mode=replace", bad).json,
+    ).toMatchObject({
+      error: "invalid_entry",
+      issues: [{ path: "entries.0.exdates" }],
+    });
+    expect(other.entries().map((e) => e.id)).toEqual([doc.entries[0]?.id]);
   });
 
   it("fails the next matching request on demand and records writes", () => {

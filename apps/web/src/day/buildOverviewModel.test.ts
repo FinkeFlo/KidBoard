@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from "vitest";
 
 import { eventFixture, mealFixture } from "../components/fixtures.test-utils";
@@ -51,9 +52,7 @@ describe("buildDayModel timeOfDay", () => {
       ms("12:00"),
     );
     const byId = Object.fromEntries(
-      model.bands
-        .flatMap((band) => band.events)
-        .map((item) => [item.event.id, item.timeOfDay]),
+      model.events.map((item) => [item.event.id, item.timeOfDay]),
     );
     expect(byId).toEqual({
       night: "morning",
@@ -111,12 +110,12 @@ describe("buildOverviewModel", () => {
     ).not.toContain("far");
   });
 
-  it("matches buildDayModel per day, flattened in time order", () => {
+  it("matches buildDayModel per day, in time order", () => {
     const now = ms("10:00");
     const model = buildOverviewModel(agenda, CONFIG, TODAY, now);
     for (const day of model.days) {
       const single = buildDayModel(agenda, CONFIG, day.date, now);
-      expect(day.events).toEqual(single.bands.flatMap((b) => b.events));
+      expect(day.events).toEqual(single.events);
       expect(day.allDay).toEqual(single.allDay);
       expect(day.meals).toEqual(single.meals);
       expect(day.isEmpty).toBe(single.isEmpty);

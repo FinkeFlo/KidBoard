@@ -1,9 +1,5 @@
 import { type AppConfigInput, WeatherResponseSchema } from "@kidboard/shared";
-import {
-  createExecutionContext,
-  reset,
-  waitOnExecutionContext,
-} from "cloudflare:test";
+import { reset } from "cloudflare:test";
 import { env as testEnv } from "cloudflare:workers";
 import {
   afterEach,
@@ -16,8 +12,9 @@ import {
 } from "vitest";
 
 import { effectiveTtlSeconds, KV_WRITES_PER_DAY_BUDGET } from "../agenda/board";
-import { type AppOptions, createApp } from "../app";
+import type { AppOptions } from "../app";
 import type { Env } from "../env";
+import { testApp } from "../testing.test-utils";
 import {
   WEATHER_FORECAST_WRITES_PER_DAY,
   WEATHER_KV_WRITES_PER_DAY,
@@ -108,35 +105,26 @@ function harness(
     backend?: "kv" | "cache";
   } = {},
 ): Harness {
-  const clock = { now: NOW };
-  const cacheName = `kidboard-weather-${String(cacheCounter++)}`;
-  const app = createApp({
-    ...options,
-    now: () => clock.now,
-    openCache: () => caches.open(cacheName),
+  const { backend, ...appOptions } = options;
+  const app = testApp({
+    ...appOptions,
+    now: NOW,
+    cacheName: `kidboard-weather-${String(cacheCounter++)}`,
   });
   const env = (
     config: Partial<AppConfigInput> = {},
     overrides: Partial<Env> = {},
   ): Env => ({
     KIDBOARD_CONFIG: JSON.stringify({ ...BASE_CONFIG, ...config }),
-    ...(options.backend === "kv"
-      ? { KIDBOARD_CACHE: testEnv.KIDBOARD_CACHE }
-      : {}),
+    ...(backend === "kv" ? { KIDBOARD_CACHE: testEnv.KIDBOARD_CACHE } : {}),
     KIDBOARD_PUBLIC: "1",
     ...overrides,
   });
   return {
-    clock,
+    clock: app.clock,
     env,
     call: async (path = "/api/weather", callEnv = env()) => {
-      const ctx = createExecutionContext();
-      const response = await app.fetch(
-        new Request(`https://board.example.test${path}`),
-        callEnv,
-        ctx,
-      );
-      await waitOnExecutionContext(ctx);
+      const response = await app.fetch(path, undefined, callEnv);
       output.push(
         await response.clone().text(),
         JSON.stringify([...response.headers]),

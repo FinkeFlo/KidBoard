@@ -1,4 +1,5 @@
 import { addCalendarDays } from "../dates";
+import { pad } from "../pad";
 import { minutesOfTime } from "../primitives";
 import {
   formatCalendarDate,
@@ -16,10 +17,6 @@ import {
  * RFC 5545 section 3.3.5 (see `../wallTime.ts`), exactly like the worker's feed
  * expansion, because it is the same code.
  */
-
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
 
 /** `HH:mm` of minutes since midnight (0-1439). */
 export function timeOfMinutes(minutes: number): string {

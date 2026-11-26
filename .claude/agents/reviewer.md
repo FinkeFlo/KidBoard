@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Independently reviews one KidBoard plan task against its acceptance criteria using only task + diff, re-runs all checks, returns a strict verdict. Default for low/medium-risk tasks.
-tools: Read, Grep, Glob, Bash, mcp__Context7__resolve-library-id, mcp__Context7__query-docs
+tools: Read, Grep, Glob, Bash, mcp__Context7__*, mcp__context7__*, mcp__claude_ai_Context7__*, mcp__plugin_context7_context7__*
 model: claude-sonnet-5-5
 ---
 

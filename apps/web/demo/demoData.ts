@@ -4,6 +4,7 @@ import {
   type AgendaResponse,
   type CalendarEvent,
   isDateKey,
+  isoWeekday,
   type Meal,
   type MealSlot,
   type PublicConfig,
@@ -73,17 +74,6 @@ interface Slot {
   fallbackIcon?: boolean;
   /** Takes place Monday to Friday only; on Saturday and Sunday {@link Slot.weekend} replaces it. */
   weekend?: Omit<Slot, "weekend">;
-}
-
-/** Saturday or Sunday; pure calendar math on the `YYYY-MM-DD` key, no time zone. */
-function isWeekend(date: string): boolean {
-  const [year, month, day] = date.split("-").map(Number) as [
-    number,
-    number,
-    number,
-  ];
-  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  return weekday === 0 || weekday === 6;
 }
 
 /**
@@ -320,7 +310,7 @@ export function demoAgenda(
   const base = { sourceId: "family" } as const;
   for (let offset = 0; offset < AGENDA_DAYS; offset += 1) {
     const date = addCalendarDays(today, offset);
-    const weekend = isWeekend(date);
+    const weekend = isoWeekday(date) >= 6;
     (WEEK[offset % 7] ?? []).forEach((template, index) => {
       const slot =
         weekend && template.weekend !== undefined ? template.weekend : template;

@@ -121,7 +121,7 @@
       "error": {
         "unauthorized": "This tablet needs a new access link.",
         "unavailable": "The editor is switched off.",
-        "failed": "The PIN could not be checked. Please try again."
+        "failed": "The PIN could not be checked. Please enter it again."
       },
       "demo": "Demo: the PIN is {{pin}}"
     },

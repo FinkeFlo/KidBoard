@@ -1,23 +1,28 @@
-import { tzOffset } from "@date-fns/tz";
+import {
+  type CalendarDate,
+  formatCalendarDate,
+  naiveUtcMs,
+  parseCalendarDate,
+  shiftCalendarDate,
+  wallTimeAt,
+} from "./wallTime";
 
 /**
- * Calendar-date helpers shared by worker and web (runtime-agnostic: `Intl` via
- * `@date-fns/tz`, no DOM, no Worker globals, no Node built-ins).
+ * Calendar-date helpers on date keys, shared by worker and web: thin string adapters of
+ * `./wallTime.ts` (runtime-agnostic, no DOM, no Worker globals, no Node built-ins).
  *
  * A *date key* is a calendar date `YYYY-MM-DD` in the configured IANA zone. The device
- * zone is never involved: offsets come from `tzOffset` (the runtime's tz database), and
- * the wall-clock fields are read through UTC getters of a shifted `Date`.
+ * zone is never involved: offsets come from the runtime's tz database (`wallTimeAt`).
  */
 
-const MINUTE_MS = 60_000;
-const DATE_KEY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const DAY_MS = 86_400_000;
 
-function pad(value: number, length = 2): string {
-  return String(Math.abs(value)).padStart(length, "0");
-}
-
-function formatUtcDate(date: Date): string {
-  return `${pad(date.getUTCFullYear(), 4)}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+function parseDateKey(date: string): CalendarDate {
+  const parsed = parseCalendarDate(date);
+  if (parsed === null) {
+    throw new RangeError("date must be YYYY-MM-DD");
+  }
+  return parsed;
 }
 
 /**
@@ -25,17 +30,13 @@ function formatUtcDate(date: Date): string {
  * Throws a `RangeError` for an unknown zone or an invalid instant.
  */
 export function dateKeyInZone(epochMs: number, timeZone: string): string {
-  const offset = tzOffset(timeZone, new Date(epochMs));
-  if (Number.isNaN(offset)) {
-    throw new RangeError("Unknown time zone or invalid instant");
-  }
-  // Only pre-1900 local mean times have second-level offsets; whole minutes suffice.
-  return formatUtcDate(new Date(epochMs + Math.round(offset) * MINUTE_MS));
+  return formatCalendarDate(wallTimeAt(epochMs, timeZone));
 }
 
 /**
- * Today's date key (`YYYY-MM-DD`) in `timeZone` at `nowMs`. The worker's agenda window
- * and the client's `range.from` both derive from this, so they always agree.
+ * Today's date key (`YYYY-MM-DD`) in `timeZone` at `nowMs` ({@link dateKeyInZone}). The
+ * worker's agenda window and the client's `range.from` both derive from this, so they
+ * always agree.
  */
 export function todayInZone(nowMs: number, timeZone: string): string {
   return dateKeyInZone(nowMs, timeZone);
@@ -43,22 +44,7 @@ export function todayInZone(nowMs: number, timeZone: string): string {
 
 /** True if `value` is a strict `YYYY-MM-DD` key of an existing date. */
 export function isDateKey(value: string): boolean {
-  const match = DATE_KEY_RE.exec(value);
-  if (!match) {
-    return false;
-  }
-  const [year, month, day] = [
-    Number(match[1]),
-    Number(match[2]),
-    Number(match[3]),
-  ];
-  const check = new Date(0);
-  check.setUTCFullYear(year, month - 1, day);
-  return (
-    check.getUTCFullYear() === year &&
-    check.getUTCMonth() === month - 1 &&
-    check.getUTCDate() === day
-  );
+  return parseCalendarDate(value) !== null;
 }
 
 /**
@@ -66,31 +52,17 @@ export function isDateKey(value: string): boolean {
  * zone, so DST cannot affect it). Throws a `RangeError` for a malformed date.
  */
 export function addCalendarDays(date: string, days: number): string {
-  if (!isDateKey(date)) {
-    throw new RangeError("date must be YYYY-MM-DD");
-  }
-  const [year, month, day] = date.split("-").map(Number) as [
-    number,
-    number,
-    number,
-  ];
-  const shifted = new Date(0);
-  shifted.setUTCFullYear(year, month - 1, day + days);
-  return formatUtcDate(shifted);
+  return formatCalendarDate(shiftCalendarDate(parseDateKey(date), days));
 }
 
 function utcDayNumber(date: string): number {
-  if (!isDateKey(date)) {
-    throw new RangeError("date must be YYYY-MM-DD");
-  }
-  const [year, month, day] = date.split("-").map(Number) as [
-    number,
-    number,
-    number,
-  ];
-  const at = new Date(0);
-  at.setUTCFullYear(year, month - 1, day);
-  return Math.round(at.getTime() / 86_400_000);
+  const at = naiveUtcMs({
+    ...parseDateKey(date),
+    hour: 0,
+    minute: 0,
+    second: 0,
+  });
+  return Math.round(at / DAY_MS);
 }
 
 /**

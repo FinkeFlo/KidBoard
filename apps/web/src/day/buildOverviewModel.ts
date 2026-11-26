@@ -59,7 +59,7 @@ export function buildOverviewModel(
       const date = addCalendarDays(today, offset);
       const isToday = offset === 0;
       const model = buildDayModel(agenda, config, date, now);
-      const events = model.bands.flatMap((band) => band.events);
+      const { events } = model;
       return {
         date,
         isToday,

@@ -1,12 +1,13 @@
 /*
- * KidBoard design tokens - final theme from the design hand-off (docs/design/README.md).
- * Generated from the KidBoard design system (docs/design/tokens.json); edit there, then
- * regenerate, so design and code stay identical.
+ * KidBoard design tokens - based on the design hand-off of 2026-11-22 (docs/design/README.md).
+ * This file is the single source of truth for every token: edit tokens here (no generator,
+ * no copy elsewhere). The PWA manifest colours are read from it at build time
+ * (apps/web/pwa/tokenColors.ts).
  *
- * Drop-in replacement for apps/web/src/styles/tokens.css: same structure, every existing
- * variable kept, new ones added (child tints, today ring, now line, nav, sun, soft error,
- * tile sizes, opacities). `@theme static` exposes them to Tailwind 4; the night set only
- * overrides colours/shadows under [data-theme="night"]. `tokens.test.ts` checks contrast.
+ * Contents: typography, colours (child tints, today ring, now line, nav, sun, soft error,
+ * ...), spacing, tile sizes, radii, shadows, durations, opacities. `@theme static` exposes
+ * them to Tailwind 4; the night set only overrides colours/shadows under
+ * [data-theme="night"]. `tokens.test.ts` checks contrast.
  */
 
 @theme static {

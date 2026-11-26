@@ -7,6 +7,12 @@
   "name": "kidboard",
   "main": "apps/worker/src/index.ts",
   "compatibility_date": "2026-11-01",
+  // The board lives at <name>.<subdomain>.workers.dev unless a custom domain is set
+  // (docs/DEPLOY.md). Stating it keeps Wrangler from warning on every deploy.
+  "workers_dev": true,
+  // No extra public URLs for non-production versions (e.g. Git branch builds): they
+  // would serve with the same secrets and D1 data as the board.
+  "preview_urls": false,
   "assets": {
     // Built by `pnpm --filter @kidboard/web build`; it must exist before deploy/dev.
     "directory": "apps/web/dist",

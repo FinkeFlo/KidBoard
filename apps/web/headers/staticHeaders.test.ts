@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
@@ -66,6 +67,36 @@ describe("inlineScriptHashes", () => {
       inlineScriptHashes("<script>a b</script>"),
     );
   });
+
+  it("ends a script at an end tag with whitespace or attributes, like the HTML parser", () => {
+    expect(
+      inlineScriptHashes(`<script>${MDN_SCRIPT}</script\t\n bar>`),
+    ).toEqual([MDN_HASH]);
+    expect(
+      inlineScriptHashes(
+        `<script>${MDN_SCRIPT}</script foo="1">\n<script></script >`,
+      ),
+    ).toEqual([MDN_HASH, EMPTY_HASH]);
+    expect(inlineScriptHashes(`<script>${MDN_SCRIPT}</script/>`)).toEqual([
+      MDN_HASH,
+    ]);
+  });
+
+  it.each(["</scripty>", "</script-x>", "</script_x>", "</script1>"])(
+    "does not end a script at %s (no end tag for the HTML parser)",
+    (fake) => {
+      const html = `<script>a${fake}b</script>`;
+      expect(inlineScriptHashes(html)).toHaveLength(1);
+      expect(inlineScriptHashes(html)).not.toEqual(
+        inlineScriptHashes("<script>a</script>"),
+      );
+      // The body runs to the real end tag.
+      const body = `a${fake}b`;
+      expect(inlineScriptHashes(html)).toEqual([
+        `'sha256-${createHash("sha256").update(body, "utf8").digest("base64")}'`,
+      ]);
+    },
+  );
 
   it("returns nothing for a page without inline scripts", () => {
     expect(inlineScriptHashes(`<script src="/a.js"></script>`)).toEqual([]);
