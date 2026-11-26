@@ -276,11 +276,11 @@ on read; a corrupt row is skipped and logged by failure type only. Every write
 change stamp `kb_meta.entries_stamp` (a random UUID, `entries/stamp.ts`) in the same
 `db.batch` as the write itself: one transaction, so a committed write always comes with a
 new stamp (a refused one may bump it too, which only costs a cache rebuild). `/api/config`
-reports `editor: true` only with the binding, a valid `KIDBOARD_PARENT_PIN` and an access
-token `KIDBOARD_ACCESS_TOKEN` (`editorEnabled` in `apps/worker/src/parent/pin.ts`; fail
-closed: a missing, trivial or template PIN, or the binding without a valid token, logs a
-configuration warning and keeps the editor, the app sources on the board and the phone feed
-off); the key is omitted when false (older web bundles parse the config strictly) and `PublicConfigSchema` defaults it to `false` and strips
+reports `editor: true` only with the binding, a valid `KIDBOARD_PARENT_PIN` and a valid
+`KIDBOARD_ACCESS_TOKEN` (`editorEnabled` in `apps/worker/src/parent/pin.ts`; fail closed,
+rules in ADR-0013 and [CONFIG.md](CONFIG.md#secrets-and-environment-variables): otherwise a
+configuration warning, and the editor, the app sources on the board and the phone feed
+stay off); the key is omitted when false (older web bundles parse the config strictly) and `PublicConfigSchema` defaults it to `false` and strips
 unknown top-level keys.
 
 ### App entries on the board (T-41, ADR-0014)
@@ -315,91 +315,49 @@ TTL write-budget floor counts the two app sources.
 
 ### Parent lock (T-42, ADR-0013)
 
-`apps/worker/src/parent/routes.ts` is mounted at `/api/parent` behind the access token.
-Editor off (no `KIDBOARD_DATA`, no valid PIN or no access token) → every `/api/parent/*`
-is `404`; bodies
-are capped at 16 KB (`bodyLimit`, `413 payload_too_large`) and parsed with zod
-(`http/jsonBody.ts`, `400 bad_request`). `POST /api/parent/unlock` `{ pin }` compares with
-`tokensEqual` and returns `{ token, expiresAt }` (ISO UTC, now + 15 min); the token is
-`v1.<exp epoch s>.<base64url HMAC-SHA-256 of "v1.<exp>">`, keyed by HKDF-SHA-256 over a
-random 32-byte server secret (`kb_meta` key `parent_session_secret`, created with
-`INSERT OR IGNORE` + read in one batch, then cached per isolate) with the PIN in `info`:
-a new PIN or a new database ends every session. Wrong PIN → `403 wrong_pin` with
-`attemptsLeft` (401 stays the access token's). Each attempt is reserved before the
-compare (`parent/lockout.ts`, D1 only) by one D1 batch whose
-conditional insert of a `kb_meta` row `parent_fail:<uuid>` → epoch s succeeds only
-without an active `parent_lock_until` and with fewer than 5 rows in the last 15 min (older
-rows are dropped); not reserved → `429 parent_lockout` with `Retry-After`, no compare. A
-wrong PIN renames the row to `parent_fail:s:<uuid>` (a settled failure; still counted)
-and, as the 5th in 15 min, writes `parent_lock_until` and raises `parent_lock_level` (the
-lock lasts 15 min x 2^(level-1), capped at 2 h, also answered with 429); a right PIN deletes
-its own row, every settled failure and the level, so earlier typos of the parent no longer
-count. Reservations of parallel attempts
-still being compared are kept, so at most 5 PINs are compared at once, and without the
-right PIN at most 5 per window. If deleting the rows after a right PIN fails, the session is still issued and the delete is
-retried once past the response (`waitUntil`); rows left behind age out with the window.
+`apps/worker/src/parent/routes.ts` is mounted at `/api/parent` behind the access token and
+turns the parent PIN into a short session for the editor routes. The decision, the PIN
+rules, the session token and the lockout are in [ADR-0013](adr/0013-parent-lock.md); the
+exact routes, status codes and storage keys are in the doc comments of the source files:
+
+* `parent/routes.ts`: editor off → every `/api/parent/*` is `404`; the 16 KB body limit;
+  `POST /unlock`, `GET /session`, `GET /feed`. If deleting the attempt rows after a right
+  PIN fails, the session is still issued and the delete is retried once past the response.
+* `parent/session.ts`: the signed session token (key derived from a random server secret
+  in D1 `kb_meta` and the PIN, so a new PIN or a new database ends every session) and
+  `requireParentSession`, the guard of the editor routes (`X-KidBoard-Parent`,
+  `403 parent_locked`).
+* `parent/lockout.ts`: attempt reservation and the escalating lockout, D1 only, so it holds
+  across isolates.
+* `http/cors.ts`: the extra methods and headers for listed origins, on `/api/parent/*` only.
+
 The lock condition counts all attempts in the window, including parallel ones still being
 compared, not only settled failures: deliberately conservative; it differs only for
 parallel attempts, which one tablet does not produce.
-`requireParentSession` (`parent/session.ts`) guards editor routes: it verifies
-`X-KidBoard-Parent` (canonical base64url, `crypto.subtle.verify`, `now < exp ≤ now +
-15 min`) or answers `403 parent_locked`; `GET /api/parent/session` → `{ expiresAt }`. CORS (`http/cors.ts`):
-only on `/api/parent/*` and only for listed origins are `POST, PATCH, DELETE`,
-`Content-Type`, `X-KidBoard-Parent` allowed and `Retry-After` exposed.
 
 ### Editor API (T-43, ADR-0014)
 
 `apps/worker/src/parent/editorRoutes.ts` adds the editor routes to the parent sub-app, so
-the editor-off `404`, the 16 KB body limit and `requireParentSession` (`403
-parent_locked`) apply; the response bodies are zod schemas in
-`packages/shared/src/editor/api.ts` (`EditorListResponseSchema`,
-`EditorWriteResponseSchema`, `EditorTemplatesResponseSchema`,
-`EditorImportResponseSchema`, `EditorErrorResponseSchema`) for the web client. The routes
-share the board's per-isolate sources (`agenda/board.ts`: memory layer, single flight,
-schema gate) with `/api/agenda`.
+the parent lock applies to all of them (editor-off `404`, body limit,
+`requireParentSession`). Each detail is documented once: the route list in the doc comment
+of `editorRoutes.ts`, the response and error bodies as zod schemas with doc comments in
+`packages/shared/src/editor/api.ts` (shared with the web client), the store rules
+(revisions, limits, import) in `apps/worker/src/entries/entryStore.ts`. The architectural
+points:
 
-* `GET /entries?from&days` (window rules of `/api/agenda`) → `{ timeZone, range,
-  sources, items }`. App items come from D1 through the board's own path
-  (`renderAppCalendar` + `expandCalendar`), one per occurrence: `entryId`, `revision`,
-  the stored `entry`, `occurrenceDate` (series; the `date` of `scope=one` writes) and
-  the `override` shown on that day. Google items reuse the cached, normalized feed data
-  (`loadSource`, never a second fetch) and are built field by field (`origin: "google"`,
-  title, icon, children, time, bring icons; never a description); a Google meal is a
-  whole day in its slot. `sources` = status of the Google calendars. Order: day, all-day
-  first, time, events before meals, slot, title.
-  Stored entries the current config can no longer express (`parseEditorEntryInput`
-  fails, e.g. a removed child) are not in `items` but in `unresolved` (`entryId`,
-  `revision`, `entry`, `issues`), so a parent can change or delete them with their
-  revision; entries whose date range does not touch the requested days are not checked.
-  D1 unavailable → the Google items with `storageUnavailable: true` (no 503).
-* `POST /entries` (body: `EditorEntryInput`) → `201`; `PATCH /entries/:id?scope=one|series&date=`
-  (body `{ revision, entry }`; `scope` defaults to `series`; `one` writes an "only this
-  day" override) and `DELETE /entries/:id?scope=one|series&date=&revision=` (`one`
-  writes an exception) → `{ entry, boardRefresh: "now" }` (`entry: null` after a full
-  delete). Series edits keep the exceptions and overrides whose dates still exist
-  (`EntryStore.update`). Errors: `400 bad_request` (JSON, query), `404 not_found`,
-  `409 conflict` (+ current `revision`), `422 invalid_entry` (+ `issues` with the
-  `parseEditorEntryInput` codes and field paths, at most 50), `422 limit_reached`
-  (+ `limit`: `entries`/`size`), `503 storage_unavailable` (D1 error, type logged only).
-* `GET /templates` → up to 12 suggestions grouped by kind, icon (VS16 ignored), title
-  and children; most occurrences first, then nearest to now. App entries count from
-  today − 56 to today + 28; Google entries only within the cached window (today − 1 to
-  today + 28),
-  because looking further back would mean another fetch and expansion outside the CPU
-  budget (ADR-0003); weekly Google series still count through their next four weeks.
-  Titles or icons an app entry cannot hold are left out; times, slot, bring icons and
-  countdown come from the occurrence nearest to now.
-* `GET /export` → the `EntryStore.exportAll` document with `Content-Disposition:
-  attachment; filename="kidboard-entries-<today>.json"` (exposed to listed CORS origins).
-  `POST /import?mode=merge|replace` (mode required) → `{ mode, imported, created,
-  updated, boardRefresh }` (`updated` = ids that were stored before the import).
-  Imported entries are checked for their shape only, not against the config, so a
-  backup from before a config change is restored and its leftovers surface as
-  `unresolved` (`create`/`update`/`setOverride` still check the config);
-  its body limit is `MAX_IMPORT_BODY_BYTES` (1 000 × (8 KB + 512 B) + 4 KB ≈ 8.3 MiB,
-  enough for any export) instead of 16 KB and is checked after the session guard, so
-  only an unlocked parent can make the worker read that much. The supported import size
-  is the store limit (1 000 entries, ADR-0014), written in one D1 batch.
+* The routes share the board's per-isolate sources (`agenda/board.ts`: memory layer, single
+  flight, schema gate) with `/api/agenda`. App items come from D1 through the board's own
+  path (`renderAppCalendar` + `expandCalendar`), Google items reuse the cached, normalized
+  feed data (`loadSource`, never a second fetch, never a description).
+* Stored entries the current config can no longer express (e.g. a removed child) are
+  listed as `unresolved` instead of being dropped, so a parent can change or delete them.
+  For the same reason imports are checked for their shape only: a backup from before a
+  config change is restored as it was.
+* Templates use Google data only inside the cached window: looking further back would mean
+  another fetch and expansion outside the CPU budget (ADR-0003).
+* The import route has its own body limit (`MAX_IMPORT_BODY_BYTES`, enough for any export),
+  checked after the session guard, so only an unlocked parent can make the worker read
+  that much.
 * Every write replaces the change stamp in its own batch; a successful one also calls
   `invalidateAppSources` before answering, so the agenda refetch the client starts at
   once shows the change.
@@ -423,47 +381,31 @@ the board is `inert` and its auto-return is paused. `EditorScreen` is the shell 
 ### Phone feed (T-46, ADR-0014 "Getting data out")
 
 `GET /api/feed.ics?token=<KIDBOARD_FEED_TOKEN>` (`apps/worker/src/feed/`) publishes the
-app entries for calendar apps on the parents' phones (read-only there).
+app entries for calendar apps on the parents' phones (read-only there). Responses and
+token handling are documented in `feed/routes.ts`, `feed/path.ts` and `feed/token.ts`, the
+calendar body in `feed/renderFeed.ts`, the token rules in
+[CONFIG.md](CONFIG.md#secrets-and-environment-variables), and why the feed keeps
+wall-clock times with a VTIMEZONE instead of UTC in [ADR-0014](adr/0014-app-entries-in-d1.md).
 
-* **On only when configured:** the editor is on (D1 + valid PIN + access token) and
-  `KIDBOARD_FEED_TOKEN` is 32–256 characters of `A-Z a-z 0-9 _ -` without the template
-  marker `REPLACE_ME` (`feed/token.ts`; e.g. `openssl rand -hex 32`). Unset → no feed;
-  unusable → no feed and one warning per isolate (never the value). Every miss (feed
-  off, missing or wrong `token`) is the plain `404 not_found` of unknown paths; the
-  token is compared with `tokensEqual` (SHA-256 + `timingSafeEqual`). The parameter is
-  `token`, distinct from the board's `key`: neither token opens the other's routes.
-* **Token in the query string, not the path:** Workers Logs record the request URL of
-  every invocation; `observability.redact_query_string` (`wrangler.jsonc`) drops query
-  strings there, as for `?key=`. Worker log lines use `c.req.path`, which has no query.
-  Calendar apps keep query strings of subscription URLs (Google "From URL" and Apple
-  subscriptions fetch the URL as given; many published feeds carry tokens there); this
-  is an assumption from common practice, no vendor documentation was available.
-* **No access token:** calendar apps subscribe by URL only, so the access token
-  middleware lets exactly `GET`/`HEAD` of the path `/api/feed.ics` through
-  (`feed/path.ts` `isFeedRequest`); every other path or method still needs it. The
-  feed token is the only guard of this route.
-* **Body:** one calendar with events and meals (one subscription; meals all-day or
-  timed exactly as stored), built from the same VEVENTs as the board's virtual sources
-  (`appEventComponents` in `entries/renderCalendar.ts`): wall-clock times with
-  `TZID` = the configured zone, `RRULE`/`EXDATE`/`RECURRENCE-ID` kept, so the feed
-  expands to the board's occurrences (tested by parsing it back). Headers: `PRODID`,
-  `CALSCALE`, `METHOD:PUBLISH`, `X-WR-CALNAME` (`KidBoard`), `X-WR-TIMEZONE`,
-  `REFRESH-INTERVAL`/`X-PUBLISHED-TTL` `PT1H` (hints; Google polls on its own schedule).
-  RFC 5545 requires a `VTIMEZONE` for each `TZID`: Google and Apple map IANA names
-  themselves, but clients like Outlook need the definition, so the feed carries the
-  configured zone's VTIMEZONE from `timezones-ical-library` (Apache-2.0, tzdb rules,
-  TZID set to the configured name; tested to resolve to the board's instants across DST
-  in three hemispheres). UTC times were rejected: a weekly `RRULE` in UTC drifts by an
-  hour at every DST switch. A zone the library lacks → no VTIMEZONE (Google/Apple
-  still work) and one warning.
-* **Responses:** `200` `Content-Type: text/calendar; charset=utf-8`,
-  `Cache-Control: no-store` (global middleware), all entries (no window). Invalid
-  config → `500 server_misconfigured`; D1 unavailable → `503 storage_unavailable`
-  (type logged only).
-* **Subscribe link:** `GET /api/parent/feed` (parent session) → `{ feedUrl }` with the
-  relative URL `/api/feed.ics?token=…`, omitted while the feed is off
-  (`ParentFeedResponseSchema` in `packages/shared`). Rotating `KIDBOARD_FEED_TOKEN`
-  revokes every subscription.
+* **On only when configured:** the editor is on and `KIDBOARD_FEED_TOKEN` is valid. Every
+  miss (feed off, missing or wrong `token`) is the plain `404 not_found` of unknown paths.
+* **Own token, no access token:** calendar apps subscribe by URL only, so the access token
+  middleware lets exactly `GET`/`HEAD` of `/api/feed.ics` through (`isFeedRequest`); the
+  feed token is the only guard of this route. Its parameter is `token`, distinct from the
+  board's `key`: neither token opens the other's routes.
+* **Token in the query string, not the path:** Workers Logs drop query strings
+  (`observability.redact_query_string`), as for `?key=`. Calendar apps keep query strings
+  of subscription URLs (Google "From URL" and Apple subscriptions fetch the URL as given;
+  many published feeds carry tokens there); this is an assumption from common practice,
+  no vendor documentation was available.
+* **Same occurrences as the board:** the body is built from the same VEVENTs as the board's
+  virtual sources (`appEventComponents` in `entries/renderCalendar.ts`), so the feed
+  expands to the board's occurrences (tested by parsing it back). The VTIMEZONE comes from
+  `timezones-ical-library` (Apache-2.0, tzdb rules; tested to resolve to the board's
+  instants across DST in three hemispheres).
+* **Subscribe link:** `GET /api/parent/feed` (parent session) → `{ feedUrl }`
+  (`ParentFeedResponseSchema` in `packages/shared`), omitted while the feed is off.
+  Rotating `KIDBOARD_FEED_TOKEN` revokes every subscription.
 
 ## Caching & offline (summary – details in [ADR-0006](adr/0006-caching-offline.md))
 
@@ -996,10 +938,11 @@ not part of `pnpm test:e2e`. CI runs it in the `screenshots` job and uploads the
   and expansion warning codes only. Response `200` if any source is `ok`/`stale` or
   there is no source at all (no calendars and the editor off: empty board, one config
   warning, T-46b), `502` otherwise; `generatedAt` = oldest `fetchedAt` served.
-- **Security:** optional `KIDBOARD_ACCESS_TOKEN` (Bearer or `?key=`, SHA-256 +
-  `crypto.subtle.timingSafeEqual`); a token still containing the template marker
-  `REPLACE_ME` fails closed (`500 server_misconfigured`, T-25); `/api/health` is public and returns only
-  `{ ok: true }`; the phone feed path has its own token (see "Phone feed"). CORS only for `KIDBOARD_ALLOWED_ORIGINS` (preflights are answered before
+- **Security:** `KIDBOARD_ACCESS_TOKEN` (Bearer or `?key=`, SHA-256 +
+  `crypto.subtle.timingSafeEqual`) is required and fails closed (`500
+  server_misconfigured`); its rules and the `KIDBOARD_PUBLIC` opt-in are in
+  [CONFIG.md](CONFIG.md#secrets-and-environment-variables). `/api/health` is public and
+  returns only `{ ok: true }`; the phone feed path has its own token (see "Phone feed"). CORS only for `KIDBOARD_ALLOWED_ORIGINS` (preflights are answered before
   the token check). Hono `secureHeaders()` (nosniff, `Referrer-Policy: no-referrer`, …) and
   `Cache-Control: no-store` on every API response (the client owns caching, ADR-0006).
 - **Config:** `KIDBOARD_CONFIG` is parsed once per isolate (memoized by raw string);
