@@ -7,8 +7,6 @@ artifacts of the maintainer; everything an implementer needs is copied into this
 
 | File | What |
 |---|---|
-| [`tokens.css`](tokens.css) | Drop-in replacement for `apps/web/src/styles/tokens.css` (same structure and variable names, new tokens added). Passes the existing `tokens.test.ts` contrast suite unchanged. |
-| [`tokens.json`](tokens.json) | The same tokens as data (design-system format: colour list with `light`/`night` themes, type scale, spacing, radius, shadow, duration, opacity). Source of truth; `tokens.css` is generated from it. |
 | [`components.md`](components.md) | Component specs: variants, states, sizes, a11y and i18n rules. |
 | [`screens/`](screens/) | PNG exports at 1280×800 and 2000×1200, plus static HTML references in `screens/html/` (open in a browser; not app code). |
 
@@ -71,9 +69,15 @@ Example data (Mia 🦊, Ben 🐻, meals Monday–Wednesday) is illustrative only
 
 ## Tokens: how they map into the code
 
-1. Replace `apps/web/src/styles/tokens.css` with [`tokens.css`](tokens.css). All existing
-   variable names stay, so the current components keep building; the legacy band surfaces
-   and `--spacing-band-tile` are marked as legacy.
+The design tokens live in one place:
+[`apps/web/src/styles/tokens.css`](../../apps/web/src/styles/tokens.css) (exposed to
+Tailwind via `@theme`, contrast-checked by `tokens.test.ts`). The hand-off delivered a
+`tokens.css` / `tokens.json` snapshot that replaced that file in T-29; the snapshot was
+removed later because the app's tokens had moved on (it is in the git history). What the
+hand-off changed against the placeholder theme:
+
+1. All existing variable names stayed, so the components kept building; the legacy band
+   surfaces and `--spacing-band-tile` were marked as legacy.
 2. New tokens: `--color-child-{1..6}-tint`, `--color-today-ring`, `--color-now`,
    `--color-nav-active`, `--color-on-nav-active`, `--color-sun`, `--color-soft-error`,
    `--text-tile`, `--text-tile-compact`, `--text-meta` (each with line-height and

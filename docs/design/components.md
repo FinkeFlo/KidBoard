@@ -1,7 +1,7 @@
 # Component specs
 
 Sizes are px at the 1280×800 baseline (root 16px); implement them with the tokens in
-[`tokens.css`](tokens.css), which are rem and scale with the board. Labels in quotes are the
+[`apps/web/src/styles/tokens.css`](../../apps/web/src/styles/tokens.css), which are rem and scale with the board. Labels in quotes are the
 German UI strings; every one needs an EN counterpart in the locale files.
 
 ## EventTile
