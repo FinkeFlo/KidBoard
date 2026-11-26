@@ -2,13 +2,15 @@ import { FEED_TIMEOUT_MS } from "@kidboard/shared";
 
 /** Why a feed could not be downloaded. */
 export type FeedFetchErrorReason =
-  "http-status" | "timeout" | "too-large" | "network";
+  "http-status" | "timeout" | "too-large" | "network" | "insecure-redirect";
 
 const MESSAGES: Record<FeedFetchErrorReason, string> = {
   "http-status": "Calendar feed responded with an error status",
   timeout: "Calendar feed did not respond in time",
   "too-large": "Calendar feed exceeds the size limit",
   network: "Calendar feed could not be fetched",
+  "insecure-redirect":
+    "Calendar feed was redirected to an address without https",
 };
 
 /**
@@ -46,7 +48,14 @@ const DEFAULT_ACCEPT = "text/calendar, text/plain;q=0.9, */*;q=0.1";
  * (checked against `Content-Length` and while streaming, so an oversized body is never
  * buffered completely).
  *
- * @throws FeedFetchError on non-2xx, timeout, oversize or network failure.
+ * Redirects are followed (the Fetch default, also in Workers) and `response.url` is the
+ * final URL after them; a response whose final URL is not https is refused like the
+ * configured URL would be (`loadSource` only accepts https). An empty `response.url`
+ * means the response did not come from the network (a `Response` built in code, as in
+ * tests) and carries no URL to check: it is accepted. A real fetch always sets it.
+ *
+ * @throws FeedFetchError on non-2xx, timeout, oversize, network failure or a redirect
+ *   to a non-https URL.
  */
 export async function fetchFeed(
   url: string,
@@ -67,6 +76,10 @@ export async function fetchFeed(
     throw new FeedFetchError(signal.aborted ? "timeout" : "network");
   }
 
+  if (response.url !== "" && !isHttpsUrl(response.url)) {
+    await cancelQuietly(response.body);
+    throw new FeedFetchError("insecure-redirect");
+  }
   if (!response.ok) {
     await cancelQuietly(response.body);
     throw new FeedFetchError("http-status", response.status);
@@ -77,6 +90,14 @@ export async function fetchFeed(
     throw new FeedFetchError("too-large");
   }
   return readTextCapped(response.body, maxBytes, signal);
+}
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 async function cancelQuietly(body: ReadableStream | null): Promise<void> {

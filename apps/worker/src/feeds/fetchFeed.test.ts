@@ -94,4 +94,55 @@ describe("fetchFeed", () => {
     );
     expect(await fetchFeed(FEED_URL)).toBe("");
   });
+
+  describe("final URL after redirects", () => {
+    /** A response as if fetched from `url` (a constructed `Response` has url ""). */
+    function responseFrom(url: string, body: BodyInit | null): Response {
+      const response = new Response(body);
+      Object.defineProperty(response, "url", { value: url });
+      return response;
+    }
+
+    it("accepts a response whose final URL is https", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        responseFrom(
+          "https://moved.kidboard.invalid/private-TESTONLY/b.ics",
+          "BEGIN:VCALENDAR",
+        ),
+      );
+      expect(await fetchFeed(FEED_URL)).toBe("BEGIN:VCALENDAR");
+    });
+
+    it.each([
+      "http://moved.kidboard.invalid/private-TESTONLY/b.ics",
+      "ftp://moved.kidboard.invalid/b.ics",
+      "not a url",
+    ])(
+      "refuses a final URL that is not https (%s) without reading the body or quoting it",
+      async (finalUrl) => {
+        let cancelled = false;
+        const body = new ReadableStream<Uint8Array>({
+          cancel() {
+            cancelled = true;
+          },
+        });
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(
+          responseFrom(finalUrl, body),
+        );
+        const error = await failure(fetchFeed(FEED_URL));
+        expect(error.reason).toBe("insecure-redirect");
+        expect(error.message).not.toContain("kidboard.invalid");
+        expect(error.message).not.toContain("http:");
+        expect(error.cause).toBeUndefined();
+        expect(cancelled).toBe(true);
+      },
+    );
+
+    it("treats an empty response URL (not from the network) as nothing to check", async () => {
+      const response = new Response("BEGIN:VCALENDAR");
+      expect(response.url).toBe("");
+      vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+      expect(await fetchFeed(FEED_URL)).toBe("BEGIN:VCALENDAR");
+    });
+  });
 });
