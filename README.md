@@ -77,13 +77,16 @@ central service: every family runs its own copy.
 
 1. Click the button, log in to Cloudflare and connect GitHub or GitLab.
 2. Fill in three fields:
-   - `KIDBOARD_ACCESS_TOKEN`: a random string of 32 to 256 letters and digits
-     (`_` and `-` allowed), e.g. from `openssl rand -hex 32`. It is required: without a valid
-     one the API refuses everything. It protects your data and is needed for the editor.
-   - `KIDBOARD_PARENT_PIN`: 6 to 12 digits; unlocks the editor. Not a repeated digit or a run like
-     `123456` (the editor stays off then), and no birthdays.
+   - `KIDBOARD_ACCESS_TOKEN`: a random string, e.g. from `openssl rand -hex 32`. It is
+     required: without a valid one the API refuses everything. It protects your data and is
+     needed for the editor.
+   - `KIDBOARD_PARENT_PIN`: 6 to 12 digits that are not easy to guess (no birthdays); unlocks
+     the editor.
    - `KIDBOARD_CONFIG`: your children (name, colour, emoji) and time zone as one line of
      JSON. Change the example names. Replace every `REPLACE_ME`.
+
+   The exact rules for the token and the PIN:
+   [docs/CONFIG.md](docs/CONFIG.md#secrets-and-environment-variables).
 
    Keep the suggested storage (`KIDBOARD_CACHE`, `KIDBOARD_DATA`): Cloudflare creates it.
 
@@ -128,11 +131,12 @@ Step by step, the local command-line way, custom domain and logs:
 - **Change or delete:** tap "Change". For a weekly entry you choose "only on <day>" or
   "whole series".
 - **Locks itself** after 3 minutes without input, when you tap "Done" and when the screen
-  turns off. After 5 wrong PINs it locks for 15 minutes; each further lockout doubles the
-  time (up to 2 hours), and the right PIN resets it.
-- **Calendar on your phone:** set the optional secret `KIDBOARD_FEED_TOKEN` (32 or more
-  letters and digits). The "Backup & phone" section then shows a link to subscribe to; keep
-  it private, anyone with the link can read the entries.
+  turns off. Too many wrong PINs lock it for a while
+  ([lockout rules](docs/CONFIG.md#secrets-and-environment-variables)).
+- **Calendar on your phone:** set the optional secret `KIDBOARD_FEED_TOKEN` (a random string
+  like the access token, [rules](docs/CONFIG.md#secrets-and-environment-variables)). The
+  "Backup & phone" section then shows a link to subscribe to; keep it private, anyone with
+  the link can read the entries.
 - **Backup:** "Download backup" saves the entries made in the app as a file; "Choose backup
   file" adds them again or replaces everything.
 
@@ -235,17 +239,17 @@ into the description (see above).
 
 ## Troubleshooting
 
-| What you see                                                 | What to do                                                                                                                                                     |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "This tablet needs a new access link" (**KB-401**)           | The access token is missing, wrong or was changed. Open the tablet link with `?key=<token>` once more.                                                         |
-| No pencil in the side bar                                    | The editor is off: `KIDBOARD_PARENT_PIN` must be 6 to 12 digits and not easy to guess (`111111`, `123456`), and `KIDBOARD_ACCESS_TOKEN` must be a valid token. |
-| "The editor is switched off."                                | Same as above; after changing a secret, reload the board.                                                                                                      |
-| "Offline · as of ..." (**KB-OFF** if there is no saved plan) | No internet. The last good plan stays visible; the board reloads by itself when the network is back.                                                           |
-| "Can't update · as of ..."                                   | The tablet cannot reach the server; the last good plan stays. Check Wi-Fi; it retries by itself.                                                               |
-| "Maybe not current · as of ..."                              | The server could not reach a Google calendar and shows the last good copy (up to 7 days). Check that calendar's secret address.                                |
-| Wrong day, or times shifted by hours                         | Set `timeZone` in `KIDBOARD_CONFIG` (e.g. `Europe/Berlin`). The tablet's own time zone is ignored on purpose.                                                  |
-| A Google calendar is empty or missing                        | Is `CAL_<ID>_URL` set and does `<ID>` match the calendar `id`? Is it the secret iCal address? New Google events can take an hour or more.                      |
-| "Back in a moment" with an error code                        | A reload usually fixes it ("Reload now"). The code tells a helper what happened, see below.                                                                    |
+| What you see                                                 | What to do                                                                                                                                             |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "This tablet needs a new access link" (**KB-401**)           | The access token is missing, wrong or was changed. Open the tablet link with `?key=<token>` once more.                                                 |
+| No pencil in the side bar                                    | The editor is off: `KIDBOARD_PARENT_PIN` or `KIDBOARD_ACCESS_TOKEN` is missing or refused ([rules](docs/CONFIG.md#secrets-and-environment-variables)). |
+| "The editor is switched off."                                | Same as above; after changing a secret, reload the board.                                                                                              |
+| "Offline · as of ..." (**KB-OFF** if there is no saved plan) | No internet. The last good plan stays visible; the board reloads by itself when the network is back.                                                   |
+| "Can't update · as of ..."                                   | The tablet cannot reach the server; the last good plan stays. Check Wi-Fi; it retries by itself.                                                       |
+| "Maybe not current · as of ..."                              | The server could not reach a Google calendar and shows the last good copy (up to 7 days). Check that calendar's secret address.                        |
+| Wrong day, or times shifted by hours                         | Set `timeZone` in `KIDBOARD_CONFIG` (e.g. `Europe/Berlin`). The tablet's own time zone is ignored on purpose.                                          |
+| A Google calendar is empty or missing                        | Is `CAL_<ID>_URL` set and does `<ID>` match the calendar `id`? Is it the secret iCal address? New Google events can take an hour or more.              |
+| "Back in a moment" with an error code                        | A reload usually fixes it ("Reload now"). The code tells a helper what happened, see below.                                                            |
 
 <details>
 <summary><b>Error codes</b> ("Error code for parents" on the error card)</summary>

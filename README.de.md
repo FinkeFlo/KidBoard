@@ -80,13 +80,16 @@ gibt keinen zentralen Dienst: Jede Familie betreibt ihre eigene Kopie.
 
 1. Auf den Button klicken, bei Cloudflare anmelden und GitHub oder GitLab verbinden.
 2. Drei Felder ausfüllen:
-   - `KIDBOARD_ACCESS_TOKEN`: eine Zufallsfolge aus 32 bis 256 Buchstaben und Ziffern
-     (`_` und `-` erlaubt), z. B. aus `openssl rand -hex 32`. Sie ist Pflicht: ohne gültiges Token
-     verweigert die API alles. Sie schützt eure Daten und wird für den Editor gebraucht.
-   - `KIDBOARD_PARENT_PIN`: 6 bis 12 Ziffern; damit öffnet sich der Editor. Keine wiederholte Ziffer und keine
-     Reihe wie `123456` (der Editor bleibt dann aus), keine Geburtstage.
+   - `KIDBOARD_ACCESS_TOKEN`: eine Zufallsfolge, z. B. aus `openssl rand -hex 32`. Sie ist
+     Pflicht: ohne gültiges Token verweigert die API alles. Sie schützt eure Daten und wird
+     für den Editor gebraucht.
+   - `KIDBOARD_PARENT_PIN`: 6 bis 12 Ziffern, nicht leicht zu erraten (keine Geburtstage);
+     damit öffnet sich der Editor.
    - `KIDBOARD_CONFIG`: eure Kinder (Name, Farbe, Emoji) und die Zeitzone als eine Zeile
      JSON. Die Beispielnamen ändern. Jedes `REPLACE_ME` ersetzen.
+
+   Die genauen Regeln für Token und PIN:
+   [docs/CONFIG.de.md](docs/CONFIG.de.md#secrets-und-umgebungsvariablen).
 
    Den vorgeschlagenen Speicher (`KIDBOARD_CACHE`, `KIDBOARD_DATA`) so lassen: Cloudflare
    legt ihn selbst an.
@@ -125,7 +128,7 @@ bleibt aus:
 
 Schritt für Schritt, der Weg über die Kommandozeile, eigene Domain und Logs:
 [docs/DEPLOY.de.md](docs/DEPLOY.de.md). Alle Einstellungen:
-[docs/CONFIG.md](docs/CONFIG.md#deutsche-kurzfassung).
+[docs/CONFIG.de.md](docs/CONFIG.de.md).
 
 ## Der Eltern-Editor
 
@@ -136,10 +139,11 @@ Schritt für Schritt, der Weg über die Kommandozeile, eigene Domain und Logs:
 - **Ändern oder löschen:** auf "Ändern" tippen. Bei einem wöchentlichen Eintrag wählst du
   "nur am <Tag>" oder "ganze Reihe".
 - **Sperrt sich selbst** nach 3 Minuten ohne Eingabe, bei "Fertig" und wenn der Bildschirm
-  ausgeht. Nach 5 falschen PINs ist er 15 Minuten gesperrt; jede weitere Sperre verdoppelt die Zeit
-  (bis 2 Stunden), die richtige PIN setzt zurück.
-- **Kalender auf dem Handy:** das optionale Secret `KIDBOARD_FEED_TOKEN` setzen (32 oder mehr
-  Buchstaben und Ziffern). Der Bereich "Sicherung & Handy" zeigt dann einen Link zum
+  ausgeht. Zu viele falsche PINs sperren ihn für eine Weile
+  ([Sperr-Regeln](docs/CONFIG.de.md#secrets-und-umgebungsvariablen)).
+- **Kalender auf dem Handy:** das optionale Secret `KIDBOARD_FEED_TOKEN` setzen (eine
+  Zufallsfolge wie das Zugriffstoken, [Regeln](docs/CONFIG.de.md#secrets-und-umgebungsvariablen)).
+  Der Bereich "Sicherung & Handy" zeigt dann einen Link zum
   Abonnieren; privat halten, jeder mit dem Link kann die Einträge lesen.
 - **Sicherung:** "Sicherung herunterladen" speichert die Einträge aus der App als Datei;
   "Sicherungsdatei wählen" spielt sie wieder ein, zusätzlich oder als Ersatz für alles.
@@ -151,7 +155,7 @@ Schritt für Schritt, der Weg über die Kommandozeile, eigene Domain und Logs:
 Einen Ort in `KIDBOARD_CONFIG` eintragen, zum Beispiel `"weather": { "place": "Hamburg",
 "country": "DE" }`. Die Vorhersage kommt von [Open-Meteo.com](https://open-meteo.com/) (ohne
 Konto und Schlüssel) und wird von deinem Server abgerufen; der Ort erreicht das Tablet nie.
-Details und die Anzieh-Regeln: [docs/CONFIG.md](docs/CONFIG.md#wetter).
+Details und die Anzieh-Regeln: [docs/CONFIG.de.md](docs/CONFIG.de.md#wetter).
 
 ## Optional: Google Kalender
 
@@ -251,17 +255,17 @@ unter "Mitbringen" antippen (oder ein eigenes Emoji hinzufügen); bei Google-Ter
 
 ## Fehlersuche
 
-| Was du siehst                                                               | Was zu tun ist                                                                                                                                                                      |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Dieses Tablet braucht einen neuen Zugangslink" (**KB-401**)                | Das Zugriffstoken fehlt, ist falsch oder wurde geändert. Den Tablet-Link mit `?key=<token>` noch einmal öffnen.                                                                     |
-| Kein Stift in der Seitenleiste                                              | Der Editor ist aus: `KIDBOARD_PARENT_PIN` muss 6 bis 12 Ziffern haben, nicht leicht zu erraten sein (`111111`, `123456`), und `KIDBOARD_ACCESS_TOKEN` muss ein gültiges Token sein. |
-| "Der Editor ist ausgeschaltet."                                             | Wie oben; nach dem Ändern eines Secrets das Board neu laden.                                                                                                                        |
-| "Offline · Stand von ..." (**KB-OFF**, wenn noch kein Plan gespeichert ist) | Kein Internet. Der letzte gute Plan bleibt sichtbar; das Board lädt von selbst neu, sobald das Netz zurück ist.                                                                     |
-| "Aktualisieren klappt nicht · Stand von ..."                                | Das Tablet erreicht den Server nicht; der letzte gute Plan bleibt. WLAN prüfen, es versucht es von selbst wieder.                                                                   |
-| "Vielleicht nicht aktuell · Stand von ..."                                  | Der Server erreicht einen Google Kalender nicht und zeigt die letzte gute Kopie (bis 7 Tage). Die geheime Adresse dieses Kalenders prüfen.                                          |
-| Falscher Tag oder um Stunden verschobene Zeiten                             | `timeZone` in `KIDBOARD_CONFIG` setzen (z. B. `Europe/Berlin`). Die Zeitzone des Tablets wird bewusst ignoriert.                                                                    |
-| Ein Google Kalender ist leer oder fehlt                                     | Ist `CAL_<ID>_URL` gesetzt und passt `<ID>` zur Kalender-`id`? Ist es die geheime iCal-Adresse? Neue Google-Termine brauchen eine Stunde oder länger.                               |
-| "Gleich geht's weiter" mit Fehlercode                                       | Meist hilft "Jetzt neu laden". Der Code sagt einem Helfer, was passiert ist, siehe unten.                                                                                           |
+| Was du siehst                                                               | Was zu tun ist                                                                                                                                                 |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Dieses Tablet braucht einen neuen Zugangslink" (**KB-401**)                | Das Zugriffstoken fehlt, ist falsch oder wurde geändert. Den Tablet-Link mit `?key=<token>` noch einmal öffnen.                                                |
+| Kein Stift in der Seitenleiste                                              | Der Editor ist aus: `KIDBOARD_PARENT_PIN` oder `KIDBOARD_ACCESS_TOKEN` fehlt oder wird abgelehnt ([Regeln](docs/CONFIG.de.md#secrets-und-umgebungsvariablen)). |
+| "Der Editor ist ausgeschaltet."                                             | Wie oben; nach dem Ändern eines Secrets das Board neu laden.                                                                                                   |
+| "Offline · Stand von ..." (**KB-OFF**, wenn noch kein Plan gespeichert ist) | Kein Internet. Der letzte gute Plan bleibt sichtbar; das Board lädt von selbst neu, sobald das Netz zurück ist.                                                |
+| "Aktualisieren klappt nicht · Stand von ..."                                | Das Tablet erreicht den Server nicht; der letzte gute Plan bleibt. WLAN prüfen, es versucht es von selbst wieder.                                              |
+| "Vielleicht nicht aktuell · Stand von ..."                                  | Der Server erreicht einen Google Kalender nicht und zeigt die letzte gute Kopie (bis 7 Tage). Die geheime Adresse dieses Kalenders prüfen.                     |
+| Falscher Tag oder um Stunden verschobene Zeiten                             | `timeZone` in `KIDBOARD_CONFIG` setzen (z. B. `Europe/Berlin`). Die Zeitzone des Tablets wird bewusst ignoriert.                                               |
+| Ein Google Kalender ist leer oder fehlt                                     | Ist `CAL_<ID>_URL` gesetzt und passt `<ID>` zur Kalender-`id`? Ist es die geheime iCal-Adresse? Neue Google-Termine brauchen eine Stunde oder länger.          |
+| "Gleich geht's weiter" mit Fehlercode                                       | Meist hilft "Jetzt neu laden". Der Code sagt einem Helfer, was passiert ist, siehe unten.                                                                      |
 
 <details>
 <summary><b>Fehlercodes</b> ("Fehlercode für Eltern" auf der Fehlerkarte)</summary>
