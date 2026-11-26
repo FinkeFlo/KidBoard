@@ -65,8 +65,8 @@ Im Dashboard gesetzte Klartext-Variablen bleiben bei späteren Deploys erhalten
 ## 3. Variante A: Button "Deploy to Cloudflare"
 
 Der schnellste Weg, aber er braucht ein kostenloses **GitHub- oder GitLab-Konto**. Das
-passiert dabei: Cloudflare bittet dich, seine GitHub-App **"Cloudflare Workers & Pages"** zu
-installieren und ihr Zugriff auf deine Repositorys zu geben. Dann legt es eine Kopie von
+passiert dabei: Cloudflare bittet dich, seine GitHub-App **"Cloudflare Workers & Pages"** (bei GitLab
+seine GitLab-Integration) zu installieren und ihr Zugriff auf deine Repositorys zu geben. Dann legt es eine Kopie von
 KidBoard als neues Repository in deinem Konto an (privat, wenn du das Kästchen ankreuzt) und
 deployt sie. Jede spätere Änderung, die auf diese Kopie gepusht wird, deployt erneut. Kein
 GitHub-Konto? Dann
@@ -99,11 +99,11 @@ GitHub-Konto? Dann
    Variables and Secrets. `calendars` in `KIDBOARD_CONFIG` ergänzen und je Kalender ein
    `CAL_<ID>_URL` anlegen (Add, Typ "Secret"). Speichern deployt eine neue Version.
 
-**Den Zugriff der App nach dem ersten Deploy einschränken.** Die App hat womöglich Zugriff
-auf alle deine Repositorys bekommen. <https://github.com/settings/installations> öffnen,
+**Den Zugriff der App nach dem ersten Deploy einschränken** (GitHub). Die App hat womöglich
+Zugriff auf alle deine Repositorys bekommen. <https://github.com/settings/installations> öffnen,
 "Cloudflare Workers & Pages" > Configure wählen, unter **Repository access** **Only select
-repositories** einstellen und dein neues KidBoard-Repository auswählen. Cloudflares eigene
-Doku empfiehlt, die App so einzuschränken.
+repositories** einstellen und dein neues KidBoard-Repository auswählen. Cloudflares Doku beschreibt,
+wie man sie einschränkt.
 
 ## 4. Variante B: vom eigenen Rechner, ohne GitHub-Konto (Wrangler-CLI)
 
@@ -141,17 +141,16 @@ Git ignoriert wird: `.dev.vars.example` nach `.dev.vars.production` kopieren, au
 `pnpm exec wrangler secret bulk .dev.vars.production` ausführen und die Datei danach
 löschen.
 
-Später aktualisieren: das ZIP erneut herunterladen und in einen neuen, leeren Ordner
-entpacken (nicht mit dem alten mischen). Den alten Ordner behalten: Beim ersten Deploy
-schreibt Wrangler die IDs des angelegten KV-Namespace und der D1-Datenbank in dessen
-`wrangler.jsonc`. Dessen Einträge
-`"kv_namespaces"` und `"d1_databases"` über dieselben Einträge in der `wrangler.jsonc` des
-neuen Ordners kopieren, damit die neue
-Version deine vorhandenen Daten weiter nutzt. Dann im neuen Ordner `pnpm install` und
-`pnpm deploy:cloudflare` ausführen (fragt Wrangler danach, erneut mit
-`pnpm exec wrangler login` anmelden). Mit einem Klon:
-`git pull && pnpm install && pnpm deploy:cloudflare`. Die Secrets bleiben in jedem Fall in
-Cloudflare.
+Später aktualisieren: das ZIP erneut herunterladen, in einen neuen, leeren Ordner entpacken
+(nicht mit dem alten mischen) und dort `pnpm install` und `pnpm deploy:cloudflare` ausführen
+(fragt Wrangler danach, erneut mit `pnpm exec wrangler login` anmelden). Mit einem Klon:
+`git pull && pnpm install && pnpm deploy:cloudflare`. Secrets, Cache und die Einträge aus dem
+Editor bleiben erhalten: Der Deploy nutzt den Speicher des Workers weiter, der schon unter
+demselben Namen läuft; die IDs, die Wrangler eventuell in `wrangler.jsonc` schreibt, musst du
+nicht aufheben. Das gilt, solange der Worker seinen Namen (`kidboard`) behält und im selben
+Cloudflare-Konto bleibt. Ein umbenannter Worker oder ein anderes Konto beginnt mit leerem
+Cache und leerer Datenbank: vorher im Editor eine Sicherung speichern ("Sicherung
+herunterladen", siehe [Der Eltern-Editor](../README.de.md#der-eltern-editor)).
 
 ## 5. Deployment prüfen
 
@@ -237,9 +236,9 @@ Workers Static Assets auf alle statischen Antworten anwendet:
 | --- | --- |
 | Board meldet "Dieses Tablet braucht einen neuen Zugangslink" | Falscher oder geänderter Token: `https://<url>/?key=<token>` erneut öffnen. |
 | `/api/config` antwortet `500 server_misconfigured` | `KIDBOARD_CONFIG` fehlt oder ist ungültig (Workers Logs nennen die Fehler), oder `KIDBOARD_ACCESS_TOKEN` fehlt oder erfüllt die [Token-Regeln](CONFIG.de.md#secrets-und-umgebungsvariablen) nicht (das Log nennt den Grund). |
-| Ein Kalender fehlt, `sources[].status` ist `error` | Secret-Name passt nicht zur Kalender-ID (`CAL_<ID>_URL`, Großbuchstaben) oder die iCal-Adresse ist falsch. |
 | Editor lange gesperrt | Es wurden wiederholt falsche PINs eingegeben; die Sperre wächst mit jeder weiteren Sperre ([Sperr-Regeln](CONFIG.de.md#secrets-und-umgebungsvariablen)) und endet von selbst. Wer das Zugriffstoken hat, kann das wiederholen: `KIDBOARD_ACCESS_TOKEN` wechseln und den Tablet-Link neu öffnen. |
-| Deploy-Formular: "Your GitHub authorization has expired …" | Die GitHub-App von Cloudflare muss neu installiert werden: <https://github.com/settings/installations> öffnen, "Cloudflare Workers & Pages" wählen, deinstallieren, dann das Deploy-Formular neu starten und die App installieren, wenn danach gefragt wird. |
+| Ein Kalender fehlt, `sources[].status` ist `error` | Secret-Name passt nicht zur Kalender-ID (`CAL_<ID>_URL`, Großbuchstaben) oder die iCal-Adresse ist falsch. |
+| Deploy-Formular (GitHub): "Your GitHub authorization has expired …" | Laut Cloudflares Anleitung zur Neuinstallation: <https://github.com/settings/installations> öffnen, "Cloudflare Workers & Pages" wählen, deinstallieren, dann GitHub neu verbinden (das Deploy-Formular neu starten und die App installieren, wenn danach gefragt wird). |
 | Build bricht mit pnpm-Fehler ab | Build-Variable `PNPM_VERSION=10.28.0` setzen (Worker > Settings > Build). |
 | `The directory specified by the "assets.directory" field ... does not exist` | Die Web-App wurde nicht gebaut: `pnpm deploy:cloudflare` bzw. Build-Befehl `pnpm run build` verwenden. |
 | Alte Version wird angezeigt | Das Tablet sucht stündlich nach einer neuen Version und lädt sich selbst neu; oder einmal neu laden. |

@@ -79,7 +79,8 @@ gibt keinen zentralen Dienst: Jede Familie betreibt ihre eigene Kopie.
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/FinkeFlo/kidboard)
 
 Der Button braucht ein kostenloses GitHub- oder GitLab-Konto: Cloudflare installiert seine
-GitHub-App "Cloudflare Workers & Pages" und legt eine Kopie von KidBoard in deinem Konto an.
+GitHub-App "Cloudflare Workers & Pages" (bei GitLab seine GitLab-Integration) und legt eine
+Kopie von KidBoard in deinem Konto an.
 Kein GitHub-Konto? Der Weg übers Terminal in [docs/DEPLOY.de.md](docs/DEPLOY.de.md) braucht
 keins.
 
@@ -102,6 +103,11 @@ keins.
 3. Deployen, dann `https://<dein-worker>.workers.dev/?key=<token>` **einmal** auf dem Tablet
    öffnen. Das Board merkt sich das Token und entfernt es aus der Adresszeile.
 
+Bei GitHub nach dem ersten Deploy den Zugriff der App auf das neue Repository beschränken
+([so geht's](docs/DEPLOY.de.md#3-variante-a-button-deploy-to-cloudflare)). Meldet das
+Formular "Your GitHub authorization has expired …", siehe
+[Fehlersuche](docs/DEPLOY.de.md#9-fehlersuche).
+
 **Deine Kopie aktualisiert sich nicht von selbst.** Der Button legt eine eigene Kopie von
 KidBoard in deinem GitHub-/GitLab-Konto an; Cloudflare baut sie bei jeder Änderung an dieser
 Kopie neu, aber Änderungen an diesem Repository kommen dort nicht automatisch an. Um von neuen
@@ -114,16 +120,18 @@ unten lesen.
 Update prüfen; sonst antwortet das Board evtl. mit einem Fehler (`KB-500`) oder der Editor
 bleibt aus:
 
-1. **Zugriffstoken ist Pflicht.** Ohne gültiges `KIDBOARD_ACCESS_TOKEN` (32 bis 256 Zeichen
-   `A-Z a-z 0-9 _ -`) verweigert die API jetzt alles. Ein kürzeres Token oder eines mit `+`,
+1. **Zugriffstoken ist Pflicht.** Ohne gültiges `KIDBOARD_ACCESS_TOKEN`
+   ([Regeln](docs/CONFIG.de.md#secrets-und-umgebungsvariablen)) verweigert die API jetzt
+   alles. Ein kürzeres Token oder eines mit `+`,
    `/` oder `=` (z. B. aus `openssl rand -base64`) funktioniert nicht mehr: ein neues erzeugen
    (`openssl rand -hex 32`), das Secret setzen und den Tablet-Link mit dem neuen `?key=<token>`
    einmal öffnen. Ein öffentliches Board braucht `KIDBOARD_PUBLIC="1"` und kein Token.
 2. **Kinderfarben.** In `KIDBOARD_CONFIG` sind nur `child-1` ... `child-6` oder Hex (`#rgb`,
    `#rrggbb`) gültig; ein Name wie `"red"` oder `rgb(...)` macht die ganze Konfiguration
    ungültig. Umstellen, z. B. `"red"` auf `"#cc0000"`.
-3. **PIN.** Eine PIN mit einer wiederholten Ziffer oder einer Reihe wie `123456` schaltet den
-   Editor aus (das Log nennt den Grund). Eine andere PIN wählen.
+3. **PIN.** Eine zu leicht zu erratende PIN, etwa eine Reihe wie `123456`, schaltet den
+   Editor aus (das Log nennt den Grund;
+   [Regeln](docs/CONFIG.de.md#secrets-und-umgebungsvariablen)). Eine andere PIN wählen.
 4. **Einbetten.** Andere Seiten können das Board nicht mehr in einem Frame einbetten (z. B. ein
    Home-Assistant-Dashboard). Die Adresse des Dashboards in `FRAME_ANCESTORS` in
    `apps/web/headers/staticHeaders.ts` ergänzen, siehe [docs/DEPLOY.de.md](docs/DEPLOY.de.md).
