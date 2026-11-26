@@ -1,4 +1,8 @@
-import { ImportModeSchema, type ImportModeValue } from "@kidboard/shared";
+import {
+  ENTRY_EXPORT_FORMAT,
+  ImportModeSchema,
+  type ImportModeValue,
+} from "@kidboard/shared";
 import { type ReactNode, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -22,7 +26,7 @@ export function readBackup(name: string, text: string): ChosenBackup | null {
     if (
       typeof json === "object" &&
       json !== null &&
-      (json as { format?: unknown }).format === "kidboard-entries" &&
+      (json as { format?: unknown }).format === ENTRY_EXPORT_FORMAT &&
       Array.isArray((json as { entries?: unknown }).entries)
     ) {
       return {
