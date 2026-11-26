@@ -1,6 +1,6 @@
 import type { Child } from "@kidboard/shared";
 
-import { useBurnInShift } from "../burnin";
+import { useBurnInShift } from "../burnin/useBurnInShift";
 import { ChildLegend } from "../components/ChildLegend";
 import { DiscreetStatusBanner } from "../day/DiscreetStatusBanner";
 import {

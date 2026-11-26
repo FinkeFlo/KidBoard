@@ -15,7 +15,7 @@ import { DayError, type DayErrorKind, DayLoading } from "../day/DayStates";
 import { OverviewBoard } from "../day/OverviewBoard";
 import { formatTime, useFormatContext } from "../i18n/format";
 import { useLockWhenEditorOff, useParentGateOpen } from "../parent";
-import { useNightTheme } from "../theme";
+import { useNightTheme } from "../theme/useNightTheme";
 import { useNow } from "../time";
 import {
   buildBoardWeather,

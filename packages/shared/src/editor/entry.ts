@@ -55,7 +55,6 @@ export const WeeklyRepeatSchema = z.strictObject({
     until: DateStringSchema.optional(),
   }),
 });
-export type WeeklyRepeat = z.infer<typeof WeeklyRepeatSchema>;
 
 export const EditorRepeatSchema = z.union([
   z.literal("none"),
