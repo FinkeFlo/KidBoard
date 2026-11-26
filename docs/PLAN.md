@@ -896,6 +896,46 @@ layout without scrolling), a T-27a-style UI/UX click test of the new surfaces by
 agents (Haiku, Sonnet, Opus) at both sizes, light/night, fixed via the builder/reviewer loop
 and re-checked by Sonnet until no blocking findings; CI green.
 
+- [ ] **T-50 Weather place in the parent editor** (risk: **high** → Opus, deps: M9, M11)
+  Parents turn the weather on, change the town or turn it off in the editor instead of
+  editing `KIDBOARD_CONFIG` (maintainer: "the weather is missing" on a board whose config
+  had no `weather` block). A first slice of the M12 setup idea, only for weather.
+  Decision: [ADR-0016](adr/0016-weather-setting-in-d1.md).
+  Acceptance:
+  1. Storage: one `kb_meta` row (`weather_setting`, a constant key) holding either
+     `{"off":true}` or a weather block (`place` 1–80 chars, optional `country`, `unit`).
+     Validated with a strict shared schema on write and on read (a corrupt row is ignored
+     and logged once with a fixed text). Effective weather = stored setting if present,
+     else `weather` from `KIDBOARD_CONFIG`; `{"off":true}` turns weather off even when the
+     config has a block. D1 missing or failing → the config's block (never a 500 for it).
+  2. `/api/config` (`weather: true` flag) and `/api/weather` use the effective weather.
+     The agenda config hash and cache keys stay derived from `KIDBOARD_CONFIG` only (a
+     weather change never invalidates feed/app caches); the weather caches already key on
+     the place.
+  3. Editor API behind the parent session (same middleware, CSRF/origin rules and 403s as
+     the entry routes): `GET /api/parent/weather` → `{ source: "config" | "editor" | "none",
+     weather: { place?, country?, unit } | null, status: "ok" | "off" | "place_unknown" |
+     "unavailable" }` (`latitude`/`longitude` from the config are reported only as
+     `coordinates: true`, never their values); `PUT` with `{ place, country?, unit }` or
+     `{ off: true }` stores it, resolves the place right away and answers the same shape,
+     so an unknown town is reported to the parent; `DELETE` removes the row (back to the
+     config). Invalid bodies → 400 with fixed texts. The place appears in no log line, error
+     body, public config or unauthenticated response (tests with `TESTONLY-Weatherplace`).
+  4. Editor UI: a "Weather" section (DE "Wetter") with an on/off switch, town field,
+     optional country (2 letters), °C/°F, Save, and "Use the setting from the configuration"
+     when an editor setting exists; shows the result (found / town not found / weather
+     service not reachable right now) as text, not only colour. Touch targets ≥ 44 px
+     (parent UI), labels and errors in DE + EN, keyboard and screen reader usable.
+  5. After a save or reset the board on the same device refetches config and weather
+     (`invalidateQueries` on both keys, persisted cache updated); other devices pick it up
+     with the next config refresh. Turning weather off removes the chips without an error.
+  6. Backup export/import of entries does not include or touch the weather setting
+     (documented in CONFIG.md).
+  7. Tests: shared schema, worker routes (precedence incl. off-over-config, D1 failure
+     fallback, auth, validation, privacy), web section (states, i18n), one e2e flow (turn
+     on with a town → chip on the board; turn off → gone). Docs: `docs/CONFIG.md` EN + DE
+     weather section (editor first, config as default), ADR-0015 pointer to ADR-0016.
+
 ## M6 – Deploy, docs, v1.0.0
 
 - [x] **T-25 Cloudflare deploy** (risk: **high** → Opus, deps: M5; built before M5b, see change log)
@@ -930,7 +970,7 @@ and re-checked by Sonnet until no blocking findings; CI green.
   ranking for leftover slots, 🌞 vs ☀️ glanceability, faint emoji on light tints, skeleton → board
   header jump, all states at both sizes light/night with 3 children and 1–12 events.
 
-- [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27a, M9, M10, M11; last task before the release)
+- [ ] **T-28 Release readiness & v1.0.0** (risk: **high** → Opus, deps: T-27a, M9, M10, M11, T-50; last task before the release)
   Acceptance: full review by `reviewer-opus`; gitleaks over full history clean;
   `pnpm audit --prod` without high/critical; release-please release `v1.0.0` published;
   branch-protection settings documented/applied; `CLAUDE.md` switched to PR workflow;
@@ -953,6 +993,7 @@ and re-checked by Sonnet until no blocking findings; CI green.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-22 | Initial plan | Phase 0 |
+| 2026-11-26 | New T-50 (after M9, before T-28): weather place, unit and on/off in the parent editor, stored in D1 `kb_meta` over the config default; ADR-0016; T-28 also depends on T-50 | Maintainer: weather "missing" because the config had no `weather` block; parents should not have to edit JSON for it |
 | 2026-11-23 | M9 after the milestone review and the UI/UX click test: T-47.4 snow ❄️; T-47.5 new clothing thresholds, rain/snow boots, two drawn pictograms (warm hat, sweater), priority order; T-49.2 evening lead with tomorrow's weather, 🌡️ chip, one-line fit, short dates; T-49.3 week weather row above the weekday; forecast via `timeformat=unixtime` (ADR-0015) | Click test (Haiku/Sonnet/Opus): tomorrow's rain clothes next to today's sun, no hat/sweater, boots and sunscreen in summer storms; review: Open-Meteo ignores DST inside the range |
 | 2026-11-23 | New milestone M9 Weather and what to wear (T-47–T-49) before v1.0.0, pulled forward from "Later"; ADR-0015; T-28 also depends on M9 | Maintainer request: weather with temperature and child-friendly clothing pictures for today and tomorrow |
 | 2026-11-23 | T-46: user docs for the editor (README, DEPLOY, CONFIG EN + DE) deferred | Maintainer: the feature is not final yet, docs would change too much |
