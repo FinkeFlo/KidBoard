@@ -61,6 +61,13 @@ secrets always do. The template for all of them is [`.dev.vars.example`](../.dev
 
 ## 3. Option A: "Deploy to Cloudflare" button
 
+The quickest way, but it needs a free **GitHub or GitLab account**. Here is what happens:
+Cloudflare asks you to install its GitHub App **"Cloudflare Workers & Pages"** and give it
+access to your repositories. It then creates a copy of KidBoard as a new repository in your
+account (private if you tick that box) and deploys it. Every later change pushed to that
+copy deploys again. No GitHub account? Use
+[option B](#4-option-b-from-your-computer-no-github-account-wrangler-cli).
+
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/FinkeFlo/kidboard)
 
 1. Click the button and log in to Cloudflare.
@@ -93,16 +100,30 @@ secrets always do. The template for all of them is [`.dev.vars.example`](../.dev
    Variables and Secrets. Add `calendars` to `KIDBOARD_CONFIG` and one `CAL_<ID>_URL` per
    calendar (Add, type "Secret"). Saving deploys a new version.
 
-## 4. Option B: from a local clone (Wrangler CLI)
+**Limit the app's access after the first deploy.** The app may have been given access to
+all your repositories. Open <https://github.com/settings/installations>, choose
+"Cloudflare Workers & Pages" > Configure, set **Repository access** to **Only select
+repositories** and pick your new KidBoard repository. Cloudflare's own docs recommend
+limiting the app this way.
 
-Requires Node 22 and pnpm 10 (`corepack enable`).
+## 4. Option B: from your computer, no GitHub account (Wrangler CLI)
 
-```sh
-git clone https://github.com/FinkeFlo/kidboard.git && cd kidboard
-pnpm install
-pnpm exec wrangler login          # opens the browser once
-pnpm deploy:cloudflare            # builds apps/web, then `wrangler deploy`
-```
+This way needs no GitHub account and no git, only:
+
+- a free Cloudflare account,
+- [Node.js](https://nodejs.org/) 22 (LTS),
+- pnpm 10: after installing Node, run `corepack enable` once.
+
+1. Get KidBoard: on the [repository page](https://github.com/FinkeFlo/kidboard) choose
+   **Code > Download ZIP** (the current `main`) and unpack it. If you use git, cloning
+   works just as well: `git clone https://github.com/FinkeFlo/kidboard.git`.
+2. Open a terminal in the unpacked folder and run:
+
+   ```sh
+   pnpm install
+   pnpm exec wrangler login          # opens the browser once
+   pnpm deploy:cloudflare            # builds apps/web, then `wrangler deploy`
+   ```
 
 The first deploy creates the Worker, its KV namespace and its D1 database. Then set the secrets (each command
 prompts for the value; every change is deployed at once):
@@ -119,7 +140,11 @@ Or all at once from a filled-in copy of the template, which is git-ignored becau
 name: copy `.dev.vars.example` to `.dev.vars.production`, fill it in, run
 `pnpm exec wrangler secret bulk .dev.vars.production` and delete the file afterwards.
 
-Updating later: `git pull && pnpm install && pnpm deploy:cloudflare`. Secrets stay.
+Updating later: download the ZIP again and unpack it into a new, empty folder (do not mix
+it with the old one), then run `pnpm install` and `pnpm deploy:cloudflare` there (log in
+again with `pnpm exec wrangler login` if Wrangler asks). With a clone:
+`git pull && pnpm install && pnpm deploy:cloudflare`. Your secrets, settings and entries
+stay in Cloudflare either way.
 
 ## 5. Check the deployment
 
@@ -203,6 +228,7 @@ which Workers Static Assets applies to all static responses:
 | `/api/config` answers `500 server_misconfigured` | `KIDBOARD_CONFIG` missing or invalid (Workers Logs list the validation errors), or `KIDBOARD_ACCESS_TOKEN` is missing or does not meet the [token rules](CONFIG.md#secrets-and-environment-variables) (the log names the reason). |
 | Editor locked for a long time | Wrong PINs were entered repeatedly; the lock grows with every further lockout ([lockout rules](CONFIG.md#secrets-and-environment-variables)) and ends by itself. A holder of the access token can repeat this: rotate `KIDBOARD_ACCESS_TOKEN` and open the tablet link again. |
 | A calendar is missing, `sources[].status` is `error` | Secret name does not match the calendar id (`CAL_<ID>_URL`, upper case) or the iCal address is wrong. |
+| Deploy form: "Your GitHub authorization has expired …" | The Cloudflare GitHub App has to be installed again: open <https://github.com/settings/installations>, choose "Cloudflare Workers & Pages", uninstall it, then start the deploy form again and install the app when asked. |
 | Build fails with a pnpm error | Add the build variable `PNPM_VERSION=10.28.0` (Worker > Settings > Build). |
 | `The directory specified by the "assets.directory" field ... does not exist` | The web app was not built: use `pnpm deploy:cloudflare` or the build command `pnpm run build`. |
 | Old version still shown | The tablet checks for a new version hourly and reloads itself; or reload once. |
@@ -214,6 +240,8 @@ Without a Cloudflare account (no real deploy): `pnpm exec wrangler deploy --dry-
 with fake secrets (`TESTONLY-not-a-secret` token, calendars from `fixtures/ics` on a local
 HTTP server), `curl` against `/api/health`, `/api/config`, `/api/agenda` (with and without
 token) and the static paths (`Cache-Control`, `_headers`), and a headless Chromium opening
-`/?key=…` (token stored and stripped, service worker active, zero CSP violations). The
+`/?key=…` (token stored and stripped, service worker active, zero CSP violations). Option B without
+git: an archive of the repository without `.git`, unpacked, ran `pnpm install` (the git
+hooks are skipped), `pnpm build` and `pnpm deploy:cloudflare --dry-run`. The
 button flow, Workers Builds and the production log behaviour follow the Cloudflare docs and
 need a real account to confirm.

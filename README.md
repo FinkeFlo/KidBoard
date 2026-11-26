@@ -75,6 +75,10 @@ central service: every family runs its own copy.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/FinkeFlo/kidboard)
 
+The button needs a free GitHub or GitLab account: Cloudflare installs its GitHub App
+"Cloudflare Workers & Pages" and puts a copy of KidBoard into your account. No GitHub
+account? The terminal way in [docs/DEPLOY.md](docs/DEPLOY.md) needs none.
+
 1. Click the button, log in to Cloudflare and connect GitHub or GitLab.
 2. Fill in three fields:
    - `KIDBOARD_ACCESS_TOKEN`: a random string, e.g. from `openssl rand -hex 32`. It is
