@@ -744,12 +744,12 @@ describe("CORS on /api/parent/*", () => {
     );
   }
 
-  it("adds POST, PATCH, DELETE and the two headers for allowed origins", async () => {
+  it("adds POST, PUT, PATCH, DELETE and the two headers for allowed origins", async () => {
     const response = await preflight(harness(), "/api/parent/unlock", ORIGIN);
     expect(response.status).toBe(204);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe(ORIGIN);
     expect(response.headers.get("Access-Control-Allow-Methods")).toBe(
-      "GET,HEAD,POST,PATCH,DELETE,OPTIONS",
+      "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS",
     );
     expect(response.headers.get("Access-Control-Allow-Headers")).toBe(
       "Authorization,Content-Type,X-KidBoard-Parent",

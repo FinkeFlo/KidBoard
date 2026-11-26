@@ -37,6 +37,15 @@ instead of the board hiding the weather silently.
 
 ## Consequences
 * One extra D1 read per `/api/config` and `/api/weather` request (both are cheap and few).
+* KV budget: the forecast's writes (`WEATHER_KV_WRITES_PER_DAY`, ADR-0015) are reserved
+  against `KV_WRITES_PER_DAY_BUDGET` whenever the config has a `weather` block **or** the
+  editor is on (D1 bound, valid PIN and access token), because the editor can turn the
+  weather on at any time. Decided without a D1 read on the agenda path; a board with the
+  editor on and the weather off pays a slightly higher feed TTL floor with KV.
+* Each `PUT` with a new town geocodes it and loads a forecast right away (KV writes for the
+  place and the forecast). Only an unlocked parent (PIN, lockout) can trigger it, and the
+  writes stay within the reserved weather budget in normal use (one forecast key per place and unit,
+  fresh 30 minutes).
 * The weather setting is not part of the entries backup; importing a backup keeps it.
 * Precedence must be documented in CONFIG.md (EN + DE): the editor setting overrides the
   config, "Use the setting from the configuration" removes it.

@@ -49,6 +49,51 @@ describe("demo API", () => {
     expect(next.days[0]?.date).toBe("2026-11-23");
   });
 
+  it("turns the demo weather off and on with the editor's weather setting", () => {
+    const api = createDemoApi(() => NOW);
+    const flag = (): boolean =>
+      PublicConfigSchema.parse(
+        answer(api.handle(request({ path: "/api/config" }))).json,
+      ).weather;
+    const unlocked = answer(
+      api.handle(
+        request({
+          method: "POST",
+          path: "/api/parent/unlock",
+          body: JSON.stringify({ pin: DEMO_PARENT_PIN }),
+        }),
+      ),
+    );
+    const session = (unlocked.json as { token: string }).token;
+    const parent = (method: string, body?: unknown): FakeResponse =>
+      answer(
+        api.handle(
+          request({
+            method,
+            path: "/api/parent/weather",
+            session,
+            body: body === undefined ? null : JSON.stringify(body),
+          }),
+        ),
+      );
+    expect(parent("GET").json).toMatchObject({
+      source: "config",
+      weather: { coordinates: true },
+    });
+    parent("PUT", { off: true });
+    expect(flag()).toBe(false);
+    expect(answer(api.handle(request({ path: "/api/weather" }))).status).toBe(
+      404,
+    );
+    parent("PUT", { place: "TESTONLY-Weatherplace", unit: "celsius" });
+    expect(flag()).toBe(true);
+    parent("DELETE");
+    expect(flag()).toBe(true);
+    expect(answer(api.handle(request({ path: "/api/weather" }))).status).toBe(
+      200,
+    );
+  });
+
   it("unlocks only with the demo PIN and then serves the editor", () => {
     let now = NOW;
     const api = createDemoApi(() => now);

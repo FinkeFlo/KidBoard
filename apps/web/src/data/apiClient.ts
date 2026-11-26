@@ -19,10 +19,13 @@ import {
   PARENT_SESSION_HEADER,
   type ParentFeedResponse,
   ParentFeedResponseSchema,
+  type ParentWeatherResponse,
+  ParentWeatherResponseSchema,
   type PublicConfig,
   PublicConfigSchema,
   type WeatherResponse,
   WeatherResponseSchema,
+  type WeatherSetting,
   WORKER_UPSTREAM_BUDGET_MS,
 } from "@kidboard/shared";
 import { z } from "zod";
@@ -135,6 +138,9 @@ export interface EditorExport {
   text: string;
 }
 
+/** Path of the editor's weather setting (T-56). */
+export const WEATHER_SETTING_PATH = "/api/parent/weather";
+
 /** File name used when the worker names none (or an unsafe one). */
 export const DEFAULT_EXPORT_FILE_NAME = "kidboard-entries.json";
 
@@ -213,6 +219,26 @@ export interface ApiClient {
     token: string,
     signal?: AbortSignal,
   ): Promise<ParentFeedResponse>;
+  /*
+   * Weather setting (T-56, ADR-0016). The answer may carry the town: keep it in
+   * component state only, never in a TanStack query (the query cache is persisted).
+   */
+  /** `GET /api/parent/weather`: what is set, where it comes from, whether it resolves. */
+  getParentWeather(
+    token: string,
+    signal?: AbortSignal,
+  ): Promise<ParentWeatherResponse>;
+  /** `PUT /api/parent/weather` with a town or `{ off: true }`. */
+  saveParentWeather(
+    token: string,
+    setting: WeatherSetting,
+    signal?: AbortSignal,
+  ): Promise<ParentWeatherResponse>;
+  /** `DELETE /api/parent/weather`: back to the configuration's setting. */
+  resetParentWeather(
+    token: string,
+    signal?: AbortSignal,
+  ): Promise<ParentWeatherResponse>;
 }
 
 export interface ApiClientOptions {
@@ -325,7 +351,7 @@ function scopeQuery(scope: EditorScope): Record<string, string> {
 }
 
 interface SendInit {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: string;
   headers?: Record<string, string>;
 }
@@ -530,6 +556,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     | "exportEntries"
     | "importEntries"
     | "getParentFeed"
+    | "getParentWeather"
+    | "saveParentWeather"
+    | "resetParentWeather"
   > = {
     listEntries: async (token, range, signal) =>
       (
@@ -608,6 +637,39 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
           {},
           {},
           ParentFeedResponseSchema,
+          signal,
+        )
+      ).body,
+    getParentWeather: async (token, signal) =>
+      (
+        await editorRequest(
+          token,
+          WEATHER_SETTING_PATH,
+          {},
+          {},
+          ParentWeatherResponseSchema,
+          signal,
+        )
+      ).body,
+    saveParentWeather: async (token, setting, signal) =>
+      (
+        await editorRequest(
+          token,
+          WEATHER_SETTING_PATH,
+          {},
+          { method: "PUT", ...jsonBody(setting) },
+          ParentWeatherResponseSchema,
+          signal,
+        )
+      ).body,
+    resetParentWeather: async (token, signal) =>
+      (
+        await editorRequest(
+          token,
+          WEATHER_SETTING_PATH,
+          {},
+          { method: "DELETE" },
+          ParentWeatherResponseSchema,
           signal,
         )
       ).body,

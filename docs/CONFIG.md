@@ -30,7 +30,7 @@ Set locally in `.dev.vars` in the repository root, next to `wrangler.jsonc` (cop
 | `KIDBOARD_ACCESS_TOKEN`   | yes (see `KIDBOARD_PUBLIC`) | unset (API refuses, `500 server_misconfigured`) | API requests must present this token as `Authorization: Bearer <token>` or `?key=<token>`, else `401`. 32 to 256 characters of `A-Z a-z 0-9 _ -`, e.g. the output of `openssl rand -hex 32`. Unset, empty, shorter, other characters or still containing `REPLACE_ME` (the template): every protected path answers `500 server_misconfigured` and the log says why (the board fails closed, it never serves data without a valid token). Prefer the header: `?key=` ends up in browser history (Workers Logs drop query strings, `redact_query_string`). `/api/health` stays public (it only returns `{ "ok": true }`). |
 | `KIDBOARD_PUBLIC`         | no       | unset              | Explicit opt-in for a public read-only board: with the value `1` **and no** `KIDBOARD_ACCESS_TOKEN`, the board is served without any check (anyone with the link sees your family's calendar; the editor stays off). If a token is set, it is enforced regardless of this variable. |
 | `KIDBOARD_ALLOWED_ORIGINS`| no       | same origin only   | Comma-separated list of allowed CORS origins, e.g. `http://localhost:5173`. Only for API use from another origin; the board itself is same-origin. |
-| `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh (integer 60-86400; other values fall back to 3600 with a log warning). With the KV cache at least `ceil(calendars × 86400 / 500)` (KV Free plan write quota; 2 calendars → 346; with the parent editor on, its two app sources count as calendars).                                    |
+| `KIDBOARD_CACHE_TTL`      | no       | `3600`             | Seconds a fetched feed counts as fresh (integer 60-86400; other values fall back to 3600 with a log warning). With the KV cache at least `ceil(calendars × 86400 / 500)` (KV Free plan write quota; 2 calendars → 346; with the parent editor on, its two app sources count as calendars; while weather is configured or the parent editor is on, 49 writes/day are reserved for the forecast first, i.e. `ceil(calendars × 86400 / 451)`).                                    |
 | `KIDBOARD_PARENT_PIN`     | no       | unset (editor off) | 6 to 12 digits that unlock the parent editor. Not accepted (editor stays off, the log says why): unset, shorter or longer, non-digits, still `REPLACE_ME`, one repeated digit (`111111`) or a run of rising or falling digits (`123456`, `654321`). Choose something not guessable: no birthdays or dates. After 5 wrong PINs in 15 minutes the editor locks for 15 minutes; every further lockout while failures continue doubles the time (up to 2 hours); a right PIN resets this. The editor also needs a valid `KIDBOARD_ACCESS_TOKEN` and the D1 binding `KIDBOARD_DATA`. |
 | `KIDBOARD_FEED_TOKEN`     | no       | unset (no feed)    | Secret token of the phone feed `/api/feed.ics?token=…` with the editor's entries; 32-256 characters `A-Z a-z 0-9 _ -`. With a valid one the parent area shows the subscribe link. Changing it ends every subscription. |
 | `KIDBOARD_CONFIG`         | yes      | -                  | The JSON document described below (single line). Missing or invalid: the API answers `500` and the log lists the validation errors.             |
@@ -103,11 +103,27 @@ schema ever disagree, the schema wins and this page must be fixed.
 
 ## Weather
 
-Optional (ADR-0015). Without a `weather` block the board shows no weather. With it, every
-overview day shows a weather icon with a temperature (today: now; other days: the high),
-the week view the icon and high in each day header inside the 7-day forecast, and today's
-card a row of clothing pictures: for today until `bands.eveningStart`, from then until
-midnight for tomorrow.
+Optional (ADR-0015). With weather on, every overview day shows a weather icon with a
+temperature (today: now; other days: the high), the week view the icon and high in each
+day header inside the 7-day forecast, and today's card a row of clothing pictures: for
+today until `bands.eveningStart`, from then until midnight for tomorrow.
+
+**In the parent editor (ADR-0016)** – the easy way, no JSON: open the editor, section
+"Weather", switch it on, enter the town (optionally the country as two letters, e.g. `DE`),
+choose °C or °F and save. The editor says right away whether the town was found, or that the
+weather service is not reachable right now; the switch turns the weather off again. The
+board on the same tablet updates at once, other devices with their next config refresh
+(`refreshMinutes`).
+
+- **Precedence:** a setting saved in the editor overrides the `weather` block of
+  `KIDBOARD_CONFIG`; "off" in the editor turns the weather off even when the config has a
+  block. "Use the setting from the configuration" removes the editor setting, and the
+  config's block (or no weather) applies again. Without the editor (no D1, no PIN) or
+  while its database cannot be reached, the config's block applies.
+- The editor setting is one row in the D1 database of the editor, not part of the entries
+  backup: exporting does not include it, importing (also "replace all") keeps it.
+
+**In the configuration** – the default when the editor has no setting:
 
 ```json
 "weather": { "place": "Hamburg", "country": "DE" }
@@ -122,7 +138,9 @@ midnight for tomorrow.
 
 - **Privacy:** the place and coordinates stay on the server; the tablet only learns that
   weather is on. The server sends them to Open-Meteo only (forecast and geocoding) and
-  caches the forecast for 30 minutes (the last good one up to 24 hours).
+  caches the forecast for 30 minutes (the last good one up to 24 hours). A town set in the
+  editor is shown again only in the unlocked editor; the board never receives it, and
+  coordinates from the config are never shown, only that they are set.
 - **Terms:** Open-Meteo is free for non-commercial use without an account or API key; its
   data is licensed under CC BY 4.0, so the board shows "Weather: Open-Meteo.com" in the
   rail while weather is on. Commercial use needs an Open-Meteo plan.
@@ -158,7 +176,7 @@ midnight for tomorrow.
 | `GET /api/health`                       | Always `{ "ok": true }`; public, does not read the config or the feeds.                                                                                                                                               |
 | `GET /api/config`                       | Public part of `KIDBOARD_CONFIG` with defaults applied.                                                                                                                                                                |
 | `GET /api/agenda?from=YYYY-MM-DD&days=N` | `days` 1-31 (default 8), `from` default today in `timeZone`. `[from, from + days)` must lie within yesterday ... today + 31 days (the cached window `[today − 1, today + 32)`), else `400`. `200` if any source has data (`ok` or `stale`) or there are no sources (no calendars, editor off: empty board and one log warning), `502` otherwise. |
-| `GET /api/weather`                      | The condensed forecast ([Weather](#weather)), never the place. `404 weather_off` without a `weather` block, `503` when the place is unknown or Open-Meteo fails without a last good forecast. |
+| `GET /api/weather`                      | The condensed forecast ([Weather](#weather)), never the place. `404 weather_off` while the weather is off (no `weather` block and no editor setting, or "off" in the editor), `503` when the place is unknown or Open-Meteo fails without a last good forecast. |
 
 Feeds are fetched with a 10 s timeout and a 5 MB limit. Each calendar's normalized data
 for the window is stored once per refresh: it is fresh for `KIDBOARD_CACHE_TTL` and kept

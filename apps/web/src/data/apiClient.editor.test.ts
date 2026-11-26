@@ -332,6 +332,95 @@ describe("ApiClient phone feed (T-46)", () => {
   });
 });
 
+describe("ApiClient weather setting (T-56)", () => {
+  const PLACE = "TESTONLY-Weatherplace";
+  const ANSWER = {
+    source: "editor",
+    weather: { place: PLACE, country: "DE", unit: "celsius" },
+    status: "ok",
+  };
+
+  it("reads the setting with the session header, uncached", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/parent/weather", { status: 200, body: ANSWER });
+    await expect(
+      createApiClient({
+        fetch: fake.fetch,
+        token: TEST_TOKEN,
+      }).getParentWeather(SESSION),
+    ).resolves.toEqual(ANSWER);
+    const call = fake.calls[0];
+    expect(call?.url).toBe("/api/parent/weather");
+    expect(call?.init?.method).toBeUndefined();
+    expect(call?.init?.cache).toBe("no-store");
+    const headers = new Headers(call?.init?.headers);
+    expect(headers.get(PARENT_SESSION_HEADER)).toBe(SESSION);
+    expect(headers.get("Authorization")).toBe(`Bearer ${TEST_TOKEN}`);
+  });
+
+  it("saves with PUT and a JSON body, and resets with DELETE", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/parent/weather", { status: 200, body: ANSWER });
+    const api = createApiClient({ fetch: fake.fetch });
+    await api.saveParentWeather(SESSION, {
+      place: PLACE,
+      country: "DE",
+      unit: "celsius",
+    });
+    await api.saveParentWeather(SESSION, { off: true });
+    fake.setReplies("/api/parent/weather", {
+      status: 200,
+      body: { source: "config", weather: null, status: "off" },
+    });
+    await expect(api.resetParentWeather(SESSION)).resolves.toEqual({
+      source: "config",
+      weather: null,
+      status: "off",
+    });
+    expect(fake.calls.map((c) => c.init?.method)).toEqual([
+      "PUT",
+      "PUT",
+      "DELETE",
+    ]);
+    expect(jsonBody(fake.calls[0]?.init)).toEqual({
+      place: PLACE,
+      country: "DE",
+      unit: "celsius",
+    });
+    expect(jsonBody(fake.calls[1]?.init)).toEqual({ off: true });
+    expect(new Headers(fake.calls[0]?.init?.headers).get("Content-Type")).toBe(
+      "application/json",
+    );
+    expect(fake.calls[2]?.init?.body).toBeUndefined();
+  });
+
+  it("rejects an unknown answer and maps known error bodies", async () => {
+    const fake = createFakeFetch();
+    fake.setReplies("/api/parent/weather", {
+      status: 200,
+      body: { source: "kv", weather: null, status: "off" },
+    });
+    const api = createApiClient({ fetch: fake.fetch });
+    expect(await rejection(api.getParentWeather(SESSION))).toMatchObject({
+      kind: "invalid-response",
+    });
+    fake.setReplies("/api/parent/weather", {
+      status: 403,
+      body: { error: "parent_locked", message: "x" },
+    });
+    expect(
+      await rejection(api.saveParentWeather(SESSION, { off: true })),
+    ).toMatchObject({ code: "parent_locked", status: 403 });
+    fake.setReplies("/api/parent/weather", {
+      status: 503,
+      body: { error: "storage_unavailable", message: "x" },
+    });
+    expect(await rejection(api.resetParentWeather(SESSION))).toBeInstanceOf(
+      EditorApiError,
+    );
+  });
+});
+
 describe("exportFileName", () => {
   it.each([
     [

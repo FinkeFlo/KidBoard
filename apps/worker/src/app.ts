@@ -4,6 +4,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { validator } from "hono/validator";
 
 import {
+  APP_SOURCES_D1_TIMEOUT_MS,
   createBoard,
   parseRangeQuery,
   rangeMessage,
@@ -20,6 +21,8 @@ import { logError } from "./log";
 import { editorEnabled } from "./parent/pin";
 import { PARENT_BASE_PATH, parentRoutes } from "./parent/routes";
 import { registerWeatherRoute } from "./weather/routes";
+import { createWeatherSettings } from "./weather/setting";
+import { createWeather } from "./weather/weather";
 
 export {
   cacheTtlSeconds,
@@ -58,6 +61,18 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
     fetchMaxBytes: options.fetchMaxBytes,
     d1TimeoutMs: options.d1TimeoutMs,
   });
+  // One weather service and one weather setting reader per isolate, shared by
+  // `/api/config`, `/api/weather` and the parent weather routes (ADR-0016).
+  const weather = createWeather({
+    now,
+    openCache,
+    timeoutMs: options.weatherTimeoutMs,
+    maxBytes: options.weatherMaxBytes,
+  });
+  const weatherSettings = createWeatherSettings({
+    gate: board.gate,
+    d1TimeoutMs: options.d1TimeoutMs ?? APP_SOURCES_D1_TIMEOUT_MS,
+  });
   const app = new Hono<AppEnv>();
 
   // ADR-0006: the client (TanStack Query) owns API caching; never cache in browsers
@@ -75,14 +90,14 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
     return c.json({ ok: true });
   });
 
-  app.get("/api/config", (c) => {
+  app.get("/api/config", async (c) => {
     const loaded = loadConfig(c.env.KIDBOARD_CONFIG);
     if (!loaded.ok) {
       return serverMisconfigured(c);
     }
-    return c.json(
-      toPublicConfig(loaded.config, { editor: editorEnabled(c.env) }),
-    );
+    // ADR-0016: the `weather` flag follows the editor setting over the config's block.
+    const { config } = await weatherSettings.effective(c, loaded.config);
+    return c.json(toPublicConfig(config, { editor: editorEnabled(c.env) }));
   });
 
   app.get(
@@ -115,15 +130,13 @@ export function createApp(options: AppOptions = {}): Hono<AppEnv> {
   );
 
   // Weather forecast from Open-Meteo (ADR-0015), behind the access token.
-  registerWeatherRoute(app, {
-    now,
-    openCache,
-    timeoutMs: options.weatherTimeoutMs,
-    maxBytes: options.weatherMaxBytes,
-  });
+  registerWeatherRoute(app, { weather, settings: weatherSettings });
 
-  // Parent lock and editor API (ADR-0013, ADR-0014), behind the access token.
-  app.route(PARENT_BASE_PATH, parentRoutes({ now, board }).app);
+  // Parent lock and editor API (ADR-0013, ADR-0014, ADR-0016), behind the access token.
+  app.route(
+    PARENT_BASE_PATH,
+    parentRoutes({ now, board, weather, weatherSettings }).app,
+  );
 
   // Phone feed of the app entries (ADR-0014), guarded by its own secret token.
   registerFeedRoute(app, { board });

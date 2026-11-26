@@ -62,6 +62,8 @@ export function renderEditor(
     maxEntries?: number;
     /** Relative phone-feed URL of the fake API (default: the feed is off). */
     feedUrl?: string;
+    /** The config's weather block as the fake parent API describes it (default: none). */
+    configWeather?: FakeEditorOptions["configWeather"];
     setup?: (editor: FakeEditor) => void;
     gate?: Partial<ParentGate>;
   } = {},
@@ -73,6 +75,9 @@ export function renderEditor(
     isSession: (token) => token !== null && sessions.has(token),
     ...(options.google === undefined ? {} : { google: options.google }),
     ...(options.feedUrl === undefined ? {} : { feedUrl: options.feedUrl }),
+    ...(options.configWeather === undefined
+      ? {}
+      : { configWeather: options.configWeather }),
     ...(options.maxEntries === undefined
       ? {}
       : { maxEntries: options.maxEntries }),

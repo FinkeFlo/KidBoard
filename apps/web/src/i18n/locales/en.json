@@ -413,6 +413,48 @@
       "copied": "Link copied",
       "select": "The link is selected – copy it now"
     },
+    "weather": {
+      "title": "Weather",
+      "hint": "The board shows the weather and what to wear for this town. The town stays on your server; only the weather service learns it.",
+      "loading": "Loading the weather setting …",
+      "switch": "Show the weather on the board",
+      "on": "On",
+      "off": "Off",
+      "place": "Town",
+      "country": "Country (optional)",
+      "countryHint": "Two letters, e.g. DE, AT or US. Helps when several towns have the same name.",
+      "coordinates": "The configuration sets the place with coordinates. Enter a town to use it instead; changing the unit here also needs a town.",
+      "unit": "Temperature",
+      "celsius": "°C Celsius",
+      "fahrenheit": "°F Fahrenheit",
+      "save": "Save weather",
+      "saving": "Saving …",
+      "reset": "Use the setting from the configuration",
+      "status": {
+        "ok": "Found. The board shows the weather.",
+        "off": "Weather is off. The board shows no weather.",
+        "place_unknown": "Town not found. Check the spelling or add the country. The board shows no weather until then.",
+        "unavailable": "The weather service is not reachable right now. The board shows the weather as soon as it is back."
+      },
+      "source": {
+        "editor": "Set here in the editor.",
+        "config": "From the configuration.",
+        "none": "Not set up yet."
+      },
+      "fieldError": {
+        "place": "Please enter a town.",
+        "country": "Use two letters, e.g. DE, or leave it empty."
+      },
+      "error": {
+        "offline": "No connection. Nothing was changed – try again when the network is back.",
+        "timeout": "That took too long. Please try again.",
+        "unauthorized": "This tablet needs a new access link.",
+        "locked": "For safety the editor locked itself. Enter the PIN again.",
+        "storage": "The setting can't be stored right now. Try again in a moment.",
+        "invalid": "Please check the town and the country.",
+        "failed": "Something went wrong. Please try again."
+      }
+    },
     "data": {
       "title": "Backup & phone",
       "export": "Download backup",
@@ -446,6 +488,7 @@
       "top": "Back to top",
       "label": "Jump to",
       "list": "Entries",
+      "weather": "Weather",
       "data": "Backup & phone"
     }
   },

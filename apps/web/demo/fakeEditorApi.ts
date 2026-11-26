@@ -28,6 +28,7 @@ import {
   MAX_AGENDA_DAYS,
   MAX_APP_ENTRIES,
   type Meal,
+  type ParentWeatherResponse,
   parseEditorEntryInput,
   type PublicConfig,
   resolveTimedRange,
@@ -35,6 +36,9 @@ import {
   splitResolvable,
   todayInZone,
   updateEntryParts,
+  type WeatherSetting,
+  WeatherSettingSchema,
+  type WeatherSettingStatus,
   WINDOW_DAYS_AFTER,
   WINDOW_DAYS_BEFORE,
 } from "@kidboard/shared";
@@ -49,7 +53,9 @@ import { z } from "zod";
  * `importEntryParts`), answers with the same shapes and error codes
  * (409 `conflict` with `revision`, 422 `invalid_entry` with `issues`, 422
  * `limit_reached`, 404 `not_found`) and expands weekly series with exceptions and
- * "only this day" overrides. Unlock and session are the caller's (`isSession`). Not
+ * "only this day" overrides. It also keeps the weather setting of `/api/parent/weather`
+ * (T-56: editor setting over the config's block, `{ off: true }` wins). Unlock and
+ * session are the caller's (`isSession`). Not
  * part of the app bundle; all data is synthetic and lives only in memory.
  */
 
@@ -89,6 +95,11 @@ export interface FakeEditorOptions {
   maxEntries?: number;
   /** Relative phone-feed URL `/api/parent/feed` answers with; none = the feed is off. */
   feedUrl?: string;
+  /**
+   * The config's weather block as `/api/parent/weather` describes it (default: none),
+   * e.g. `{ place: "…", unit: "celsius" }` or `{ unit: "celsius", coordinates: true }`.
+   */
+  configWeather?: NonNullable<ParentWeatherResponse["weather"]>;
 }
 
 export interface FakeEditor {
@@ -107,6 +118,15 @@ export interface FakeEditor {
   setStorageUnavailable(value: boolean): void;
   /** Turns the phone feed on (a relative URL) or off (`undefined`). */
   setFeedUrl(feedUrl: string | undefined): void;
+  /** The stored weather setting (`null`: the config's block applies). */
+  weatherSetting(): WeatherSetting | null;
+  /**
+   * Whether the board's weather is on: the stored setting if any, else `configOn` (the
+   * board API's `config.weather`).
+   */
+  weatherOn(configOn: boolean): boolean;
+  /** What resolving a town answers from now on (default `ok`). */
+  setWeatherStatus(status: Exclude<WeatherSettingStatus, "off">): void;
   /** The app entries of `range` as board events and meals (`/api/agenda`). */
   agendaItems(range: DateRange): { events: CalendarEvent[]; meals: Meal[] };
   /** Every write request seen (method, path, query, parsed body). */
@@ -274,6 +294,8 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
   const writes: FakeEditor["writes"] = [];
   let feedUrl: string | undefined = options.feedUrl;
   let storageUnavailable = false;
+  let weatherSetting: WeatherSetting | null = null;
+  let weatherStatus: Exclude<WeatherSettingStatus, "off"> = "ok";
 
   const config = (): PublicConfig => options.config();
   const today = (): string => todayInZone(now(), config().timeZone);
@@ -498,6 +520,44 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
     };
   };
 
+  /** `/api/parent/weather` answer for the current setting (as the worker's shape). */
+  const weatherAnswer = (): FakeResponse => {
+    const fromConfig = options.configWeather;
+    let body: ParentWeatherResponse;
+    if (weatherSetting !== null) {
+      body =
+        "off" in weatherSetting
+          ? { source: "editor", weather: null, status: "off" }
+          : {
+              source: "editor",
+              weather: { ...weatherSetting },
+              status: weatherStatus,
+            };
+    } else if (fromConfig === undefined) {
+      body = { source: "none", weather: null, status: "off" };
+    } else {
+      body = { source: "config", weather: { ...fromConfig }, status: "ok" };
+    }
+    return { status: 200, json: body };
+  };
+
+  const weatherRoute = (request: FakeRequest): FakeResponse => {
+    if (request.method === "GET") return weatherAnswer();
+    if (request.method === "DELETE") {
+      weatherSetting = null;
+      return weatherAnswer();
+    }
+    if (request.method === "PUT") {
+      const parsed = WeatherSettingSchema.safeParse(
+        parseJson(request.body)?.value,
+      );
+      if (!parsed.success) return error(400, "bad_request");
+      weatherSetting = parsed.data;
+      return weatherAnswer();
+    }
+    return error(404, "not_found");
+  };
+
   const route = (request: FakeRequest): FakeResponse | null => {
     const query = parseQuery(request.search);
     const { method, path } = request;
@@ -521,6 +581,7 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
     }
     if (path === "/api/parent/templates" && method === "GET")
       return templates();
+    if (path === "/api/parent/weather") return weatherRoute(request);
     if (path === "/api/parent/feed" && method === "GET") {
       return {
         status: 200,
@@ -550,7 +611,7 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
   return {
     handle(request) {
       const isEditorRoute =
-        /^\/api\/parent\/(entries|templates|export|import|feed)(\/|$)/.test(
+        /^\/api\/parent\/(entries|templates|export|import|feed|weather)(\/|$)/.test(
           request.path,
         );
       if (!isEditorRoute) return null;
@@ -597,6 +658,13 @@ export function createFakeEditor(options: FakeEditorOptions): FakeEditor {
     },
     setStorageUnavailable(value) {
       storageUnavailable = value;
+    },
+    weatherSetting: () =>
+      weatherSetting === null ? null : structuredClone(weatherSetting),
+    weatherOn: (configOn) =>
+      weatherSetting === null ? configOn : !("off" in weatherSetting),
+    setWeatherStatus(status) {
+      weatherStatus = status;
     },
     agendaItems(range) {
       const items = appItems(range);

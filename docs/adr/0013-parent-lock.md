@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-11-23
+- Amended by: [ADR-0016](0016-weather-setting-in-d1.md) (the parent CORS set also allows
+  `PUT`, for `PUT /api/parent/weather`)
 
 ## Context
 The editor (ADR-0014) runs on the same wall tablet the children use. Children aged 3–8
@@ -43,7 +45,8 @@ Option 1.
   → 403 `parent_locked`. A wrong PIN at unlock is 403 `wrong_pin` (with the attempts
   left). 401 stays reserved for the access token: the board client forgets its token on
   any 401. Bearer header, no cookies → no CSRF; CORS for listed origins
-  additionally allows `POST, PATCH, DELETE` and the two headers.
+  additionally allows `POST, PUT, PATCH, DELETE` and the two headers (`PUT` since
+  ADR-0016).
 * **Lockout:** wrong PINs are counted since the last right PIN, not per time window;
   every 5th one locks the unlock route, which answers 429 `parent_lockout` (with
   `Retry-After`) for 15 minutes. The lockout escalates: every further lockout without a

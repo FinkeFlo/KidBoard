@@ -331,7 +331,10 @@ export async function mockBoard(
     const path = new URL(route.request().url()).pathname;
     api.requests.push(path);
     if (path === "/api/config") {
-      return route.fulfill({ status: api.configStatus, json: api.config });
+      return route.fulfill({
+        status: api.configStatus,
+        json: withWeatherSetting(api),
+      });
     }
     if (path === "/api/agenda") {
       return route.fulfill({
@@ -340,7 +343,10 @@ export async function mockBoard(
       });
     }
     if (path === "/api/weather") {
-      return api.weather === undefined
+      // The editor's weather setting (T-56) can turn it off over the config.
+      const off =
+        api.editor.weatherSetting() !== null && !api.editor.weatherOn(true);
+      return api.weather === undefined || off
         ? route.fulfill({ status: 404, json: { error: "weather_off" } })
         : route.fulfill({ status: api.weatherStatus, json: api.weather });
     }
@@ -350,6 +356,23 @@ export async function mockBoard(
     return route.fulfill({ status: 404, json: { error: "not_found" } });
   });
   return api;
+}
+
+/**
+ * The config answer with the `weather` flag of the editor's weather setting (T-56): the
+ * stored setting wins over `config.weather`; unchanged without a setting.
+ */
+function withWeatherSetting(api: MockApi): unknown {
+  if (
+    api.configStatus !== 200 ||
+    api.editor.weatherSetting() === null ||
+    typeof api.config !== "object" ||
+    api.config === null
+  ) {
+    return api.config;
+  }
+  const configOn = (api.config as { weather?: unknown }).weather === true;
+  return { ...api.config, weather: api.editor.weatherOn(configOn) };
 }
 
 /**

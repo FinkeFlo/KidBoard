@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-11-23
+- Amended by: [ADR-0016](0016-weather-setting-in-d1.md) (the place can also be set in the
+  parent editor and is then stored in D1; the config's block is the default)
 
 ## Context
 M9 shows the weather and child-friendly clothing pictures for today and tomorrow. Setup must

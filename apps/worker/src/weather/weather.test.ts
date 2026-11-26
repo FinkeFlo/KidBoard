@@ -616,6 +616,48 @@ describe("KV write budget", () => {
       "KIDBOARD_CACHE_TTL 120 s would exceed the KV write budget for 1 calendars; using 192 s",
     );
   });
+
+  it("reserves the weather writes while the editor is on, even without a config block (T-56)", async () => {
+    const h = harness({ backend: "kv" });
+    const withoutWeather: AppConfigInput = { ...BASE_CONFIG };
+    delete withoutWeather.weather;
+    const env: Env = {
+      KIDBOARD_CONFIG: JSON.stringify(withoutWeather),
+      KIDBOARD_CACHE: testEnv.KIDBOARD_CACHE,
+      KIDBOARD_DATA: testEnv.KIDBOARD_DATA,
+      KIDBOARD_PARENT_PIN: "246813",
+      KIDBOARD_ACCESS_TOKEN: TOKEN,
+      KIDBOARD_CACHE_TTL: "120",
+      CAL_KINDER_URL:
+        "https://feeds.kidboard.invalid/TESTONLY-weather-budget-editor.ics",
+    };
+    expect((await h.call(`/api/agenda?key=${TOKEN}`, env)).status).not.toBe(
+      401,
+    );
+    // 3 sources (kinder + the two app sources) × 86 400 / (500 − 49) = 574.7 → 575 s
+    // (519 s without the reservation).
+    expect(output.join("\n")).toContain(
+      "KIDBOARD_CACHE_TTL 120 s would exceed the KV write budget for 3 calendars; using 575 s",
+    );
+  });
+
+  it("reserves nothing with KV, no config block and the editor off", async () => {
+    const h = harness({ backend: "kv" });
+    const withoutWeather: AppConfigInput = { ...BASE_CONFIG };
+    delete withoutWeather.weather;
+    const env = h.env(withoutWeather, {
+      KIDBOARD_CACHE_TTL: "100",
+      CAL_KINDER_URL:
+        "https://feeds.kidboard.invalid/TESTONLY-weather-budget-off.ics",
+    });
+    // `h.env` merges into the base config, which has a weather block: replace it.
+    env.KIDBOARD_CONFIG = JSON.stringify(withoutWeather);
+    await h.call("/api/agenda", env);
+    // 1 source × 86 400 / 500 = 172.8 → 173 s.
+    expect(output.join("\n")).toContain(
+      "KIDBOARD_CACHE_TTL 100 s would exceed the KV write budget for 1 calendars; using 173 s",
+    );
+  });
 });
 
 describe("access token", () => {

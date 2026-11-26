@@ -6,6 +6,7 @@ import {
   test,
 } from "@playwright/test";
 
+import { demoWeather } from "../demo/demoData";
 import {
   agenda,
   config,
@@ -14,6 +15,8 @@ import {
   MOCK_PARENT_PIN,
   type MockApi,
   mockBoard,
+  NOW,
+  QUERY_CACHE_KEY,
 } from "./mockApi";
 
 /*
@@ -50,6 +53,12 @@ async function openEditor(
   options.seed?.(api);
   await page.goto(`/?key=${TOKEN}`);
   await expect(page.getByTestId("board-ready")).toBeVisible();
+  await unlock(page);
+  return api;
+}
+
+/** Press and hold the parent entry, enter the PIN: the editor opens. */
+async function unlock(page: Page): Promise<void> {
   const entry = page.getByRole("button", { name: /parent area/i });
   const box = await entry.boundingBox();
   if (box === null) throw new Error("entry has no box");
@@ -64,7 +73,6 @@ async function openEditor(
   await pad.getByRole("button", { name: "OK" }).click();
   await expect(editor(page)).toBeVisible();
   await expect(page.getByTestId("entry-list")).toBeVisible();
-  return api;
 }
 
 /**
@@ -615,5 +623,70 @@ test.describe("parent editor (T-45)", () => {
     );
     expect(await page.evaluate(() => "__xss" in window)).toBe(false);
     await expect(page.getByTestId("entry-list").locator("img")).toHaveCount(0);
+  });
+
+  test("weather: turned on with a town the chips show on the board, turned off they are gone (T-56)", async ({
+    page,
+  }) => {
+    const place = "TESTONLY-Weatherplace";
+    const api = await openEditor(page, {
+      seed: (mock) => {
+        mock.weather = demoWeather(dateOf(0), NOW);
+      },
+    });
+    // The config has no weather block: the board asks for no forecast.
+    expect(api.requests).not.toContain("/api/weather");
+    const section = page.getByTestId("weather-section");
+    const toggle = section.getByRole("switch", {
+      name: "Show the weather on the board",
+    });
+    await toggle.scrollIntoViewIfNeeded();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(section.getByTestId("weather-status")).toContainText(
+      "Weather is off.",
+    );
+    await toggle.click();
+    await section.getByLabel("Town").fill(place);
+    await section.getByLabel("Country (optional)").fill("de");
+    await expect(section.getByLabel("Country (optional)")).toHaveValue("DE");
+    await expectTouchTargets(section);
+    await section.getByRole("button", { name: "Save weather" }).click();
+    await expect(section.getByTestId("weather-status")).toContainText(
+      "Found. The board shows the weather.",
+    );
+    expect(api.editor.weatherSetting()).toEqual({
+      place,
+      country: "DE",
+      unit: "celsius",
+    });
+    // The board refetched its config and then the forecast.
+    await expect.poll(() => api.requests.includes("/api/weather")).toBe(true);
+
+    await editor(page).getByRole("button", { name: "Done" }).click();
+    await expect(editor(page)).toBeHidden();
+    await expect(page.getByTestId("weather-chip")).toHaveCount(4);
+    await expect(page.getByTestId("weather-attribution")).toBeVisible();
+    // The town never reaches the tablet's persisted cache.
+    expect(
+      await page.evaluate(
+        (key) => window.localStorage.getItem(key) ?? "",
+        QUERY_CACHE_KEY,
+      ),
+    ).not.toContain(place);
+
+    await unlock(page);
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(section.getByLabel("Town")).toHaveValue(place);
+    await toggle.click();
+    await section.getByRole("button", { name: "Save weather" }).click();
+    await expect(section.getByTestId("weather-status")).toContainText(
+      "Weather is off.",
+    );
+    expect(api.editor.weatherSetting()).toEqual({ off: true });
+    await editor(page).getByRole("button", { name: "Done" }).click();
+    await expect(page.getByTestId("weather-chip")).toHaveCount(0);
+    await expect(page.getByTestId("weather-attribution")).toHaveCount(0);
+    await expect(page.getByTestId("board-ready")).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
   });
 });

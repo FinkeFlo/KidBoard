@@ -12,6 +12,8 @@ import { tokensEqual } from "../http/auth";
 import { errorName, notFound } from "../http/errors";
 import { parseJsonBody, payloadTooLarge } from "../http/jsonBody";
 import { logWarn } from "../log";
+import type { WeatherSettings } from "../weather/setting";
+import type { WeatherService } from "../weather/weather";
 import { IMPORT_ROUTE, registerEditorRoutes } from "./editorRoutes";
 import { clearFailures, recordFailure, reserveAttempt } from "./lockout";
 import { editorEnabled } from "./pin";
@@ -22,6 +24,7 @@ import {
   SessionKeys,
   signSession,
 } from "./session";
+import { registerWeatherRoutes } from "./weatherRoutes";
 
 /** Where {@link parentRoutes} is mounted. */
 export const PARENT_BASE_PATH = "/api/parent";
@@ -40,6 +43,10 @@ export interface ParentRoutesOptions {
   now: () => number;
   /** Board sources of the isolate (feeds for the editor list, app cache invalidation). */
   board: Board;
+  /** Weather service of the isolate (resolves the place of the weather setting). */
+  weather: WeatherService;
+  /** The editor's weather setting in D1 (ADR-0016). */
+  weatherSettings: WeatherSettings;
 }
 
 export interface ParentRoutes {
@@ -68,7 +75,8 @@ function isoSeconds(epochSeconds: number): string {
  * * `GET /session` (needs {@link requireParentSession}) → `{ expiresAt }`;
  * * `GET /feed` (session) → `{ feedUrl }`, the relative phone feed path, only while
  *   `KIDBOARD_FEED_TOKEN` is valid (`ParentFeedResponseSchema`);
- * * the editor API (`./editorRoutes.ts`, T-43), behind the same session guard.
+ * * the editor API (`./editorRoutes.ts`, T-43) and the weather setting
+ *   (`./weatherRoutes.ts`, T-56), behind the same session guard.
  *
  * The key cache lives in the returned instance; the attempt counters live in D1.
  */
@@ -170,6 +178,11 @@ export function parentRoutes(options: ParentRoutesOptions): ParentRoutes {
   registerEditorRoutes(app, {
     now: options.now,
     board: options.board,
+    requireSession,
+  });
+  registerWeatherRoutes(app, {
+    weather: options.weather,
+    settings: options.weatherSettings,
     requireSession,
   });
 

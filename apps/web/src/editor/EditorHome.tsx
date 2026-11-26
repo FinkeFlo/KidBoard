@@ -22,10 +22,12 @@ import { TID } from "./testIds";
 import { EditorButton, FOCUS_RING } from "./ui";
 import type { Backup } from "./useBackup";
 import type { EditorData } from "./useEditorData";
+import { WeatherSection } from "./WeatherSection";
 
 /** The jump bar: section headings of the home view and their labels. */
 const JUMP_TARGETS = [
   { id: "editor-list", label: "editor.jump.list" },
+  { id: "editor-weather", label: "editor.jump.weather" },
   { id: "editor-data", label: "editor.jump.data" },
 ] as const;
 
@@ -56,7 +58,7 @@ interface HomeProps {
 
 /**
  * The editor's home view: new entry / new meal, the jump bar, the "Again" row, the
- * 14-day list and the Data section.
+ * 14-day list, the weather setting and the Data section.
  */
 export function EditorHome({
   api,
@@ -170,6 +172,12 @@ export function EditorHome({
             />
           )}
         </section>
+        <WeatherSection
+          key={`weather-${token}`}
+          api={api}
+          token={token}
+          onUnlock={onUnlock}
+        />
         {failure !== null && <FailureNotice failure={failure} />}
         <DataSection
           busy={busy}

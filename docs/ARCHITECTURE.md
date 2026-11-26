@@ -363,6 +363,35 @@ points:
   `invalidateAppSources` before answering, so the agenda refetch the client starts at
   once shows the change.
 
+**Weather setting (T-56, ADR-0016).** `apps/worker/src/parent/weatherRoutes.ts` on the
+same sub-app (editor-off `404`, 16 KB limit, `403 parent_locked`), shapes in
+`packages/shared/src/weather/setting.ts`:
+
+* Storage (`apps/worker/src/weather/setting.ts`): one `kb_meta` row `weather_setting` with
+  `{"off":true}` or `{ place, country?, unit }` as JSON, validated with the strict
+  `WeatherSettingSchema` on write and on read (a corrupt row is ignored and logged once
+  with a fixed text). It is read only while the editor is on (like the app sources),
+  through the board's schema gate and with the app-source D1 deadline.
+* Effective weather (`effectiveWeather`): the stored setting, else the config's block;
+  `off` wins. `/api/config` (`weather` flag) and `/api/weather` use it; on a D1 error or
+  timeout the config's block applies (type logged only, never a 500). The agenda config
+  hash and every feed/app cache key stay derived from `KIDBOARD_CONFIG` only; the weather
+  caches key on the place, unit and zone already. One `WeatherService` per isolate is
+  shared by `/api/weather` and these routes (same caches, same single flight).
+* `GET /weather` → `{ source: "config" | "editor" | "none", weather: { place?, country?,
+  unit, coordinates? } | null, status: "ok" | "off" | "place_unknown" | "unavailable" }`
+  (config coordinates only as `coordinates: true`); `PUT /weather` with `{ place,
+  country?, unit }` or `{ off: true }` stores, then resolves at once (an unknown town is
+  stored and reported); `DELETE /weather` removes the row. Invalid bodies → `400
+  bad_request` naming the field only; D1 errors → `503 storage_unavailable`.
+* Not part of `GET /export` / `POST /import` (they touch `app_entries` and their own
+  `kb_meta` keys only).
+* Web (`apps/web/src/editor/WeatherSection.tsx`): plain `ApiClient` calls with the
+  session (no TanStack query: the town is never persisted), component state only; after
+  a save or reset (`useMutation`) it invalidates `queryKeys.config()` and then
+  `queryKeys.weather()`, so the board switches its weather query on or off and refetches
+  the forecast.
+
 **Web gate (T-44).** `apps/web/src/parent/`: with `config.editor` the nav rail shows a
 quiet pencil (`ParentEntry`, 64 px) that opens the PIN pad only after a 2 s pointer,
 Enter or Space hold (ring after 0.3 s, so short taps show nothing). The PIN pad takes at

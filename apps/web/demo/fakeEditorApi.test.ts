@@ -102,6 +102,68 @@ describe("fake editor API: phone feed", () => {
   });
 });
 
+describe("fake editor API: weather setting (T-56)", () => {
+  const PLACE = "TESTONLY-Weatherplace";
+
+  it("follows the worker: none → editor town → off → back to the config", () => {
+    const editor = fake();
+    expect(call(editor, "GET", "/api/parent/weather").json).toEqual({
+      source: "none",
+      weather: null,
+      status: "off",
+    });
+    expect(editor.weatherOn(false)).toBe(false);
+    expect(
+      call(editor, "PUT", "/api/parent/weather", {
+        place: ` ${PLACE} `,
+        unit: "fahrenheit",
+      }).json,
+    ).toEqual({
+      source: "editor",
+      weather: { place: PLACE, unit: "fahrenheit" },
+      status: "ok",
+    });
+    expect(editor.weatherOn(false)).toBe(true);
+    editor.setWeatherStatus("place_unknown");
+    expect(
+      (call(editor, "GET", "/api/parent/weather").json as { status: string })
+        .status,
+    ).toBe("place_unknown");
+    call(editor, "PUT", "/api/parent/weather", { off: true });
+    expect(editor.weatherSetting()).toEqual({ off: true });
+    expect(editor.weatherOn(true)).toBe(false);
+    call(editor, "DELETE", "/api/parent/weather");
+    expect(editor.weatherSetting()).toBeNull();
+    expect(editor.weatherOn(true)).toBe(true);
+    expect(editor.writes.map((w) => w.method)).toEqual([
+      "PUT",
+      "PUT",
+      "DELETE",
+    ]);
+  });
+
+  it("describes the config's block and refuses invalid bodies and no session", () => {
+    const editor = createFakeEditor({
+      config: () => CONFIG,
+      now: () => NOW,
+      isSession: (token) => token === SESSION,
+      configWeather: { unit: "celsius", coordinates: true },
+    });
+    expect(call(editor, "GET", "/api/parent/weather").json).toEqual({
+      source: "config",
+      weather: { unit: "celsius", coordinates: true },
+      status: "ok",
+    });
+    expect(
+      call(editor, "PUT", "/api/parent/weather", { place: PLACE }).status,
+    ).toBe(400);
+    expect(
+      errorOf(call(editor, "GET", "/api/parent/weather", undefined, null)),
+    ).toBe("parent_locked");
+    expect(editor.weatherSetting()).toBeNull();
+  });
+});
+
 describe("fake editor API", () => {
   it("serves only editor routes and only with a session (403, never 401)", () => {
     const editor = fake();

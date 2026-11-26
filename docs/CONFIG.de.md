@@ -18,7 +18,9 @@ Token als `Authorization: Bearer <token>` oder `?key=<token>`; besser den Header
 landet im Browserverlauf; Workers Logs entfernen den Query-String, `redact_query_string`). Ohne gültiges Token (fehlt, leer, zu kurz, falsche Zeichen oder noch `REPLACE_ME`) verweigert die API alles mit `500` und das Log nennt den Grund: das Board schaltet nie ungeschützt. Ein bewusst öffentliches Board gibt es nur per Opt-in `KIDBOARD_PUBLIC="1"` ohne Token (jeder mit dem Link sieht den Familienkalender, der Editor bleibt aus). `/api/health` bleibt öffentlich und liefert nur `{ "ok": true }`.
 Optional: `KIDBOARD_PARENT_PIN` (6-12 Ziffern, schaltet den Eltern-Editor ein; braucht zusätzlich das Zugriffstoken. Abgelehnt werden (Editor bleibt aus, das Log nennt den Grund) zu kurze/lange oder nicht-numerische Werte, eine einzige wiederholte Ziffer (`111111`) und Zahlenreihen (`123456`, `654321`); bitte keine Geburtstage oder Datumsangaben. Nach 5 falschen PINs in 15 Minuten sperrt der Editor 15 Minuten; jede weitere Sperre verdoppelt die Zeit (höchstens 2 Stunden), eine richtige PIN setzt zurück), `KIDBOARD_FEED_TOKEN` (32-256 Zeichen `A-Z a-z 0-9 _ -`, schaltet den Handy-Feed der Editor-Einträge ein; der Eltern-Bereich zeigt dann den Abo-Link; ein neuer Wert beendet alle Abos), `KIDBOARD_ALLOWED_ORIGINS` (nur für API-Zugriffe von anderen Origins; das Board selbst ist same-origin), `KIDBOARD_CACHE_TTL` (Sekunden, 60-86400, Standard 3600; andere Werte fallen mit einer Log-Warnung auf 3600 zurück; mit
 KV-Cache mindestens `Kalender × 86400 / 500`; bei eingeschaltetem Eltern-Editor zählen
-seine zwei App-Quellen mit). Die Kalender-IDs `app-events` und `app-meals` sind für die in
+seine zwei App-Quellen mit; solange Wetter konfiguriert oder der Eltern-Editor an ist, sind
+zuerst 49 Schreibvorgänge pro Tag für die Vorhersage reserviert, also `Kalender × 86400 /
+451`). Die Kalender-IDs `app-events` und `app-meals` sind für die in
 der App angelegten Einträge reserviert. Die Adresse `CAL_<ID>_URL` muss mit `https://` (oder
 `webcal://`) beginnen; `http://` und andere Schemata werden abgelehnt. Besser eigene
 Zweitkalender ("Kinder", "Essen") als den Hauptkalender verwenden: dessen Feed listet auch
@@ -72,11 +74,29 @@ der Beschreibung (nicht im Titel) stehen; Feed- und Cache-Verzögerung bis zu
 
 ## Wetter
 
-Optional (ADR-0015): ohne `weather`-Block kein Wetter. Mit ihm zeigt jeder Tag der Übersicht
-ein Wetter-Icon mit Temperatur (heute: jetzt, sonst: Höchstwert), die Wochenansicht Icon und
-Höchstwert im Kopf jedes Tages der 7-Tage-Vorhersage und die heutige Karte eine Reihe
-Kleidungsbilder: für heute bis `bands.eveningStart`, ab dann bis Mitternacht für morgen.
-Beispiel: `"weather": { "place": "Hamburg", "country": "DE" }`. `place` (1-80 Zeichen) wird
+Optional (ADR-0015). Mit Wetter zeigt jeder Tag der Übersicht ein Wetter-Icon mit Temperatur
+(heute: jetzt, sonst: Höchstwert), die Wochenansicht Icon und Höchstwert im Kopf jedes Tages
+der 7-Tage-Vorhersage und die heutige Karte eine Reihe Kleidungsbilder: für heute bis
+`bands.eveningStart`, ab dann bis Mitternacht für morgen.
+
+**Im Eltern-Editor (ADR-0016)** – der einfache Weg, ohne JSON: Editor öffnen, Abschnitt
+"Wetter", einschalten, Ort eingeben (optional das Land mit zwei Buchstaben, z. B. `DE`), °C
+oder °F wählen und speichern. Der Editor sagt sofort, ob der Ort gefunden wurde oder der
+Wetterdienst gerade nicht erreichbar ist; mit dem Schalter geht das Wetter wieder aus. Das
+Board auf demselben Tablet zeigt die Änderung sofort, andere Geräte beim nächsten Laden der
+Konfiguration (`refreshMinutes`).
+
+- **Vorrang:** eine im Editor gespeicherte Einstellung gilt vor dem `weather`-Block von
+  `KIDBOARD_CONFIG`; "aus" im Editor schaltet das Wetter auch dann aus, wenn die
+  Konfiguration einen Block hat. "Einstellung aus der Konfiguration verwenden" entfernt die
+  Editor-Einstellung, dann gilt wieder der Block der Konfiguration (oder kein Wetter). Ohne
+  Editor (kein D1, keine PIN) oder solange seine Datenbank nicht erreichbar ist, gilt der
+  Block der Konfiguration.
+- Die Editor-Einstellung ist eine Zeile in der D1-Datenbank des Editors und nicht Teil der
+  Sicherung der Einträge: der Export enthält sie nicht, ein Import (auch "alle ersetzen")
+  lässt sie stehen.
+
+**In der Konfiguration** – der Standard, solange der Editor keine Einstellung hat. Beispiel: `"weather": { "place": "Hamburg", "country": "DE" }`. `place` (1-80 Zeichen) wird
 einmal über die Geocoding-API von Open-Meteo gesucht (erster Treffer, `country` als
 ISO-3166-1-Alpha-2-Code grenzt ein; kein Treffer: kein Wetter, das Board läuft weiter);
 alternativ `latitude` und `longitude` (nie beides). `unit`: `celsius` (Standard) oder
@@ -84,7 +104,9 @@ alternativ `latitude` und `longitude` (nie beides). `unit`: `celsius` (Standard)
 
 - **Datenschutz:** Ort und Koordinaten bleiben auf dem Server; das Tablet erfährt nur, dass
   Wetter an ist. Der Server schickt sie nur an Open-Meteo und speichert die Vorhersage 30
-  Minuten (die letzte gute bis 24 Stunden).
+  Minuten (die letzte gute bis 24 Stunden). Ein im Editor eingestellter Ort ist nur im
+  entsperrten Editor wieder zu sehen; das Board bekommt ihn nie, und Koordinaten aus der
+  Konfiguration werden nie angezeigt, nur dass sie gesetzt sind.
 - **Bedingungen:** Open-Meteo ist für nicht kommerzielle Nutzung kostenlos, ohne Konto und
   API-Schlüssel; die Daten stehen unter CC BY 4.0, daher zeigt die Leiste "Wetter:
   Open-Meteo.com", solange Wetter an ist. Kommerzielle Nutzung braucht einen Open-Meteo-Tarif.

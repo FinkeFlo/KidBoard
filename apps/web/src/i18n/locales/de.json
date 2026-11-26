@@ -413,6 +413,48 @@
       "copied": "Link kopiert",
       "select": "Der Link ist markiert – jetzt kopieren"
     },
+    "weather": {
+      "title": "Wetter",
+      "hint": "Das Board zeigt für diesen Ort das Wetter und was man anziehen sollte. Der Ort bleibt auf deinem Server; nur der Wetterdienst erfährt ihn.",
+      "loading": "Wettereinstellung wird geladen …",
+      "switch": "Wetter auf dem Board zeigen",
+      "on": "An",
+      "off": "Aus",
+      "place": "Ort",
+      "country": "Land (optional)",
+      "countryHint": "Zwei Buchstaben, z. B. DE, AT oder US. Hilft, wenn mehrere Orte gleich heißen.",
+      "coordinates": "Die Konfiguration legt den Ort über Koordinaten fest. Gib einen Ort ein, um stattdessen ihn zu verwenden; auch eine andere Einheit braucht hier einen Ort.",
+      "unit": "Temperatur",
+      "celsius": "°C Celsius",
+      "fahrenheit": "°F Fahrenheit",
+      "save": "Wetter speichern",
+      "saving": "Wird gespeichert …",
+      "reset": "Einstellung aus der Konfiguration verwenden",
+      "status": {
+        "ok": "Gefunden. Das Board zeigt das Wetter.",
+        "off": "Wetter ist aus. Das Board zeigt kein Wetter.",
+        "place_unknown": "Ort nicht gefunden. Prüfe die Schreibweise oder gib das Land an. Bis dahin zeigt das Board kein Wetter.",
+        "unavailable": "Der Wetterdienst ist gerade nicht erreichbar. Das Board zeigt das Wetter, sobald er wieder da ist."
+      },
+      "source": {
+        "editor": "Hier im Editor eingestellt.",
+        "config": "Aus der Konfiguration.",
+        "none": "Noch nicht eingerichtet."
+      },
+      "fieldError": {
+        "place": "Bitte einen Ort eingeben.",
+        "country": "Zwei Buchstaben, z. B. DE, oder leer lassen."
+      },
+      "error": {
+        "offline": "Keine Verbindung. Es wurde nichts geändert – versuch es wieder, wenn das Netz da ist.",
+        "timeout": "Das hat zu lange gedauert. Bitte noch einmal versuchen.",
+        "unauthorized": "Dieses Tablet braucht einen neuen Zugangslink.",
+        "locked": "Zur Sicherheit hat sich der Editor gesperrt. Gib die PIN noch einmal ein.",
+        "storage": "Die Einstellung kann gerade nicht gespeichert werden. Versuch es gleich noch einmal.",
+        "invalid": "Bitte Ort und Land prüfen.",
+        "failed": "Etwas ist schiefgelaufen. Bitte noch einmal versuchen."
+      }
+    },
     "data": {
       "title": "Sicherung & Handy",
       "export": "Sicherung herunterladen",
@@ -446,6 +488,7 @@
       "top": "Nach oben",
       "label": "Springen zu",
       "list": "Termine",
+      "weather": "Wetter",
       "data": "Sicherung & Handy"
     }
   },

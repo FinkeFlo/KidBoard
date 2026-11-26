@@ -286,7 +286,12 @@ export function createBoard(options: BoardOptions): Board {
           cacheTtlSeconds(c.env.KIDBOARD_CACHE_TTL),
           config.calendars.length + (db === undefined ? 0 : APP_SOURCES.length),
           backend.kind === "kv",
-          config.weather === undefined ? 0 : WEATHER_KV_WRITES_PER_DAY,
+          // ADR-0015/0016: the forecast's KV writes are reserved while weather can be on:
+          // a config block, or the editor (it can turn weather on at any time). Decided
+          // without reading D1 here, so the agenda path stays deterministic.
+          config.weather === undefined && db === undefined
+            ? 0
+            : WEATHER_KV_WRITES_PER_DAY,
         ),
         db,
       };

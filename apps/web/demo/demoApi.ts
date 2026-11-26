@@ -126,6 +126,8 @@ export function createDemoApi(now: () => number = Date.now): DemoApi {
     now,
     google,
     feedUrl: DEMO_FEED_URL,
+    // The demo board's weather comes from its "configuration" (no town named).
+    configWeather: { unit: "celsius", coordinates: true },
     isSession: (token) => {
       const until = token === null ? undefined : sessions.get(token);
       return until !== undefined && until > now();
@@ -153,13 +155,24 @@ export function createDemoApi(now: () => number = Date.now): DemoApi {
     editor,
     handle(request) {
       const { method, path } = request;
+      // The editor's weather setting (T-56) turns the demo weather on or off.
+      const weatherOn = editor.weatherOn(demoEditorConfig().weather);
       if (path === "/api/config") {
-        return { status: 200, json: demoEditorConfig() };
+        return {
+          status: 200,
+          json: { ...demoEditorConfig(), weather: weatherOn },
+        };
       }
       if (path === "/api/agenda") {
         return { status: 200, json: agenda(request.search) };
       }
       if (path === "/api/weather" && method === "GET") {
+        if (!weatherOn) {
+          return {
+            status: 404,
+            json: { error: "weather_off", message: "" },
+          };
+        }
         return {
           status: 200,
           json: demoWeather(demoToday(now()), new Date(now()).toISOString()),
