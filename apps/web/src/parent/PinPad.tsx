@@ -175,6 +175,8 @@ export function PinPad(): React.JSX.Element {
         setErrorCount((count) => count + 1);
         return;
       case "error":
+        // Never keep a typed PIN around: a child could submit it later.
+        setDigits("");
         setFeedback({ kind: "error", error: outcome.error });
         return;
     }
