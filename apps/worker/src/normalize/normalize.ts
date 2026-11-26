@@ -269,13 +269,19 @@ export function normalize(
     return bring;
   };
 
-  for (const o of occurrences) {
-    const description = capUtf16(o.description, MAX_DESCRIPTION_UNITS);
-    const parsed = parseTitle(capUtf16(o.summary, MAX_SUMMARY_UNITS), {
+  for (const raw of occurrences) {
+    // Capped once; everything below (parsing, bring scan, ids of UID-less events) sees
+    // only the capped text.
+    const o: Occurrence = {
+      ...raw,
+      summary: capUtf16(raw.summary, MAX_SUMMARY_UNITS),
+      description: capUtf16(raw.description, MAX_DESCRIPTION_UNITS),
+    };
+    const parsed = parseTitle(o.summary, {
       kind: source.kind,
       children: config.children,
       countdownEmojis: config.countdown.emojis,
-      description,
+      description: o.description,
     });
     if (parsed.isEmpty) {
       continue;
@@ -283,7 +289,7 @@ export function normalize(
     if (source.kind === "meals") {
       meals.push(...mealsFor(o, parsed, source, config, options));
     } else {
-      const bring = bringOf(description);
+      const bring = bringOf(o.description);
       events.push({
         id: stableId(...occurrenceKey(source, o)),
         sourceId: source.id,

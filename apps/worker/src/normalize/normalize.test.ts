@@ -730,4 +730,17 @@ describe("normalize input caps", () => {
     ).events[0];
     expect(early?.countdown).toBe(true);
   });
+
+  it("gives a UID-less event with a huge summary a stable id from the capped text", () => {
+    const head = `⚽ ${"x".repeat(MAX_SUMMARY_UNITS)}`;
+    const id = (summary: string): string | undefined =>
+      normalize([occ({ summary, uid: "" })], family, config).events[0]?.id;
+    const first = id(`${head}${"y".repeat(100_000)}`);
+    expect(first).toMatch(/^[0-9a-f]{16}$/);
+    expect(id(`${head}${"y".repeat(100_000)}`)).toBe(first);
+    // Only the first MAX_SUMMARY_UNITS units take part.
+    expect(id(`${head}${"z".repeat(50)}`)).toBe(first);
+    // Short summaries still tell UID-less events apart.
+    expect(id("⚽ Spiel A")).not.toBe(id("⚽ Spiel B"));
+  });
 });
