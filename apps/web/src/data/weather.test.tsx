@@ -3,7 +3,7 @@ import type { PersistedClient } from "@tanstack/react-query-persist-client";
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, createApiClient } from "./apiClient";
+import { ApiError } from "./apiClient";
 import { useApiErrorKind, useConnectionStatus } from "./connectionStatus";
 import {
   deserializePersistedClient,
@@ -12,14 +12,13 @@ import {
   serializePersistedClient,
 } from "./persister";
 import { useAgenda, useWeather, WEATHER_REFRESH_MS } from "./queries";
-import { createQueryClient } from "./queryClient";
 import { queryKeys, queryKindOf } from "./queryKeys";
 import {
   agendaFixture,
   configFixture,
   createFakeFetch,
   createMemoryStorage,
-  dataWrapper,
+  fakeBoardWrapper,
   type FakeFetch,
   TEST_TOKEN,
   TODAY,
@@ -54,15 +53,9 @@ function useBoard(enabled: boolean): {
 function renderBoard(
   enabled: boolean,
 ): ReturnType<typeof renderHook<ReturnType<typeof useBoard>, boolean>> {
-  const client = createQueryClient({ retry: false, onUnauthorized });
-  clients.push(client);
   return renderHook(useBoard, {
     initialProps: enabled,
-    wrapper: dataWrapper(
-      createApiClient({ fetch: fake.fetch, token: TEST_TOKEN }),
-      client,
-      storage,
-    ),
+    wrapper: fakeBoardWrapper({ fake, storage, clients, onUnauthorized }),
   });
 }
 

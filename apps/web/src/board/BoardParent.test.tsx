@@ -3,16 +3,13 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MIA } from "../components/fixtures.test-utils";
-import { createApiClient } from "../data/apiClient";
-import { createQueryClient } from "../data/queryClient";
 import {
   agendaFixture,
   configFixture,
   createFakeFetch,
   createMemoryStorage,
-  dataWrapper,
+  fakeBoardWrapper,
   type FakeFetch,
-  TEST_TOKEN,
 } from "../data/testing.test-utils";
 import en from "../i18n/locales/en.json";
 import { ParentGateProvider, ParentLayer } from "../parent";
@@ -24,13 +21,11 @@ let fake: FakeFetch;
 let clients: QueryClient[] = [];
 
 function renderBoard(): void {
-  const client = createQueryClient({ retry: false });
-  clients.push(client);
-  const Wrapper = dataWrapper(
-    createApiClient({ fetch: fake.fetch, token: TEST_TOKEN }),
-    client,
-    createMemoryStorage(),
-  );
+  const Wrapper = fakeBoardWrapper({
+    fake,
+    storage: createMemoryStorage(),
+    clients,
+  });
   render(
     <Wrapper>
       <ParentGateProvider>
