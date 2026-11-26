@@ -1,15 +1,12 @@
-import { type RefObject, useLayoutEffect, useState } from "react";
+import type { RefObject } from "react";
+
+import { rootRem, useContentBox } from "./useContentBox";
 
 export interface ContentSize {
   /** Content-box height of the element in px. */
   height: number;
   /** Root font size in px (1rem), read at the same time: the board's rem scale. */
   rem: number;
-}
-
-function rootRem(): number {
-  const size = parseFloat(getComputedStyle(document.documentElement).fontSize);
-  return Number.isFinite(size) && size > 0 ? size : 16;
 }
 
 /** Content-box height right now: `clientHeight` minus the vertical padding. */
@@ -19,6 +16,18 @@ export function measureContentHeight(element: HTMLElement): number {
     (parseFloat(style.paddingTop) || 0) +
     (parseFloat(style.paddingBottom) || 0);
   return Math.max(0, element.clientHeight - padding);
+}
+
+function measureSize(element: HTMLElement): ContentSize {
+  return { height: measureContentHeight(element), rem: rootRem() };
+}
+
+function sizeFromEntry(entry: ResizeObserverEntry): ContentSize {
+  return { height: entry.contentRect.height, rem: rootRem() };
+}
+
+function sameSize(previous: ContentSize, next: ContentSize): boolean {
+  return previous.height === next.height && previous.rem === next.rem;
 }
 
 /**
@@ -32,32 +41,5 @@ export function measureContentHeight(element: HTMLElement): number {
 export function useContentHeight(
   ref: RefObject<HTMLElement | null>,
 ): ContentSize | null {
-  const [size, setSize] = useState<ContentSize | null>(null);
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (element === null || typeof ResizeObserver === "undefined") {
-      return undefined;
-    }
-    const update = (height: number): void => {
-      const next = { height, rem: rootRem() };
-      setSize((previous) =>
-        previous?.height === next.height && previous.rem === next.rem
-          ? previous
-          : next,
-      );
-    };
-    // Synchronous first measurement: a state update in a layout effect re-renders before
-    // the paint, so the observer's first (asynchronous) callback is not awaited.
-    update(measureContentHeight(element));
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[entries.length - 1];
-      if (entry === undefined) return;
-      update(entry.contentRect.height);
-    });
-    observer.observe(element);
-    return () => {
-      observer.disconnect();
-    };
-  }, [ref]);
-  return size;
+  return useContentBox(ref, measureSize, sizeFromEntry, sameSize);
 }
