@@ -12,6 +12,7 @@ import {
   ENTRY_EXPORT_FORMAT,
   type EntryExport,
   EntryStore,
+  IMPORT_REVISION_CLAMP,
   MAX_ENTRY_BYTES,
   MAX_ENTRY_EXCEPTIONS,
   MAX_IMPORT_REVISION,
@@ -793,7 +794,7 @@ describe("export / import", () => {
       [swim.id, 1],
     ]);
 
-    // At the cap the import still works and stays editable.
+    // At the cap the import still works; the revision it gets is clamped.
     ok(
       await s.importAll(
         { ...doc, entries: [{ ...valid, revision: MAX_IMPORT_REVISION }] },
@@ -801,10 +802,23 @@ describe("export / import", () => {
       ),
     );
     const [imported] = await s.list();
-    expect(imported?.revision).toBe(MAX_IMPORT_REVISION + 1);
-    expect(
-      ok(await s.update(swim.id, MAX_IMPORT_REVISION + 1, SWIMMING)).revision,
-    ).toBe(MAX_IMPORT_REVISION + 2);
+    expect(imported?.revision).toBe(IMPORT_REVISION_CLAMP + 1);
+    // Edit, export, re-import (both modes): this store's own export always imports.
+    const edited = ok(
+      await s.update(swim.id, IMPORT_REVISION_CLAMP + 1, SWIMMING),
+    );
+    expect(edited.revision).toBe(IMPORT_REVISION_CLAMP + 2);
+    const again = await s.exportAll();
+    ok(await s.importAll(again, "replace"));
+    ok(await s.importAll(again, "merge"));
+    const [final] = await s.list();
+    expect(final?.revision).toBeGreaterThan(edited.revision);
+    expect(final?.revision).toBeLessThan(MAX_IMPORT_REVISION);
+    // A client still holding the pre-import revision gets a conflict.
+    expect(await s.update(swim.id, edited.revision, SWIMMING)).toMatchObject({
+      ok: false,
+      error: "conflict",
+    });
   });
 
   it("restores entries the config can no longer express (shape-checked only)", async () => {

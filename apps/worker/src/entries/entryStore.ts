@@ -60,11 +60,18 @@ export type StoreFailure =
 export type StoreResult<T> = { ok: true; value: T } | StoreFailure;
 
 /**
- * Highest revision an import accepts. Revisions grow by one per write, so real data
- * stays far below; the cap keeps a crafted file from pushing revisions near 2^53, where
- * `revision + 1` is no longer exact in JavaScript and optimistic concurrency breaks.
+ * Highest revision an import accepts (2^40, exactly representable). Larger values are
+ * refused, so a crafted file cannot push revisions near 2^53, where `revision + 1` is no
+ * longer exact in JavaScript and optimistic concurrency breaks.
  */
-export const MAX_IMPORT_REVISION = 1_000_000_000;
+export const MAX_IMPORT_REVISION = 2 ** 40;
+
+/**
+ * An imported revision takes part in the new revision only up to this value (2^30).
+ * From there, revisions grow by one per write or import, so stored revisions stay far
+ * below {@link MAX_IMPORT_REVISION} and every export of this store imports again.
+ */
+export const IMPORT_REVISION_CLAMP = 2 ** 30;
 
 /**
  * Most exceptions (and, separately, overrides) an imported entry may list: each takes
@@ -590,7 +597,7 @@ export class EntryStore {
         statements.push(
           upsert.bind(
             row.id,
-            row.revision,
+            Math.min(row.revision, IMPORT_REVISION_CLAMP),
             row.parts.data.kind,
             row.serialized.data,
             row.serialized.exdates,
