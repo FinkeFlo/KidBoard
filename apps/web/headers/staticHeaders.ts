@@ -25,9 +25,12 @@ export interface HeaderRule {
 
 export const HEADERS_FILE_NAME = "_headers";
 
-// The end tag may carry whitespace and junk before `>` (`</script\t\n bar>`): the HTML
-// parser still ends the script there, so the hash must stop there too.
-const SCRIPT_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi;
+// Matches end tags the way the HTML parser does: `</script` followed by HTML whitespace,
+// `/` or `>` ends the script, junk up to `>` included (`</script\t\n bar>`), while
+// `</script-x>` or `</scripty>` does not. Runs only at build time over the project's own
+// built index.html, so the worst case on pathological input does not matter.
+const SCRIPT_RE =
+  /<script\b([^>]*)>([\s\S]*?)<\/script(?=[\t\n\f\r />])[^>]*>/gi;
 const SRC_ATTR_RE = /(?:^|\s)src\s*=/i;
 
 /**
