@@ -21,6 +21,16 @@ updates:
       # Node 22 LTS is the runtime (.nvmrc); keep @types/node on 22.x.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # TypeScript 7 and ESLint 10 are not yet allowed by the peer ranges of
+      # typescript-eslint and the ESLint plugins, so these majors end in
+      # `update_not_possible` and fail the whole npm run. Drop these three entries
+      # once typescript-eslint (and the plugins) declare support for the new majors.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
     groups:
       react:
         update-types: [minor, patch]
